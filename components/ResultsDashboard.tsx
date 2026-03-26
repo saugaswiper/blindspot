@@ -77,6 +77,37 @@ export function ResultsDashboard({
   const [localFeasibilityScore] = useState(feasibilityScore);
   const [localFeasibilityExplanation] = useState(feasibilityExplanation);
 
+  // Email report state
+  const [emailInput, setEmailInput] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+
+  async function sendReport() {
+    setEmailError(null);
+    setEmailSending(true);
+    try {
+      const res = await fetch("/api/email-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resultId, email: emailInput }),
+      });
+      const data = (await res.json()) as { error?: string; success?: boolean };
+      if (!res.ok || data.error) {
+        setEmailError(data.error ?? "Failed to send email. Please try again.");
+      } else {
+        setEmailSent(true);
+        setShowEmailForm(false);
+        setEmailInput("");
+      }
+    } catch {
+      setEmailError("Network error. Please check your connection and try again.");
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
   async function runAnalysis() {
     setAnalysisError(null);
     startTransition(async () => {
@@ -184,14 +215,59 @@ export function ResultsDashboard({
             </div>
           )}
           {hasAnalysis && (
-            <button
-              onClick={() => window.print()}
-              className="px-4 py-2 border border-[#1e3a5f] text-[#1e3a5f] text-sm font-medium rounded-md hover:bg-[#1e3a5f] hover:text-white transition-colors"
-            >
-              Download PDF
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                className="px-4 py-2 border border-[#1e3a5f] text-[#1e3a5f] text-sm font-medium rounded-md hover:bg-[#1e3a5f] hover:text-white transition-colors"
+              >
+                Download PDF
+              </button>
+              {!emailSent ? (
+                <button
+                  onClick={() => { setShowEmailForm((v) => !v); setEmailError(null); }}
+                  className="px-4 py-2 border border-gray-300 text-gray-600 text-sm font-medium rounded-md hover:border-[#4a90d9] hover:text-[#4a90d9] transition-colors"
+                >
+                  Email report
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-sm text-green-700 font-medium">
+                  <span className="text-xs">✓</span> Report sent!
+                </span>
+              )}
+            </div>
           )}
         </div>
+
+        {/* Email report inline form */}
+        {hasAnalysis && showEmailForm && !emailSent && (
+          <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
+            <p className="text-xs text-gray-500 mb-2">
+              We&apos;ll send a formatted report with your gap analysis and study design recommendation.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && emailInput) sendReport(); }}
+                placeholder="you@institution.edu"
+                className="flex-1 min-w-0 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent text-gray-800 placeholder-gray-400"
+                disabled={emailSending}
+              />
+              <button
+                onClick={sendReport}
+                disabled={emailSending || !emailInput.trim()}
+                className="px-3 py-1.5 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {emailSending ? "Sending…" : "Send"}
+              </button>
+            </div>
+            {emailError && (
+              <p className="mt-2 text-xs text-red-600">{emailError}</p>
+            )}
+          </div>
+        )}
+
         {analysisError && (
           <p className="mt-2 text-sm text-red-600">{analysisError}</p>
         )}
