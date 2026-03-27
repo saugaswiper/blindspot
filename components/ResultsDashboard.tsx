@@ -615,7 +615,20 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 sm:p-5 space-y-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Recommended study design</p>
-          <p className="text-lg font-bold text-gray-800">{studyDesign.primary}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-lg font-bold text-gray-800">{studyDesign.primary}</p>
+            {studyDesign.confidence && (
+              <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${
+                studyDesign.confidence === "high"
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : studyDesign.confidence === "moderate"
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-gray-50 text-gray-500 border-gray-200"
+              }`}>
+                {studyDesign.confidence} confidence
+              </span>
+            )}
+          </div>
           <p className="mt-2 text-sm text-gray-600 leading-relaxed">{studyDesign.rationale}</p>
         </div>
 
