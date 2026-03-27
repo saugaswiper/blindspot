@@ -3,6 +3,7 @@ import * as PubMed from "@/lib/pubmed";
 import * as OpenAlex from "@/lib/openalex";
 import * as EuropePMC from "@/lib/europepmc";
 import * as ClinicalTrials from "@/lib/clinicaltrials";
+import * as SemanticScholar from "@/lib/semanticscholar";
 import { getCachedResult, saveSearchResult } from "@/lib/cache";
 import { validateSearchInput } from "@/lib/validators";
 import { toApiError } from "@/lib/errors";
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
     let pubmedReviews: ExistingReview[] = [];
     let openalexReviews: ExistingReview[] = [];
     let europepmcReviews: ExistingReview[] = [];
+    let semanticScholarReviews: ExistingReview[] = [];
     let primaryStudyCount = 0;
     let pubmedFailed = false;
     let openalexFailed = false;
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
       pubmedResult,
       openalexResult,
       europepmcResult,
+      semanticScholarResult,
       pubmedCount,
       openalexCount,
       europepmcCount,
@@ -94,6 +97,7 @@ export async function POST(request: Request) {
       PubMed.searchExistingReviews(query),
       OpenAlex.searchExistingReviews(query),
       EuropePMC.searchExistingReviews(query),
+      SemanticScholar.searchExistingReviews(query),
       PubMed.countPrimaryStudies(query),
       OpenAlex.countPrimaryStudies(query),
       EuropePMC.countPrimaryStudies(query),
@@ -121,6 +125,13 @@ export async function POST(request: Request) {
       console.error("Europe PMC failed:", europepmcResult.reason);
     }
 
+    // Semantic Scholar is optional — never fail the request if it's down
+    if (semanticScholarResult.status === "fulfilled") {
+      semanticScholarReviews = semanticScholarResult.value;
+    } else {
+      console.error("Semantic Scholar failed:", semanticScholarResult.reason);
+    }
+
     if (pubmedFailed && openalexFailed && europepmcFailed) {
       return Response.json(
         { error: "Academic databases are temporarily unavailable. Please try again in a few minutes." },
@@ -128,13 +139,50 @@ export async function POST(request: Request) {
       );
     }
 
-    // Use the highest count across all sources as the primary study estimate
-    const counts = [pubmedCount, openalexCount, europepmcCount, clinicalTrialsCount].map(
-      (r) => (r.status === "fulfilled" ? r.value : 0)
-    );
-    primaryStudyCount = Math.max(...counts);
+    // Smarter primary study count estimation:
+    // PubMed and Europe PMC are precise clinical databases; OpenAlex is broader but
+    // can significantly over-count for general topics. If OpenAlex count exceeds the
+    // max of the two clinical sources by more than 5×, blend rather than taking the
+    // raw maximum to avoid inflating feasibility scores.
+    const pubmedCountVal = pubmedCount.status === "fulfilled" ? pubmedCount.value : null;
+    const openalexCountVal = openalexCount.status === "fulfilled" ? openalexCount.value : null;
+    const europepmcCountVal = europepmcCount.status === "fulfilled" ? europepmcCount.value : null;
+    const clinicalTrialsCountVal =
+      clinicalTrialsCount.status === "fulfilled" ? clinicalTrialsCount.value : null;
 
-    const existingReviews = dedupeReviews(pubmedReviews, openalexReviews, europepmcReviews);
+    const clinicalCounts = [pubmedCountVal, europepmcCountVal].filter(
+      (c): c is number => c !== null
+    );
+    const allCounts = [pubmedCountVal, openalexCountVal, europepmcCountVal].filter(
+      (c): c is number => c !== null
+    );
+
+    if (allCounts.length === 0) {
+      primaryStudyCount = clinicalTrialsCountVal ?? 0;
+    } else {
+      const maxClinical = clinicalCounts.length > 0 ? Math.max(...clinicalCounts) : 0;
+      const maxAll = Math.max(...allCounts);
+
+      // If OpenAlex is the sole outlier (>5× clinical sources), use a weighted blend
+      if (
+        openalexCountVal !== null &&
+        clinicalCounts.length > 0 &&
+        openalexCountVal > maxClinical * 5
+      ) {
+        const clinicalAvg =
+          clinicalCounts.reduce((a, b) => a + b, 0) / clinicalCounts.length;
+        primaryStudyCount = Math.round(clinicalAvg * 0.6 + openalexCountVal * 0.4);
+      } else {
+        primaryStudyCount = Math.max(maxAll, clinicalTrialsCountVal ?? 0);
+      }
+    }
+
+    const existingReviews = dedupeReviews(
+      pubmedReviews,
+      openalexReviews,
+      europepmcReviews,
+      semanticScholarReviews
+    );
 
     // Build warnings for failed sources
     const failedSources = [
