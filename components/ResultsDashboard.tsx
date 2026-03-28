@@ -9,6 +9,7 @@ import type {
   GapDimension,
 } from "@/types";
 import { PrintableReport } from "@/components/PrintableReport";
+import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
   High: "bg-green-100 text-green-800 border-green-200",
@@ -399,6 +400,20 @@ function SourceBadge({ source }: { source?: string }) {
 /* -------------------------------------------------------------------------- */
 
 function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
+  const [exportOpen, setExportOpen] = useState(false);
+
+  function handleExportRis() {
+    const content = toRis(reviews);
+    downloadTextFile(content, "blindspot-reviews.ris", "application/x-research-info-systems");
+    setExportOpen(false);
+  }
+
+  function handleExportBibtex() {
+    const content = toBibtex(reviews);
+    downloadTextFile(content, "blindspot-reviews.bib", "application/x-bibtex");
+    setExportOpen(false);
+  }
+
   if (reviews.length === 0) {
     return (
       <div className="text-center py-10">
@@ -415,6 +430,41 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
     );
   }
   return (
+    <div>
+      {/* Export toolbar */}
+      <div className="flex items-center justify-end mb-3 relative">
+        <div className="relative">
+          <button
+            onClick={() => setExportOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-600 rounded-md hover:border-[#4a90d9] hover:text-[#4a90d9] transition-colors"
+            aria-label="Export references"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Export references
+          </button>
+          {exportOpen && (
+            <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1">
+              <button
+                onClick={handleExportRis}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                RIS (.ris)
+                <span className="block text-[10px] text-gray-400">Zotero, Mendeley, EndNote</span>
+              </button>
+              <button
+                onClick={handleExportBibtex}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                BibTeX (.bib)
+                <span className="block text-[10px] text-gray-400">LaTeX, Overleaf, JabRef</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
     <div className="divide-y divide-gray-100">
       {reviews.map((review, i) => (
         <div
@@ -460,6 +510,7 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
           )}
         </div>
       ))}
+    </div>
     </div>
   );
 }
