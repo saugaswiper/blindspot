@@ -75,8 +75,9 @@ export async function saveSearchResult(
     throw new Error(`Failed to save search: ${searchError?.message}`);
   }
 
-  // Create the result row
-  const { data: result, error: resultError } = await supabase
+  // Try inserting with clinical_trials_count; fall back without it if migration 004
+  // hasn't been applied yet (column won't exist — Postgres returns a 42703 error).
+  let { data: result, error: resultError } = await supabase
     .from("search_results")
     .insert({
       search_id: search.id,
@@ -86,6 +87,21 @@ export async function saveSearchResult(
     })
     .select("id")
     .single();
+
+  if (resultError?.code === "42703") {
+    // Column does not exist — insert without it
+    const fallback = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+      })
+      .select("id")
+      .single();
+    result = fallback.data;
+    resultError = fallback.error;
+  }
 
   if (resultError || !result) {
     throw new Error(`Failed to save search result: ${resultError?.message}`);
