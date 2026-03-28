@@ -72,6 +72,7 @@ export async function saveSearchResult(
     .single();
 
   if (searchError || !search) {
+    console.error("[cache] searches INSERT failed:", searchError?.code, searchError?.message, searchError?.details, searchError?.hint);
     throw new Error(`Failed to save search: ${searchError?.message}`);
   }
 
@@ -104,6 +105,7 @@ export async function saveSearchResult(
   }
 
   if (resultError || !result) {
+    console.error("[cache] search_results INSERT failed:", resultError?.code, resultError?.message, resultError?.details, resultError?.hint);
     throw new Error(`Failed to save search result: ${resultError?.message}`);
   }
 
