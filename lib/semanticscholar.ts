@@ -30,6 +30,9 @@ export async function searchExistingReviews(query: string): Promise<ExistingRevi
   url.searchParams.set("query", `${query} systematic review`);
   url.searchParams.set("fields", "title,year,venue,abstract,externalIds");
   url.searchParams.set("limit", "25");
+  // Filter to Review publication type to reduce primary-study contamination;
+  // combined with the keyword bias above this strongly favours review articles.
+  url.searchParams.set("publicationTypes", "Review");
 
   const res = await fetch(url.toString(), {
     headers: { Accept: "application/json" },

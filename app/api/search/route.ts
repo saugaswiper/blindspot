@@ -18,6 +18,20 @@ function buildQueryString(body: { queryText?: string; pico?: { population: strin
   return "";
 }
 
+/**
+ * Normalize a DOI to a bare identifier (strip URL prefix if present).
+ * OpenAlex returns DOIs as "https://doi.org/10.xxx/..." while Europe PMC
+ * and Semantic Scholar return bare DOIs ("10.xxx/..."). Normalising before
+ * comparison prevents the same paper from appearing twice in results.
+ */
+function normalizeDoi(doi: string | undefined): string | undefined {
+  if (!doi) return undefined;
+  return doi
+    .toLowerCase()
+    .trim()
+    .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
+}
+
 function dedupeReviews(...sources: ExistingReview[][]): ExistingReview[] {
   const seenTitles = new Set<string>();
   const seenDois = new Set<string>();
@@ -27,7 +41,7 @@ function dedupeReviews(...sources: ExistingReview[][]): ExistingReview[] {
   for (const source of sources) {
     for (const review of source) {
       const titleKey = review.title.toLowerCase().trim();
-      const doiKey = review.doi?.toLowerCase().trim();
+      const doiKey = normalizeDoi(review.doi);
       const pmidKey = review.pmid?.trim();
 
       // Skip if we've seen this review by any identifier
