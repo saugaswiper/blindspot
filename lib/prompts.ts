@@ -53,6 +53,7 @@ Respond in this exact JSON format — no markdown, no code fences, just raw JSON
       "feasibility": "high|moderate|low"
     }
   ],
-  "overall_assessment": "2-3 sentence summary of the evidence landscape and the most promising opportunities"
+  "overall_assessment": "2-3 sentence summary of the evidence landscape and the most promising opportunities",
+  "boolean_search_string": "A draft PubMed Boolean search string for systematically searching this topic. Use MeSH terms (with [MeSH Terms] qualifier) combined with free-text synonyms (with [tiab] qualifier) joined by OR within concept blocks, then AND between concept blocks. Include a systematic review filter where appropriate. Example structure: ((\"concept A\"[MeSH Terms] OR \"synonym A1\"[tiab] OR \"synonym A2\"[tiab]) AND (\"concept B\"[MeSH Terms] OR \"synonym B1\"[tiab]) AND (\"systematic review\"[pt] OR \"meta-analysis\"[pt])). Keep to 3-5 concept blocks. Output only the search string, no surrounding explanation."
 }`;
 }

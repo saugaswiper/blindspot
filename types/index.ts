@@ -90,6 +90,12 @@ export interface GapAnalysis {
   gaps: Gap[];
   suggested_topics: SuggestedTopic[];
   overall_assessment: string;
+  /**
+   * AI-generated PubMed Boolean search string for the topic.
+   * Optional: absent on results that predate this field (before v008).
+   * Uses MeSH terms and [tiab] qualifiers in standard PubMed syntax.
+   */
+  boolean_search_string?: string;
 }
 
 export type StudyDesignType =
@@ -116,10 +122,18 @@ export interface SearchResult {
   search_id: string;
   existing_reviews: ExistingReview[];
   primary_study_count: number;
+  /**
+   * Number of studies registered on ClinicalTrials.gov for this query.
+   * Null if the count was not available when the search was run (e.g. the
+   * API was down, or the result predates migration 004).
+   */
+  clinical_trials_count: number | null;
   feasibility_score: FeasibilityScore;
   feasibility_explanation: string;
   gap_analysis: GapAnalysis | null;
   study_design_recommendation: StudyDesignRecommendation | null;
+  /** Whether this result is publicly accessible without authentication. */
+  is_public: boolean;
   created_at: string;
   expires_at: string;
 }

@@ -212,6 +212,7 @@ export async function POST(request: Request) {
     const resultId = await saveSearchResult(user.id, query, {
       existing_reviews: existingReviews,
       primary_study_count: primaryStudyCount,
+      clinical_trials_count: clinicalTrialsCountVal,
     });
 
     return Response.json({

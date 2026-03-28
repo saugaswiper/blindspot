@@ -21,6 +21,8 @@ interface Props {
   query: string;
   existingReviews: ExistingReview[];
   primaryStudyCount: number;
+  /** Null means the ClinicalTrials.gov count was unavailable; omit the stat. */
+  clinicalTrialsCount?: number | null;
   feasibilityScore: FeasibilityScore | null;
   feasibilityExplanation: string | null;
   gapAnalysis: GapAnalysis;
@@ -32,6 +34,7 @@ export function PrintableReport({
   query,
   existingReviews,
   primaryStudyCount,
+  clinicalTrialsCount = null,
   feasibilityScore,
   feasibilityExplanation,
   gapAnalysis,
@@ -63,6 +66,12 @@ export function PrintableReport({
             <span className="stat-label">Existing reviews found</span>
             <span className="stat-value">{existingReviews.length}</span>
           </div>
+          {clinicalTrialsCount !== null && clinicalTrialsCount !== undefined && (
+            <div>
+              <span className="stat-label">Registered trials (ClinicalTrials.gov)</span>
+              <span className="stat-value">{clinicalTrialsCount.toLocaleString("en-US")}</span>
+            </div>
+          )}
           {feasibilityScore && (
             <div>
               <span className="stat-label">Feasibility</span>
@@ -107,6 +116,16 @@ export function PrintableReport({
             <p>{topic.rationale}</p>
           </div>
         ))}
+
+        {gapAnalysis.boolean_search_string && (
+          <>
+            <h3>Draft PubMed Boolean Search String</h3>
+            <p className="report-topic-meta">
+              AI-generated draft — verify MeSH terms and adapt for your target database before use in a formal review protocol.
+            </p>
+            <pre className="report-boolean-string">{gapAnalysis.boolean_search_string.trim()}</pre>
+          </>
+        )}
       </section>
 
       {/* Study Design */}

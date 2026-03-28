@@ -5,6 +5,8 @@ export interface CachedSearchResult {
   id: string;
   existing_reviews: ExistingReview[];
   primary_study_count: number;
+  /** Null when the ClinicalTrials.gov count was unavailable at search time. */
+  clinical_trials_count: number | null;
 }
 
 // Normalize query for cache key comparison
@@ -35,7 +37,7 @@ export async function getCachedResult(
 
   const { data: result } = await supabase
     .from("search_results")
-    .select("id, existing_reviews, primary_study_count, expires_at")
+    .select("id, existing_reviews, primary_study_count, clinical_trials_count, expires_at")
     .eq("search_id", match.id)
     .gt("expires_at", new Date().toISOString())
     .single();
@@ -46,13 +48,19 @@ export async function getCachedResult(
     id: result.id,
     existing_reviews: result.existing_reviews as ExistingReview[],
     primary_study_count: result.primary_study_count,
+    clinical_trials_count: (result.clinical_trials_count as number | null) ?? null,
   };
 }
 
 export async function saveSearchResult(
   userId: string,
   query: string,
-  data: { existing_reviews: ExistingReview[]; primary_study_count: number }
+  data: {
+    existing_reviews: ExistingReview[];
+    primary_study_count: number;
+    /** Pass null when the ClinicalTrials.gov API was unavailable. */
+    clinical_trials_count: number | null;
+  }
 ): Promise<string> {
   const supabase = await createClient();
 
@@ -74,6 +82,7 @@ export async function saveSearchResult(
       search_id: search.id,
       existing_reviews: data.existing_reviews,
       primary_study_count: data.primary_study_count,
+      clinical_trials_count: data.clinical_trials_count,
     })
     .select("id")
     .single();

@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import { PrintableReport } from "@/components/PrintableReport";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
+import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
   High: "bg-green-100 text-green-800 border-green-200",
@@ -54,10 +55,21 @@ interface Props {
   query: string;
   existingReviews: ExistingReview[];
   primaryStudyCount: number;
+  /**
+   * Number of registered trials on ClinicalTrials.gov for this query.
+   * Null means the data was unavailable when the search ran (API down, or
+   * pre-migration result). In that case the metric is hidden rather than
+   * shown as 0.
+   */
+  clinicalTrialsCount?: number | null;
   feasibilityScore: FeasibilityScore | null;
   feasibilityExplanation: string | null;
   gapAnalysis: GapAnalysis | null;
   studyDesign: StudyDesignRecommendation | null;
+  /** True when the logged-in user is the owner of this result. */
+  isOwner?: boolean;
+  /** Current public-sharing state (owner can toggle; public viewers see it as read-only). */
+  isPublic?: boolean;
 }
 
 export function ResultsDashboard({
@@ -65,10 +77,13 @@ export function ResultsDashboard({
   query,
   existingReviews,
   primaryStudyCount,
+  clinicalTrialsCount = null,
   feasibilityScore,
   feasibilityExplanation,
   gapAnalysis,
   studyDesign,
+  isOwner = false,
+  isPublic = false,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("reviews");
   const [isPending, startTransition] = useTransition();
@@ -77,6 +92,44 @@ export function ResultsDashboard({
   const [localStudyDesign] = useState(studyDesign);
   const [localFeasibilityScore] = useState(feasibilityScore);
   const [localFeasibilityExplanation] = useState(feasibilityExplanation);
+
+  // Sharing state
+  const [localIsPublic, setLocalIsPublic] = useState(isPublic);
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+
+  async function handleToggleShare() {
+    if (isSharing) return;
+    setIsSharing(true);
+    setShareToast(null);
+    try {
+      const res = await fetch(`/api/share/${resultId}`, { method: "POST" });
+      const data = (await res.json()) as { is_public?: boolean; error?: string };
+      if (!res.ok || data.error) {
+        setShareToast(data.error ?? "Failed to update sharing. Please try again.");
+        return;
+      }
+      const nowPublic = data.is_public ?? false;
+      setLocalIsPublic(nowPublic);
+      if (nowPublic) {
+        // Copy the page URL to clipboard
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          setShareToast("Link copied to clipboard! Anyone with the link can view this report.");
+        } catch {
+          setShareToast("Sharing enabled. Copy this page URL to share your report.");
+        }
+      } else {
+        setShareToast("Link removed. This report is now private.");
+      }
+    } catch {
+      setShareToast("Something went wrong. Please try again.");
+    } finally {
+      setIsSharing(false);
+      // Auto-dismiss toast after 4 s
+      setTimeout(() => setShareToast(null), 4000);
+    }
+  }
 
   async function runAnalysis() {
     setAnalysisError(null);
@@ -113,10 +166,70 @@ export function ResultsDashboard({
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+
+      {/* Public viewer CTA banner — shown to non-owners viewing a shared result */}
+      {!isOwner && localIsPublic && (
+        <div className="mb-5 bg-[#1e3a5f] text-white rounded-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">You&apos;re viewing a shared Blindspot report.</p>
+            <p className="text-xs text-white/70 mt-0.5">
+              Sign up free to run your own systematic review gap analysis.
+            </p>
+          </div>
+          <a
+            href="/signup"
+            className="shrink-0 bg-white text-[#1e3a5f] text-sm font-semibold px-4 py-2 rounded-md hover:bg-gray-100 transition-colors whitespace-nowrap"
+          >
+            Sign up free →
+          </a>
+        </div>
+      )}
+
     <div data-screen-content>
       {/* Header */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
-        <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Topic searched</p>
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <p className="text-xs text-gray-400 uppercase tracking-wide">Topic searched</p>
+
+          {/* Share button — only visible to the owner */}
+          {isOwner && (
+            <div className="relative flex flex-col items-end gap-1 shrink-0">
+              <button
+                onClick={handleToggleShare}
+                disabled={isSharing}
+                aria-pressed={localIsPublic}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
+                  localIsPublic
+                    ? "bg-blue-50 border-[#4a90d9] text-[#4a90d9] hover:bg-blue-100"
+                    : "border-gray-300 text-gray-600 hover:border-[#4a90d9] hover:text-[#4a90d9]"
+                }`}
+              >
+                {/* Share icon */}
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z"
+                  />
+                </svg>
+                {isSharing ? "Updating…" : localIsPublic ? "Shared" : "Share"}
+              </button>
+              {/* Toast notification */}
+              {shareToast && (
+                <p className="text-xs text-gray-500 max-w-[220px] text-right leading-tight">
+                  {shareToast}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         <h1 className="text-lg sm:text-xl font-semibold text-[#1e3a5f] break-words">{query}</h1>
 
         {/* Key metrics row */}
@@ -129,6 +242,43 @@ export function ResultsDashboard({
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Existing reviews</p>
             <p className="text-2xl font-bold text-gray-800">{existingReviews.length}</p>
           </div>
+          {/* ClinicalTrials.gov count — only shown when data is available (non-null) */}
+          {clinicalTrialsCount !== null && clinicalTrialsCount !== undefined && (
+            <div>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
+                Registered trials
+              </p>
+              <a
+                href={`https://clinicaltrials.gov/search?term=${encodeURIComponent(query)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 group"
+                title="View on ClinicalTrials.gov"
+              >
+                <p className="text-2xl font-bold text-gray-800 group-hover:text-[#4a90d9] transition-colors">
+                  {clinicalTrialsCount.toLocaleString("en-US")}
+                </p>
+                {/* External link icon */}
+                <svg
+                  className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#4a90d9] transition-colors mt-1 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                  />
+                </svg>
+              </a>
+              <p className="text-xs text-gray-400 mt-0.5">
+                via ClinicalTrials.gov
+              </p>
+            </div>
+          )}
           {localFeasibilityScore && (
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Feasibility</p>
@@ -160,13 +310,21 @@ export function ResultsDashboard({
 
         {/* Analyze / Download buttons */}
         <div className="mt-4">
-          {!hasAnalysis && !isPending && (
+          {isOwner && !hasAnalysis && !isPending && (
             <button
               onClick={runAnalysis}
               className="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] transition-colors"
             >
               Run AI Gap Analysis
             </button>
+          )}
+          {!isOwner && !hasAnalysis && (
+            <a
+              href="/signup"
+              className="inline-block px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] transition-colors"
+            >
+              Sign up free to run AI analysis
+            </a>
           )}
           {isPending && (
             <div className="space-y-2">
@@ -240,6 +398,7 @@ export function ResultsDashboard({
           query={query}
           existingReviews={existingReviews}
           primaryStudyCount={primaryStudyCount}
+          clinicalTrialsCount={clinicalTrialsCount}
           feasibilityScore={localFeasibilityScore}
           feasibilityExplanation={localFeasibilityExplanation}
           gapAnalysis={localGapAnalysis}
@@ -443,6 +602,81 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
 /* Gaps tab                                                                   */
 /* -------------------------------------------------------------------------- */
 
+function BooleanSearchBlock({ booleanString }: { booleanString: string }) {
+  const [copied, setCopied] = useState(false);
+  const sanitized = sanitizeBooleanString(booleanString);
+  const pubmedUrl = buildPubMedUrl(sanitized);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(sanitized);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API unavailable (e.g. non-HTTPS); do nothing silently
+    }
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center justify-between gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          {/* Search icon */}
+          <svg className="w-3.5 h-3.5 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">PubMed Boolean Search String</span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Open in PubMed */}
+          <a
+            href={pubmedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-[#4a90d9] hover:underline"
+            title="Open this search in PubMed"
+          >
+            Open in PubMed
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+            </svg>
+          </a>
+          {/* Copy button */}
+          <button
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors px-2 py-1 rounded border border-gray-200 hover:border-gray-400 bg-white"
+            title="Copy to clipboard"
+          >
+            {copied ? (
+              <>
+                <svg className="w-3 h-3 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+                </svg>
+                Copy
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+      {/* Query string */}
+      <pre className="px-4 py-3 text-xs text-gray-800 font-mono whitespace-pre-wrap break-all leading-relaxed bg-white overflow-x-auto">
+        {sanitized}
+      </pre>
+      <p className="px-4 py-2 text-[10px] text-gray-400 border-t border-gray-100 bg-gray-50">
+        AI-generated draft — verify MeSH terms and adapt for your target database (e.g. Embase, CINAHL) before use in a formal review protocol.
+      </p>
+    </div>
+  );
+}
+
 function GapsTab({ gapAnalysis, isPending, onAnalyze, error }: {
   gapAnalysis: GapAnalysis | null;
   isPending: boolean;
@@ -456,6 +690,12 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error }: {
   if (!gapAnalysis) {
     return <AnalysisPrompt isPending={isPending} onAnalyze={onAnalyze} error={error} />;
   }
+
+  const booleanString =
+    gapAnalysis.boolean_search_string &&
+    looksLikeBooleanString(gapAnalysis.boolean_search_string)
+      ? gapAnalysis.boolean_search_string
+      : null;
 
   return (
     <div className="space-y-6">
@@ -515,6 +755,13 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error }: {
           ))}
         </div>
       </div>
+
+      {/* Boolean search string — only shown when Gemini returns a valid one */}
+      {booleanString && (
+        <div>
+          <BooleanSearchBlock booleanString={booleanString} />
+        </div>
+      )}
     </div>
   );
 }
