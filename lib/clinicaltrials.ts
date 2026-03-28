@@ -10,7 +10,7 @@ export async function countPrimaryStudies(query: string): Promise<number> {
   const url = new URL(BASE);
   url.searchParams.set("query.term", query);
   url.searchParams.set("pageSize", "1");
-  url.searchParams.set("fields", "NCTId");
+  url.searchParams.set("countTotal", "true");
 
   const res = await fetch(url.toString(), { next: { revalidate: 0 } });
   if (!res.ok) throw new ApiError(`ClinicalTrials.gov search failed: ${res.status}`, 502);
