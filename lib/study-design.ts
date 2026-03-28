@@ -1,8 +1,5 @@
 import type { FeasibilityResult, StudyDesignRecommendation } from "@/types";
 
-// Base type without the confidence field — used internally before alignment
-type BaseRecommendation = Omit<StudyDesignRecommendation, "confidence">;
-
 const METHODOLOGY_LINKS = [
   { label: "Cochrane Handbook", url: "https://training.cochrane.org/handbook" },
   { label: "PRISMA 2020", url: "https://www.prisma-statement.org/" },
@@ -16,11 +13,7 @@ const SCOPING_LINKS = [
   { label: "PROSPERO Registration", url: "https://www.crd.york.ac.uk/prospero/" },
 ];
 
-/**
- * Internal: pure decision-tree that maps feasibility data to a base recommendation.
- * No alignment checks, no confidence field.
- */
-function _buildRecommendation(feasibility: FeasibilityResult): BaseRecommendation {
+export function recommendStudyDesign(feasibility: FeasibilityResult): StudyDesignRecommendation {
   const { score, primary_study_count: count, existing_review_status } = feasibility;
 
   // Umbrella review — multiple existing reviews available
@@ -162,81 +155,5 @@ function _buildRecommendation(feasibility: FeasibilityResult): BaseRecommendatio
       },
     ],
     methodology_links: METHODOLOGY_LINKS,
-  };
-}
-
-/**
- * Internal: computes recommendation confidence based on how clearly the evidence
- * count falls within (rather than at the boundary of) a feasibility tier.
- *
- * Score thresholds:  <3 = Insufficient | 3–5 = Low | 6–10 = Moderate | ≥11 = High
- * Boundary counts (±1 of each threshold) carry moderate uncertainty.
- */
-function _computeConfidence(count: number): "high" | "moderate" | "low" {
-  // Counts that sit at or immediately adjacent to score thresholds
-  const BORDERLINE_COUNTS = [2, 3, 5, 6, 10, 11];
-  return BORDERLINE_COUNTS.includes(count) ? "moderate" : "high";
-}
-
-/**
- * Builds a study design recommendation from feasibility data, then applies
- * three alignment guards and assigns a confidence level.
- *
- * Alignment guards (in priority order):
- *  1. Meta-analysis recommended but primary_study_count < 10 → downgrade to Narrative Synthesis
- *  2. Umbrella Review recommended but existing_review_status === "novel" → downgrade to score-appropriate recommendation
- *  3. Scoping Review recommended but primary_study_count ≥ 15 → keep but add upgrade note
- *
- * Confidence:
- *  - "low"      — alignment guard fired (edge case or data inconsistency)
- *  - "moderate" — count sits at a threshold boundary (±1)
- *  - "high"     — count clearly within a tier, no alignment needed
- */
-export function recommendStudyDesign(feasibility: FeasibilityResult): StudyDesignRecommendation {
-  const { primary_study_count: count, existing_review_status } = feasibility;
-  const base = _buildRecommendation(feasibility);
-
-  // ── Guard 1: Meta-analysis but fewer than 10 primary studies ──────────────
-  if (base.primary === "Systematic Review with Meta-Analysis" && count < 10) {
-    const narrativeFeasibility: FeasibilityResult = { ...feasibility, score: "Moderate" };
-    const narrative = _buildRecommendation(narrativeFeasibility);
-    return {
-      ...narrative,
-      confidence: "low",
-      rationale:
-        narrative.rationale +
-        ` (Alignment note: meta-analysis was downgraded to narrative synthesis — only ${count} primary ${count === 1 ? "study was" : "studies were"} found; at least 10 are needed for reliable statistical pooling.)`,
-    };
-  }
-
-  // ── Guard 2: Umbrella review but topic appears novel (no existing reviews) ─
-  if (base.primary === "Umbrella Review" && existing_review_status === "novel") {
-    // Re-derive the appropriate recommendation now that umbrella is excluded
-    const fallbackFeasibility: FeasibilityResult = { ...feasibility, existing_review_status: "novel" };
-    const fallback = _buildRecommendation(fallbackFeasibility);
-    return {
-      ...fallback,
-      confidence: "low",
-      rationale:
-        fallback.rationale +
-        " (Alignment note: umbrella review was overridden — no existing systematic reviews were identified, indicating this is a novel research area.)",
-    };
-  }
-
-  // ── Guard 3: Scoping review but evidence base may already support more ─────
-  if (base.primary === "Scoping Review" && count >= 15) {
-    return {
-      ...base,
-      confidence: "low",
-      rationale:
-        base.rationale +
-        ` Note: with ${count} primary studies identified, a systematic review with narrative synthesis may already be feasible — consider upgrading after completing initial evidence mapping.`,
-    };
-  }
-
-  // ── No alignment needed — derive confidence from threshold proximity ───────
-  return {
-    ...base,
-    confidence: _computeConfidence(count),
   };
 }

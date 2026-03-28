@@ -305,7 +305,7 @@ export function ResultsDashboard({
       </div>
 
       <p className="text-xs text-gray-400 text-center mt-6">
-        Results sourced from PubMed, OpenAlex, and Europe PMC (includes Cochrane abstracts). Trial counts via ClinicalTrials.gov. AI-generated analysis may contain errors — verify all findings with domain expertise.
+        Results sourced from PubMed, OpenAlex, Europe PMC (includes Cochrane abstracts), and Semantic Scholar. Trial counts via ClinicalTrials.gov. AI-generated analysis may contain errors — verify all findings with domain expertise.
       </p>
     </div>
 

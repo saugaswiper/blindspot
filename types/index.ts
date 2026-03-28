@@ -107,8 +107,6 @@ export interface StudyDesignRecommendation {
   example_paper: { citation: string; url: string };
   alternatives: { type: StudyDesignType; rationale: string }[];
   methodology_links: { label: string; url: string }[];
-  /** Confidence in the recommendation: high = strong evidence match, moderate = borderline, low = alignment correction applied */
-  confidence?: "high" | "moderate" | "low";
 }
 
 export interface SearchResult {
