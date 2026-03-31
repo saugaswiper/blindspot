@@ -157,13 +157,13 @@ interface TooltipProps {
 }
 
 export function ShortcutsDiscoveryTooltip({ onOpenShortcuts }: TooltipProps) {
-  // Lazy initializer mirrors the OnboardingTour pattern:
-  //   • Server render  → typeof window === "undefined" → false (no tooltip in SSR HTML)
-  //   • Client render  → checks localStorage → true on first visit, false thereafter
-  const [visible, setVisible] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return !hasShortcutsTooltipBeenSeen();
-  });
+  // Always start hidden (matches SSR). After hydration, check localStorage
+  // and show the tooltip if it hasn't been seen yet.
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!hasShortcutsTooltipBeenSeen()) setVisible(true);
+  }, []);
 
   // When visible becomes true (first-visit only): mark as seen and start
   // the 5 s auto-dismiss timer.  Cleanup clears the timer if the user

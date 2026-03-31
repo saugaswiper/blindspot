@@ -48,13 +48,13 @@ function StepDots({
  * full-screen overlay so its DOM position does not affect layout.
  */
 export function OnboardingTour() {
-  // Lazy initializer: read localStorage once on client mount.
-  // Returns false on the server (no localStorage), so the initial HTML
-  // always has the modal hidden; the client may show it after hydration.
-  const [open, setOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return !hasTourBeenSeen();
-  });
+  // Always start hidden (matches SSR). After hydration, check localStorage
+  // and show the tour if it hasn't been seen yet.
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!hasTourBeenSeen()) setOpen(true);
+  }, []);
   const [step, setStep] = useState(0);
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
   const total = getTourStepCount();
@@ -103,14 +103,11 @@ export function OnboardingTour() {
   const current = TOUR_STEPS[step];
 
   return (
-    /* Backdrop — suppressHydrationWarning: open is always false on the server
-       but may be true on the client (localStorage gate), so a mismatch is expected. */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
       role="dialog"
       aria-modal="true"
       aria-label="Blindspot onboarding tour"
-      suppressHydrationWarning
     >
       {/* Modal card */}
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
