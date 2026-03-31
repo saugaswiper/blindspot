@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { TopicInput } from "@/components/TopicInput";
 import { NavBar } from "@/components/NavBar";
+import { OnboardingTour, TourRestartButton } from "@/components/OnboardingTour";
 
 export default function HomePage() {
   return (
@@ -20,7 +22,10 @@ export default function HomePage() {
       {/* Search box */}
       <section className="max-w-2xl mx-auto px-4 pb-16">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <TopicInput />
+          {/* Suspense required because TopicInput uses useSearchParams() */}
+          <Suspense fallback={<div className="h-24 bg-gray-50 rounded-lg animate-pulse" />}>
+            <TopicInput />
+          </Suspense>
         </div>
         <p className="text-center text-xs text-gray-400 mt-3">
           Free to use. No credit card required.
@@ -70,9 +75,13 @@ export default function HomePage() {
           <div className="flex gap-4">
             <a href="/about" className="hover:text-gray-600">About &amp; Methodology</a>
             <a href="/privacy" className="hover:text-gray-600">Privacy</a>
+            <TourRestartButton />
           </div>
         </div>
       </footer>
+
+      {/* Onboarding tour — auto-shows on first visit (localStorage gate) */}
+      <OnboardingTour />
     </main>
   );
 }

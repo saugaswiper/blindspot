@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/SignOutButton";
+import { NavHelpButton } from "@/components/OnboardingTour";
 
 export async function NavBar() {
   const supabase = await createClient();
@@ -14,6 +15,7 @@ export async function NavBar() {
         </Link>
 
         <div className="flex items-center gap-2 sm:gap-4">
+          <NavHelpButton />
           {user ? (
             <>
               <Link

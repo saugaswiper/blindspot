@@ -128,6 +128,12 @@ export interface SearchResult {
    * API was down, or the result predates migration 004).
    */
   clinical_trials_count: number | null;
+  /**
+   * Number of systematic reviews registered on PROSPERO for this query.
+   * Null if the count was not available when the search was run (e.g. the
+   * PROSPERO API was down, or the result predates PROSPERO integration).
+   */
+  prospero_registrations_count: number | null;
   feasibility_score: FeasibilityScore;
   feasibility_explanation: string;
   gap_analysis: GapAnalysis | null;

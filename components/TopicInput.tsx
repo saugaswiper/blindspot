@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PICOForm } from "@/components/PICOForm";
 import { validateSearchInput } from "@/lib/validators";
 import type { PICOInput, SearchMode } from "@/types";
@@ -15,8 +15,10 @@ const EMPTY_PICO: PICOInput = {
 
 export function TopicInput() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Pre-populate the query from the ?q= URL param (used by Related Searches links).
   const [mode, setMode] = useState<SearchMode>("simple");
-  const [queryText, setQueryText] = useState("");
+  const [queryText, setQueryText] = useState(searchParams.get("q") ?? "");
   const [pico, setPico] = useState<PICOInput>(EMPTY_PICO);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);

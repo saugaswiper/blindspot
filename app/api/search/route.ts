@@ -4,6 +4,7 @@ import * as OpenAlex from "@/lib/openalex";
 import * as EuropePMC from "@/lib/europepmc";
 import * as ClinicalTrials from "@/lib/clinicaltrials";
 import * as SemanticScholar from "@/lib/semanticscholar";
+import { searchProspero, isQuerySubstantialEnough } from "@/lib/prospero";
 import { getCachedResult, saveSearchResult } from "@/lib/cache";
 import { validateSearchInput } from "@/lib/validators";
 import { toApiError } from "@/lib/errors";
@@ -32,11 +33,26 @@ function normalizeDoi(doi: string | undefined): string | undefined {
     .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
 }
 
-function dedupeReviews(...sources: ExistingReview[][]): ExistingReview[] {
+interface DedupeResult {
+  /** Deduplicated reviews, capped at 50 for display. */
+  reviews: ExistingReview[];
+  /** Sum of all records across every source before deduplication. */
+  totalIdentified: number;
+  /**
+   * Number of duplicate records removed (totalIdentified - unique count,
+   * computed before the 50-record display cap is applied so that true
+   * cross-database duplicates are counted accurately).
+   */
+  deduplicationCount: number;
+}
+
+function dedupeReviews(...sources: ExistingReview[][]): DedupeResult {
+  const totalIdentified = sources.reduce((sum, src) => sum + src.length, 0);
+
   const seenTitles = new Set<string>();
   const seenDois = new Set<string>();
   const seenPmids = new Set<string>();
-  const result: ExistingReview[] = [];
+  const unique: ExistingReview[] = [];
 
   for (const source of sources) {
     for (const review of source) {
@@ -52,10 +68,16 @@ function dedupeReviews(...sources: ExistingReview[][]): ExistingReview[] {
       seenTitles.add(titleKey);
       if (doiKey) seenDois.add(doiKey);
       if (pmidKey) seenPmids.add(pmidKey);
-      result.push(review);
+      unique.push(review);
     }
   }
-  return result.slice(0, 50);
+
+  return {
+    reviews: unique.slice(0, 50),
+    totalIdentified,
+    // Measure true duplicates before the display cap so the PRISMA count is accurate
+    deduplicationCount: totalIdentified - unique.length,
+  };
 }
 
 export async function POST(request: Request) {
@@ -107,6 +129,7 @@ export async function POST(request: Request) {
       openalexCount,
       europepmcCount,
       clinicalTrialsCount,
+      prosperoCount,
     ] = await Promise.allSettled([
       PubMed.searchExistingReviews(query),
       OpenAlex.searchExistingReviews(query),
@@ -116,6 +139,7 @@ export async function POST(request: Request) {
       OpenAlex.countPrimaryStudies(query),
       EuropePMC.countPrimaryStudies(query),
       ClinicalTrials.countPrimaryStudies(query),
+      isQuerySubstantialEnough(query) ? searchProspero(query) : Promise.resolve(0),
     ]);
 
     if (pubmedResult.status === "fulfilled") {
@@ -163,6 +187,8 @@ export async function POST(request: Request) {
     const europepmcCountVal = europepmcCount.status === "fulfilled" ? europepmcCount.value : null;
     const clinicalTrialsCountVal =
       clinicalTrialsCount.status === "fulfilled" ? clinicalTrialsCount.value : null;
+    const prosperoCountVal =
+      prosperoCount.status === "fulfilled" ? prosperoCount.value : null;
 
     const clinicalCounts = [pubmedCountVal, europepmcCountVal].filter(
       (c): c is number => c !== null
@@ -191,7 +217,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const existingReviews = dedupeReviews(
+    const {
+      reviews: existingReviews,
+      deduplicationCount,
+    } = dedupeReviews(
       pubmedReviews,
       openalexReviews,
       europepmcReviews,
@@ -213,6 +242,8 @@ export async function POST(request: Request) {
       existing_reviews: existingReviews,
       primary_study_count: primaryStudyCount,
       clinical_trials_count: clinicalTrialsCountVal,
+      prospero_registrations_count: prosperoCountVal,
+      deduplication_count: deduplicationCount,
     });
 
     return Response.json({

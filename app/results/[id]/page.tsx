@@ -17,11 +17,14 @@ async function getResult(id: string) {
       id,
       primary_study_count,
       clinical_trials_count,
+      prospero_registrations_count,
+      deduplication_count,
       existing_reviews,
       feasibility_score,
       feasibility_explanation,
       gap_analysis,
       study_design_recommendation,
+      protocol_draft,
       is_public,
       searches (query_text, user_id)
     `)
@@ -69,6 +72,12 @@ export default async function ResultsPage({
         clinicalTrialsCount={
           (result.clinical_trials_count as number | null | undefined) ?? null
         }
+        prosperoRegistrationsCount={
+          (result.prospero_registrations_count as number | null | undefined) ?? null
+        }
+        deduplicationCount={
+          (result.deduplication_count as number | null | undefined) ?? null
+        }
         feasibilityScore={result.feasibility_score as FeasibilityScore | null}
         feasibilityExplanation={
           result.feasibility_explanation as string | null
@@ -79,6 +88,7 @@ export default async function ResultsPage({
         }
         isOwner={isOwner}
         isPublic={isPublic}
+        protocolDraft={(result.protocol_draft as string | null | undefined) ?? null}
       />
     </main>
   );

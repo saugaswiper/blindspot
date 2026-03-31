@@ -1,5 +1,5 @@
 import { ApiError } from "@/lib/errors";
-import { SYSTEM_PROMPT } from "@/lib/prompts";
+import { SYSTEM_PROMPT, PROTOCOL_SYSTEM_PROMPT } from "@/lib/prompts";
 import type { GapAnalysis } from "@/types";
 
 const GEMINI_URL =
@@ -58,6 +58,40 @@ function validateGapAnalysis(obj: unknown): obj is GapAnalysis {
   if (typeof obj !== "object" || obj === null) return false;
   const o = obj as Record<string, unknown>;
   return Array.isArray(o.gaps) && Array.isArray(o.suggested_topics) && typeof o.overall_assessment === "string";
+}
+
+/**
+ * Generate a free-text systematic review protocol draft (not JSON).
+ * Uses text/plain response mode so Gemini returns Markdown directly.
+ */
+export async function generateProtocol(userPrompt: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new ApiError("Gemini API key not configured", 500);
+
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: PROTOCOL_SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: 8192 },
+    }),
+  });
+
+  const data = (await res.json()) as GeminiResponse;
+
+  if (!res.ok || data.error) {
+    throw new ApiError(
+      `Gemini API error: ${data.error?.message ?? res.status}`,
+      502,
+      "Protocol generation is temporarily unavailable. Please try again in a few minutes."
+    );
+  }
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!text) throw new ApiError("Gemini returned empty protocol response", 502);
+
+  return text;
 }
 
 export async function generateGapAnalysis(userPrompt: string): Promise<GapAnalysis> {

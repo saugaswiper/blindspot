@@ -33,6 +33,103 @@ body {
   100% { width: 93%; }
 }
 
+/* ── PRISMA flow diagram (screen) ─────────────────────────────────────────── */
+.prisma-flow-diagram {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.prisma-phase-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.prisma-phase-label span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  padding: 2px 10px;
+  border-radius: 3px;
+}
+
+.prisma-box {
+  border: 1.5px solid #93c5fd;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.prisma-box-source {
+  border-color: #4a90d9;
+  background: #eff6ff;
+}
+
+.prisma-box-process {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+
+.prisma-box-included {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.prisma-box-context {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.prisma-box-excluded {
+  border-color: #f87171;
+  background: #fef2f2;
+}
+
+.prisma-box-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e3a5f;
+}
+
+.prisma-box-sublabel {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.prisma-box-count {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin-top: 2px;
+}
+
+.prisma-box-count-large {
+  font-size: 22px;
+}
+
+.prisma-box-note {
+  font-size: 10px;
+  color: #9ca3af;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.prisma-arrow {
+  font-size: 20px;
+  color: #9ca3af;
+  line-height: 1;
+  margin: 2px 0;
+}
+
 /* ── Print styles ─────────────────────────────────────────────────────────── */
 @media print {
   /* Hide screen UI, show only the printable report */
@@ -223,11 +320,176 @@ body {
     line-height: 1.5;
   }
 
+  .report-prospero-warning {
+    background: #fffacd;
+    border-left: 3px solid #daa520;
+    padding: 8pt;
+    margin-bottom: 10pt;
+    font-size: 10pt;
+    color: #333;
+  }
+
+  .report-prospero-warning a {
+    color: #1e3a5f;
+    text-decoration: underline;
+  }
+
   .report-footer {
     border-top: 1px solid #ccc;
     margin-top: 20pt;
     padding-top: 8pt;
     font-size: 8pt;
     color: #666;
+  }
+
+  /* ── PRISMA flow diagram (print) ─────────────────────────────────────── */
+  .report-prisma-section {
+    margin-top: 16pt;
+  }
+
+  .report-prisma-section h2 {
+    font-size: 13pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4pt;
+    margin-bottom: 10pt;
+  }
+
+  .report-prisma-phase {
+    font-size: 7pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    display: inline-block;
+    padding: 2pt 8pt;
+    margin-bottom: 4pt;
+  }
+
+  .report-prisma-sources-row {
+    display: flex;
+    gap: 6pt;
+    margin-bottom: 4pt;
+  }
+
+  .report-prisma-source-box {
+    flex: 1;
+    border: 1px solid #4a90d9;
+    border-radius: 3pt;
+    padding: 5pt 6pt;
+    text-align: center;
+  }
+
+  .report-prisma-source-name {
+    font-size: 8pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    display: block;
+  }
+
+  .report-prisma-source-count {
+    font-size: 8pt;
+    color: #333;
+    display: block;
+    margin-top: 2pt;
+  }
+
+  .report-prisma-arrow {
+    text-align: center;
+    font-size: 14pt;
+    color: #666;
+    margin: 2pt 0;
+    line-height: 1;
+  }
+
+  .report-prisma-box {
+    border: 1.5pt solid #1e3a5f;
+    border-radius: 3pt;
+    padding: 6pt 10pt;
+    margin: 0 auto 4pt;
+    width: 60%;
+    text-align: center;
+  }
+
+  .report-prisma-box-included {
+    border-color: #2e7d32;
+    background: #f1f8e9;
+  }
+
+  .report-prisma-box-label {
+    font-size: 9pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    display: block;
+  }
+
+  .report-prisma-box-sublabel {
+    font-size: 7pt;
+    color: #555;
+    display: block;
+    margin-top: 1pt;
+  }
+
+  .report-prisma-box-count {
+    font-size: 11pt;
+    font-weight: bold;
+    color: #333;
+    display: block;
+    margin-top: 3pt;
+  }
+
+  .report-prisma-box-note {
+    font-size: 7pt;
+    color: #777;
+    display: block;
+    margin-top: 2pt;
+    font-style: italic;
+  }
+
+  .report-prisma-context {
+    margin-top: 10pt;
+    border-top: 1pt dashed #ccc;
+    padding-top: 8pt;
+  }
+
+  .report-prisma-context-label {
+    font-size: 7pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+    margin-bottom: 4pt;
+    display: block;
+  }
+
+  .report-prisma-context-row {
+    display: flex;
+    gap: 6pt;
+  }
+
+  .report-prisma-context-box {
+    flex: 1;
+    border: 1pt solid #ddd;
+    border-radius: 3pt;
+    padding: 5pt 6pt;
+    text-align: center;
+  }
+
+  .report-prisma-dedup-note {
+    font-size: 7.5pt;
+    color: #555;
+    margin: 3pt 0 6pt;
+    text-align: center;
+    font-style: italic;
+  }
+
+  .report-prisma-reference {
+    font-size: 7.5pt;
+    color: #666;
+    margin-top: 8pt;
+    font-style: italic;
   }
 }
