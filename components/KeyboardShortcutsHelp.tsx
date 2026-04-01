@@ -9,6 +9,7 @@ import {
   markShortcutsTooltipAsSeen,
 } from "@/lib/keyboard-shortcuts";
 import type { KeyboardShortcut } from "@/lib/keyboard-shortcuts";
+import { useFocusTrap } from "@/lib/focus-trap";
 
 interface Props {
   open: boolean;
@@ -23,6 +24,10 @@ const CATEGORY_LABELS: Record<KeyboardShortcut["category"], string> = {
 
 export function KeyboardShortcutsHelp({ open, onClose }: Props) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Trap focus inside the dialog panel while it is open (WCAG 2.4.3)
+  useFocusTrap(panelRef, open);
 
   // Close on Escape
   useEffect(() => {
@@ -61,6 +66,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
     >
       {/* Panel — stops click propagation so clicking the panel itself doesn't close it */}
       <div
+        ref={panelRef}
         className="bg-white rounded-xl border border-gray-200 shadow-xl w-full sm:w-80 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -85,7 +91,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
         <div className="px-4 py-3 space-y-4 max-h-80 overflow-y-auto">
           {categories.map((cat) => (
             <div key={cat}>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
                 {CATEGORY_LABELS[cat]}
               </p>
               <div className="space-y-1.5">
@@ -99,7 +105,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
 
         {/* Footer */}
         <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
-          <p className="text-xs text-gray-400 text-center">
+          <p className="text-xs text-gray-600 text-center">
             Shortcuts are disabled when typing in a form field
           </p>
         </div>

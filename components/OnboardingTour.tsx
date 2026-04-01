@@ -9,6 +9,7 @@ import {
   isLastStep,
   markTourAsSeen,
 } from "@/lib/onboarding";
+import { useFocusTrap } from "@/lib/focus-trap";
 
 // ---------------------------------------------------------------------------
 // Step dots indicator
@@ -57,7 +58,11 @@ export function OnboardingTour() {
   }, []);
   const [step, setStep] = useState(0);
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const total = getTourStepCount();
+
+  // Trap focus inside the modal card while the tour is open (WCAG 2.4.3)
+  useFocusTrap(modalRef, open);
 
   // Define dismiss before the useEffect that references it.
   function dismiss() {
@@ -110,7 +115,7 @@ export function OnboardingTour() {
       aria-label="Blindspot onboarding tour"
     >
       {/* Modal card */}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
 
         {/* Header */}
         <div className="bg-[#1e3a5f] px-6 py-5">
@@ -139,7 +144,7 @@ export function OnboardingTour() {
           <p className="text-sm text-gray-700 leading-relaxed">
             {current.description}
           </p>
-          <p className="mt-3 text-xs text-gray-400 italic border-l-2 border-gray-200 pl-3">
+          <p className="mt-3 text-xs text-gray-600 italic border-l-2 border-gray-200 pl-3">
             {current.hint}
           </p>
         </div>
@@ -164,7 +169,7 @@ export function OnboardingTour() {
               <button
                 type="button"
                 onClick={dismiss}
-                className="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
               >
                 Skip
               </button>
@@ -225,7 +230,11 @@ export function NavHelpButton() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
+  const navModalRef = useRef<HTMLDivElement>(null);
   const total = getTourStepCount();
+
+  // Trap focus inside the modal card while the tour is open (WCAG 2.4.3)
+  useFocusTrap(navModalRef, open);
 
   // Define close before the useEffect that references it.
   function close() {
@@ -271,7 +280,7 @@ export function NavHelpButton() {
       <button
         type="button"
         onClick={() => { setStep(0); setOpen(true); }}
-        className="w-6 h-6 rounded-full border border-gray-300 text-gray-400 hover:text-[#1e3a5f] hover:border-[#1e3a5f] flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
+        className="w-6 h-6 rounded-full border border-gray-300 text-gray-600 hover:text-[#1e3a5f] hover:border-[#1e3a5f] flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
         aria-label="Open onboarding tour"
         title="How Blindspot works"
       >
@@ -286,7 +295,7 @@ export function NavHelpButton() {
           aria-modal="true"
           aria-label="Blindspot onboarding tour"
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div ref={navModalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             {/* Header */}
             <div className="bg-[#1e3a5f] px-6 py-5">
               <div className="flex items-center justify-between">
@@ -314,7 +323,7 @@ export function NavHelpButton() {
               <p className="text-sm text-gray-700 leading-relaxed">
                 {current.description}
               </p>
-              <p className="mt-3 text-xs text-gray-400 italic border-l-2 border-gray-200 pl-3">
+              <p className="mt-3 text-xs text-gray-600 italic border-l-2 border-gray-200 pl-3">
                 {current.hint}
               </p>
             </div>
@@ -336,7 +345,7 @@ export function NavHelpButton() {
                   <button
                     type="button"
                     onClick={close}
-                    className="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
                   >
                     Close
                   </button>

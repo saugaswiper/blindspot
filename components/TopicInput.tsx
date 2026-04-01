@@ -105,7 +105,7 @@ export function TopicInput() {
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
             placeholder="Enter a research area, e.g. 'cognitive behavioral therapy for insomnia in elderly patients'"
-            className={`w-full px-4 py-3 border rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
+            className={`w-full px-4 py-3 border rounded-lg text-sm text-gray-900 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
               errors.queryText ? "border-red-400" : "border-gray-300"
             }`}
           />

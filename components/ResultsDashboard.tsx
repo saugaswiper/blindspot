@@ -9,6 +9,7 @@ import type {
   GapDimension,
 } from "@/types";
 import { PrintableReport } from "@/components/PrintableReport";
+import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 import { formatProsperoWarning } from "@/lib/prospero";
@@ -69,6 +70,7 @@ type Tab = "reviews" | "gaps" | "design" | "prisma";
 
 interface Props {
   resultId: string;
+  searchId?: string;
   query: string;
   existingReviews: ExistingReview[];
   primaryStudyCount: number;
@@ -106,10 +108,13 @@ interface Props {
    * stored draft immediately. Null means no protocol has been generated yet.
    */
   protocolDraft?: string | null;
+  /** Whether the owner is subscribed to email alerts for this search. */
+  isAlertSubscribed?: boolean;
 }
 
 export function ResultsDashboard({
   resultId,
+  searchId = "",
   query,
   existingReviews,
   primaryStudyCount,
@@ -123,6 +128,7 @@ export function ResultsDashboard({
   isOwner = false,
   isPublic = false,
   protocolDraft = null,
+  isAlertSubscribed = false,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("reviews");
   const [isPending, startTransition] = useTransition();
@@ -304,7 +310,7 @@ export function ResultsDashboard({
       {/* Header */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
         <div className="flex items-start justify-between gap-3 mb-1">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Topic searched</p>
+          <p className="text-xs text-gray-600 uppercase tracking-wide">Topic searched</p>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Keyboard shortcuts button + one-time discovery tooltip */}
@@ -358,17 +364,17 @@ export function ResultsDashboard({
         {/* Key metrics row */}
         <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap items-start gap-4 sm:gap-6">
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Primary studies</p>
+            <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Primary studies</p>
             <p className="text-2xl font-bold text-gray-800">{primaryStudyCount.toLocaleString("en-US")}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Existing reviews</p>
+            <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Existing reviews</p>
             <p className="text-2xl font-bold text-gray-800">{existingReviews.length}</p>
           </div>
           {/* ClinicalTrials.gov count — only shown when data is available (non-null) */}
           {clinicalTrialsCount !== null && clinicalTrialsCount !== undefined && (
             <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
+              <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">
                 Registered trials
               </p>
               <a
@@ -383,7 +389,7 @@ export function ResultsDashboard({
                 </p>
                 {/* External link icon */}
                 <svg
-                  className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#4a90d9] transition-colors mt-1 shrink-0"
+                  className="w-3.5 h-3.5 text-gray-600 group-hover:text-[#4a90d9] transition-colors mt-1 shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   strokeWidth={2}
@@ -397,14 +403,14 @@ export function ResultsDashboard({
                   />
                 </svg>
               </a>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-600 mt-0.5">
                 via ClinicalTrials.gov
               </p>
             </div>
           )}
           {localFeasibilityScore && (
             <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Feasibility</p>
+              <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Feasibility</p>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${FEASIBILITY_STYLES[localFeasibilityScore]}`}>
                 <span className="text-xs">{FEASIBILITY_ICONS[localFeasibilityScore]}</span>
                 {localFeasibilityScore}
@@ -551,12 +557,21 @@ export function ResultsDashboard({
         </div>
       </div>
 
+      {/* Email alerts subscription — shown to owner */}
+      {isOwner && searchId && (
+        <AlertSubscription
+          searchId={searchId}
+          isSubscribed={isAlertSubscribed}
+          isOwner={isOwner}
+        />
+      )}
+
       {/* Related Searches — shown when gap analysis has suggestions */}
       {localGapAnalysis && localGapAnalysis.suggested_topics.length > 0 && (
         <RelatedSearchesSection gapAnalysis={localGapAnalysis} />
       )}
 
-      <p className="text-xs text-gray-400 text-center mt-6">
+      <p className="text-xs text-gray-600 text-center mt-6">
         Results sourced from PubMed, OpenAlex, Europe PMC (includes Cochrane abstracts), and Semantic Scholar. Trial counts via ClinicalTrials.gov. AI-generated analysis may contain errors — verify all findings with domain expertise.
       </p>
     </div>
@@ -604,23 +619,6 @@ function SkeletonCard() {
         <div className="h-3 w-full bg-gray-100 rounded" />
         <div className="h-3 w-5/6 bg-gray-100 rounded" />
       </div>
-    </div>
-  );
-}
-
-function ReviewSkeleton() {
-  return (
-    <div className="space-y-4">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="py-4 border-b border-gray-100 last:border-0 animate-pulse">
-          <div className="h-4 w-4/5 bg-gray-200 rounded mb-2" />
-          <div className="h-3 w-1/3 bg-gray-100 rounded mb-2" />
-          <div className="space-y-1.5">
-            <div className="h-3 w-full bg-gray-100 rounded" />
-            <div className="h-3 w-3/4 bg-gray-100 rounded" />
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -719,7 +717,7 @@ function RelatedSearchesSection({ gapAnalysis }: { gapAnalysis: import("@/types"
     <div className="mt-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-700">Explore Related Topics</h2>
-        <span className="text-xs text-gray-400">Click to search on Blindspot</span>
+        <span className="text-xs text-gray-600">Click to search on Blindspot</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {suggestions.map((s, i) => (
@@ -767,12 +765,12 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
     return (
       <div className="text-center py-10">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
-          <span className="text-xl text-gray-400">0</span>
+          <span className="text-xl text-gray-600">0</span>
         </div>
         <p className="text-sm text-gray-500">
           No existing systematic reviews found on this exact topic — this may indicate a genuine research gap.
         </p>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-gray-600 mt-1">
           Try broadening your search terms if you expected to find reviews.
         </p>
       </div>
@@ -800,14 +798,14 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 RIS (.ris)
-                <span className="block text-[10px] text-gray-400">Zotero, Mendeley, EndNote</span>
+                <span className="block text-[10px] text-gray-600">Zotero, Mendeley, EndNote</span>
               </button>
               <button
                 onClick={handleExportBibtex}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 BibTeX (.bib)
-                <span className="block text-[10px] text-gray-400">LaTeX, Overleaf, JabRef</span>
+                <span className="block text-[10px] text-gray-600">LaTeX, Overleaf, JabRef</span>
               </button>
             </div>
           )}
@@ -846,7 +844,7 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
             </p>
             <SourceBadge source={review.source} />
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-600 mt-0.5">
             {review.journal} &middot; {review.year || "Year unknown"}
             {review.doi && (
               <> &middot; <span className="text-gray-300">DOI: {review.doi.replace("https://doi.org/", "")}</span></>
@@ -936,7 +934,7 @@ function BooleanSearchBlock({ booleanString }: { booleanString: string }) {
       <pre className="px-4 py-3 text-xs text-gray-800 font-mono whitespace-pre-wrap break-all leading-relaxed bg-white overflow-x-auto">
         {sanitized}
       </pre>
-      <p className="px-4 py-2 text-[10px] text-gray-400 border-t border-gray-100 bg-gray-50">
+      <p className="px-4 py-2 text-[10px] text-gray-600 border-t border-gray-100 bg-gray-50">
         AI-generated draft — verify MeSH terms and adapt for your target database (e.g. Embase, CINAHL) before use in a formal review protocol.
       </p>
     </div>
@@ -972,7 +970,7 @@ function GapDimensionFilter({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-gray-400 mr-0.5 shrink-0">Filter:</span>
+      <span className="text-xs text-gray-600 mr-0.5 shrink-0">Filter:</span>
       {ALL_DIMENSIONS.map((d) => {
         const isActive = activeDimensions.has(d);
         const count = gapCounts[d];
@@ -1000,7 +998,7 @@ function GapDimensionFilter({
       {filtered && (
         <button
           onClick={onReset}
-          className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors ml-1 underline underline-offset-2"
+          className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-700 transition-colors ml-1 underline underline-offset-2"
           aria-label="Clear all gap dimension filters"
         >
           Clear
@@ -1058,7 +1056,7 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
           <h3 className="text-sm font-semibold text-gray-700 shrink-0">
             Identified Gaps
             {isFiltered && (
-              <span className="ml-2 text-xs font-normal text-gray-400">
+              <span className="ml-2 text-xs font-normal text-gray-600">
                 ({visibleGaps.length} of {gapAnalysis.gaps.length} shown)
               </span>
             )}
@@ -1075,7 +1073,7 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
         </div>
 
         {visibleGaps.length === 0 ? (
-          <div className="text-center py-6 text-sm text-gray-400">
+          <div className="text-center py-6 text-sm text-gray-600">
             No gaps match the selected dimensions.{" "}
             <button
               onClick={() => setActiveDimensions(resetFilter())}
@@ -1111,14 +1109,14 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
         <h3 className="text-sm font-semibold text-gray-700 mb-3">
           Suggested Review Topics
           {isFiltered && visibleTopics.length !== gapAnalysis.suggested_topics.length && (
-            <span className="ml-2 text-xs font-normal text-gray-400">
+            <span className="ml-2 text-xs font-normal text-gray-600">
               ({visibleTopics.length} of {gapAnalysis.suggested_topics.length} shown)
             </span>
           )}
         </h3>
 
         {visibleTopics.length === 0 ? (
-          <div className="text-center py-6 text-sm text-gray-400">
+          <div className="text-center py-6 text-sm text-gray-600">
             No suggested topics match the selected dimensions.{" "}
             <button
               onClick={() => setActiveDimensions(resetFilter())}
@@ -1239,7 +1237,7 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
       {/* Study design method */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 sm:p-5 space-y-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Recommended study design</p>
+          <p className="text-xs uppercase tracking-wide text-gray-600 mb-1">Recommended study design</p>
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-lg font-bold text-gray-800">{studyDesign.primary}</p>
             {studyDesign.confidence && (
@@ -1320,7 +1318,7 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
         </div>
       </div>
 
-      <p className="text-xs text-gray-400 italic">AI-generated — verify all recommendations with domain expertise.</p>
+      <p className="text-xs text-gray-600 italic">AI-generated — verify all recommendations with domain expertise.</p>
     </div>
   );
 }
@@ -1394,7 +1392,7 @@ function PrismaFlowTab({
               </div>
             ))}
         </div>
-        <p className="text-[10px] text-gray-400 text-center mb-3">
+        <p className="text-[10px] text-gray-600 text-center mb-3">
           {hasDedupData
             ? "Records attributed to first source that found them (post-deduplication)."
             : "Counts reflect unique records attributed to each database after cross-database deduplication."}
@@ -1547,7 +1545,7 @@ function AnalysisPrompt({ isPending, onAnalyze, error }: {
         </svg>
       </div>
       <p className="text-gray-700 text-sm font-medium mb-1">AI analysis not yet run</p>
-      <p className="text-gray-400 text-xs mb-4">
+      <p className="text-gray-600 text-xs mb-4">
         Run the analysis to identify research gaps, suggested topics, and study design recommendations.
       </p>
       <button
@@ -1675,7 +1673,7 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
             {/* Regenerate button — lets users replace the stored draft */}
             <button
               onClick={() => { setStatus("idle"); setProtocol(null); setErrorMsg(null); }}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-600 transition-colors"
               aria-label="Regenerate protocol draft"
               title="Discard this draft and generate a new one"
             >
@@ -1735,7 +1733,7 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
 
       {status === "done" && (
         <div className="px-4 pb-3">
-          <p className="text-[10px] text-gray-400">
+          <p className="text-[10px] text-gray-600">
             AI-generated draft — review and adapt before PROSPERO registration. Verify eligibility criteria and search strategy with a medical librarian or domain expert.
           </p>
         </div>

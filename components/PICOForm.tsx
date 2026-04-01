@@ -52,7 +52,7 @@ export function PICOForm({ value, onChange, errors }: PICOFormProps) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             {label}
             {!required && (
-              <span className="ml-1 text-gray-400 font-normal">(optional)</span>
+              <span className="ml-1 text-gray-600 font-normal">(optional)</span>
             )}
           </label>
           <input
@@ -60,7 +60,7 @@ export function PICOForm({ value, onChange, errors }: PICOFormProps) {
             value={value[key] ?? ""}
             onChange={(e) => handleChange(key, e.target.value)}
             placeholder={placeholder}
-            className={`w-full px-3 py-2 border rounded-md text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
+            className={`w-full px-3 py-2 border rounded-md text-sm text-gray-900 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
               errors[key] ? "border-red-400" : "border-gray-300"
             }`}
           />

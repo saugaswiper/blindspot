@@ -27,7 +27,7 @@ export default function HomePage() {
             <TopicInput />
           </Suspense>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-3">
+        <p className="text-center text-xs text-gray-600 mt-3">
           Free to use. No credit card required.
         </p>
       </section>
@@ -70,7 +70,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white">
-        <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-400">
+        <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-600">
           <span suppressHydrationWarning>Blindspot &copy; {new Date().getFullYear()}</span>
           <div className="flex gap-4">
             <a href="/about" className="hover:text-gray-600">About &amp; Methodology</a>

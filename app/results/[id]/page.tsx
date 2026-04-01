@@ -26,11 +26,23 @@ async function getResult(id: string) {
       study_design_recommendation,
       protocol_draft,
       is_public,
-      searches (query_text, user_id)
+      searches (id, query_text, user_id)
     `)
     .eq("id", id)
     .single();
   return data;
+}
+
+async function getAlertStatus(searchId: string, userId: string | undefined) {
+  if (!userId) return false;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("search_alerts")
+    .select("is_enabled")
+    .eq("search_id", searchId)
+    .eq("user_id", userId)
+    .single();
+  return data?.is_enabled ?? false;
 }
 
 export default async function ResultsPage({
@@ -50,9 +62,10 @@ export default async function ResultsPage({
   if (!result) notFound();
 
   const searchData = (
-    result.searches as unknown as { query_text: string; user_id: string } | null
+    result.searches as unknown as { id: string; query_text: string; user_id: string } | null
   );
   const query = searchData?.query_text ?? "";
+  const searchId = searchData?.id ?? "";
 
   // The viewer is the owner if they are logged in and the search belongs to them
   const isOwner = !!(user && searchData?.user_id === user.id);
@@ -60,12 +73,19 @@ export default async function ResultsPage({
   // is_public may be absent on older DB rows before the migration (treat as false)
   const isPublic = (result.is_public as boolean | undefined) ?? false;
 
+  // Fetch alert subscription status (only relevant for owner)
+  let isAlertSubscribed = false;
+  if (isOwner && searchId) {
+    isAlertSubscribed = await getAlertStatus(searchId, user?.id);
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
       <NavBar />
 
       <ResultsDashboard
         resultId={id}
+        searchId={searchId}
         query={query}
         existingReviews={(result.existing_reviews ?? []) as ExistingReview[]}
         primaryStudyCount={result.primary_study_count as number}
@@ -89,6 +109,7 @@ export default async function ResultsPage({
         isOwner={isOwner}
         isPublic={isPublic}
         protocolDraft={(result.protocol_draft as string | null | undefined) ?? null}
+        isAlertSubscribed={isAlertSubscribed}
       />
     </main>
   );

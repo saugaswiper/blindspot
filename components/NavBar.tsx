@@ -24,7 +24,7 @@ export async function NavBar() {
               >
                 My Searches
               </Link>
-              <span className="hidden sm:block text-xs text-gray-400 truncate max-w-[160px]">
+              <span className="hidden sm:block text-xs text-gray-600 truncate max-w-[160px]">
                 {user.email}
               </span>
               <SignOutButton />

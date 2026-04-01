@@ -23,6 +23,9 @@ async function getSearches(userId: string) {
         id,
         feasibility_score,
         gap_analysis
+      ),
+      search_alerts (
+        is_enabled
       )
     `)
     .eq("user_id", userId)
@@ -69,8 +72,12 @@ export default async function DashboardPage() {
               const result = Array.isArray(search.search_results)
                 ? search.search_results[0]
                 : search.search_results;
+              const alertRow = Array.isArray(search.search_alerts)
+                ? search.search_alerts[0]
+                : search.search_alerts;
               const feasibility = result?.feasibility_score as FeasibilityScore | null;
               const hasAnalysis = !!(result?.gap_analysis);
+              const hasActiveAlert = !!(alertRow?.is_enabled);
               const date = new Date(search.created_at).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -88,9 +95,18 @@ export default async function DashboardPage() {
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {search.query_text}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">{date}</p>
+                      <p className="text-xs text-gray-600 mt-1">{date}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {hasActiveAlert && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1"
+                          title="Weekly email alerts active"
+                        >
+                          <span aria-hidden="true">🔔</span>
+                          <span>Monitoring</span>
+                        </span>
+                      )}
                       {feasibility && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${FEASIBILITY_STYLES[feasibility]}`}>
                           {feasibility}
