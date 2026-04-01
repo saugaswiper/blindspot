@@ -43,34 +43,34 @@ export default async function UnsubscribedPage({ searchParams }: PageProps) {
   const errorContent = errorCode ? ERROR_MESSAGES[errorCode] ?? ERROR_MESSAGES.server : null;
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <NavBar />
 
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         {isError ? (
           <>
             {/* Error state */}
-            <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-6">
+            <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center mx-auto mb-6">
               <span className="text-2xl" aria-hidden="true">⚠</span>
             </div>
 
-            <h1 className="text-2xl font-bold text-[#1e3a5f] mb-3">
+            <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-blue-300 mb-3">
               {errorContent?.heading ?? "Something went wrong"}
             </h1>
-            <p className="text-gray-600 text-sm leading-relaxed mb-8">
+            <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-8">
               {errorContent?.body ?? ERROR_MESSAGES.server.body}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 href="/dashboard"
-                className="inline-block text-sm bg-[#1e3a5f] text-white px-5 py-2.5 rounded-md hover:bg-[#2d5a8e] transition-colors"
+                className="inline-block text-sm bg-[#1e3a5f] dark:bg-blue-700 text-white px-5 py-2.5 rounded-md hover:bg-[#2d5a8e] dark:hover:bg-blue-600 transition-colors"
               >
                 Manage alerts in dashboard
               </Link>
               <Link
                 href="/"
-                className="inline-block text-sm border border-gray-300 text-gray-700 px-5 py-2.5 rounded-md hover:border-gray-400 hover:bg-white transition-colors"
+                className="inline-block text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-5 py-2.5 rounded-md hover:border-gray-400 dark:hover:border-gray-500 hover:bg-white dark:hover:bg-gray-800 transition-colors"
               >
                 Back to home
               </Link>
@@ -79,14 +79,14 @@ export default async function UnsubscribedPage({ searchParams }: PageProps) {
         ) : (
           <>
             {/* Success state */}
-            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+            <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center mx-auto mb-6">
               <span className="text-2xl" aria-hidden="true">✓</span>
             </div>
 
-            <h1 className="text-2xl font-bold text-[#1e3a5f] mb-3">
+            <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-blue-300 mb-3">
               You&apos;ve been unsubscribed
             </h1>
-            <p className="text-gray-600 text-sm leading-relaxed mb-8">
+            <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-8">
               You&apos;ll no longer receive weekly email digests for this search topic.
               You can re-enable alerts at any time from your searches dashboard.
             </p>
@@ -94,13 +94,13 @@ export default async function UnsubscribedPage({ searchParams }: PageProps) {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 href="/dashboard"
-                className="inline-block text-sm bg-[#1e3a5f] text-white px-5 py-2.5 rounded-md hover:bg-[#2d5a8e] transition-colors"
+                className="inline-block text-sm bg-[#1e3a5f] dark:bg-blue-700 text-white px-5 py-2.5 rounded-md hover:bg-[#2d5a8e] dark:hover:bg-blue-600 transition-colors"
               >
                 View my searches
               </Link>
               <Link
                 href="/"
-                className="inline-block text-sm border border-gray-300 text-gray-700 px-5 py-2.5 rounded-md hover:border-gray-400 hover:bg-white transition-colors"
+                className="inline-block text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-5 py-2.5 rounded-md hover:border-gray-400 dark:hover:border-gray-500 hover:bg-white dark:hover:bg-gray-800 transition-colors"
               >
                 Run a new search
               </Link>

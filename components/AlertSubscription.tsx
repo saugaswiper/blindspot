@@ -60,11 +60,11 @@ export function AlertSubscription({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5">
+    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-gray-900">Email Alerts</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Email Alerts</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Get weekly email updates when new systematic reviews are discovered
             on this topic.
           </p>
@@ -74,8 +74,8 @@ export function AlertSubscription({
           disabled={isLoading}
           className={`shrink-0 px-4 py-2 text-sm font-medium rounded-md border transition-colors disabled:opacity-50 ${
             subscribed
-              ? "bg-blue-50 border-[#4a90d9] text-[#4a90d9] hover:bg-blue-100"
-              : "border-gray-300 text-gray-700 hover:border-[#4a90d9] hover:text-[#4a90d9]"
+              ? "bg-blue-50 dark:bg-blue-900/30 border-[#4a90d9] dark:border-blue-500 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+              : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-[#4a90d9] dark:hover:border-blue-400 hover:text-[#4a90d9] dark:hover:text-blue-400"
           }`}
         >
           {isLoading ? "Updating..." : subscribed ? "Subscribed" : "Subscribe"}
@@ -85,8 +85,8 @@ export function AlertSubscription({
       {message && (
         <p className={`text-xs mt-3 ${
           subscribed
-            ? "text-green-700 bg-green-50"
-            : "text-blue-700 bg-blue-50"
+            ? "text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20"
+            : "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20"
         } px-3 py-2 rounded`}>
           {message}
         </p>

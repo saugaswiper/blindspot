@@ -31,10 +31,10 @@ import { KeyboardShortcutsHelp, ShortcutsButton, ShortcutsDiscoveryTooltip } fro
 import { deriveProtocolFilename, hasStoredProtocol } from "@/lib/protocol-storage";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
-  High: "bg-green-100 text-green-800 border-green-200",
-  Moderate: "bg-amber-100 text-amber-800 border-amber-200",
-  Low: "bg-orange-100 text-orange-800 border-orange-200",
-  Insufficient: "bg-red-100 text-red-800 border-red-200",
+  High: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700",
+  Moderate: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-700",
+  Low: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700",
+  Insufficient: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-700",
 };
 
 const FEASIBILITY_ICONS: Record<FeasibilityScore, string> = {
@@ -54,16 +54,16 @@ const GAP_LABELS: Record<GapDimension, string> = {
 };
 
 const IMPORTANCE_STYLES = {
-  high: "bg-red-50 text-red-700 border-red-200",
-  medium: "bg-amber-50 text-amber-700 border-amber-200",
-  low: "bg-gray-50 text-gray-600 border-gray-200",
+  high: "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
+  medium: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+  low: "bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700",
 };
 
 const SOURCE_STYLES: Record<string, string> = {
-  PubMed: "bg-blue-50 text-blue-700 border-blue-200",
-  OpenAlex: "bg-purple-50 text-purple-700 border-purple-200",
-  "Europe PMC": "bg-teal-50 text-teal-700 border-teal-200",
-  "Semantic Scholar": "bg-orange-50 text-orange-700 border-orange-200",
+  PubMed: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+  OpenAlex: "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
+  "Europe PMC": "bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800",
+  "Semantic Scholar": "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
 };
 
 type Tab = "reviews" | "gaps" | "design" | "prisma";
@@ -308,9 +308,9 @@ export function ResultsDashboard({
 
     <div data-screen-content>
       {/* Header */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 mb-6">
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 sm:p-6 mb-6">
         <div className="flex items-start justify-between gap-3 mb-1">
-          <p className="text-xs text-gray-600 uppercase tracking-wide">Topic searched</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide">Topic searched</p>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Keyboard shortcuts button + one-time discovery tooltip */}
@@ -359,22 +359,22 @@ export function ResultsDashboard({
           )}
           </div>{/* end flex items-center gap-2 wrapper */}
         </div>
-        <h1 className="text-lg sm:text-xl font-semibold text-[#1e3a5f] break-words">{query}</h1>
+        <h1 className="text-lg sm:text-xl font-semibold text-[#1e3a5f] dark:text-blue-300 break-words">{query}</h1>
 
         {/* Key metrics row */}
         <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap items-start gap-4 sm:gap-6">
           <div>
-            <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Primary studies</p>
-            <p className="text-2xl font-bold text-gray-800">{primaryStudyCount.toLocaleString("en-US")}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Primary studies</p>
+            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{primaryStudyCount.toLocaleString("en-US")}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Existing reviews</p>
-            <p className="text-2xl font-bold text-gray-800">{existingReviews.length}</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Existing reviews</p>
+            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{existingReviews.length}</p>
           </div>
           {/* ClinicalTrials.gov count — only shown when data is available (non-null) */}
           {clinicalTrialsCount !== null && clinicalTrialsCount !== undefined && (
             <div>
-              <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">
+              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">
                 Registered trials
               </p>
               <a
@@ -384,12 +384,12 @@ export function ResultsDashboard({
                 className="inline-flex items-center gap-1 group"
                 title="View on ClinicalTrials.gov"
               >
-                <p className="text-2xl font-bold text-gray-800 group-hover:text-[#4a90d9] transition-colors">
+                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 group-hover:text-[#4a90d9] dark:group-hover:text-blue-400 transition-colors">
                   {clinicalTrialsCount.toLocaleString("en-US")}
                 </p>
                 {/* External link icon */}
                 <svg
-                  className="w-3.5 h-3.5 text-gray-600 group-hover:text-[#4a90d9] transition-colors mt-1 shrink-0"
+                  className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400 group-hover:text-[#4a90d9] dark:group-hover:text-blue-400 transition-colors mt-1 shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   strokeWidth={2}
@@ -403,14 +403,14 @@ export function ResultsDashboard({
                   />
                 </svg>
               </a>
-              <p className="text-xs text-gray-600 mt-0.5">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                 via ClinicalTrials.gov
               </p>
             </div>
           )}
           {localFeasibilityScore && (
             <div>
-              <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Feasibility</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Feasibility</p>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${FEASIBILITY_STYLES[localFeasibilityScore]}`}>
                 <span className="text-xs">{FEASIBILITY_ICONS[localFeasibilityScore]}</span>
                 {localFeasibilityScore}
@@ -420,20 +420,20 @@ export function ResultsDashboard({
         </div>
 
         {localFeasibilityExplanation && (
-          <p className="mt-3 text-sm text-gray-600 leading-relaxed">{localFeasibilityExplanation}</p>
+          <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{localFeasibilityExplanation}</p>
         )}
 
         {/* PROSPERO warning banner */}
         {prosperoRegistrationsCount !== null && prosperoRegistrationsCount !== undefined && prosperoRegistrationsCount > 0 && (
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <p className="text-sm text-yellow-800 font-medium">
+          <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md">
+            <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
               {formatProsperoWarning(prosperoRegistrationsCount)}
             </p>
             <a
               href="https://www.crd.york.ac.uk/prospero/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-yellow-700 hover:text-yellow-900 underline mt-1.5 inline-flex items-center gap-1"
+              className="text-xs text-yellow-700 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-200 underline mt-1.5 inline-flex items-center gap-1"
             >
               Check PROSPERO registry
               <svg
@@ -456,11 +456,11 @@ export function ResultsDashboard({
 
         {/* Top gaps quick summary */}
         {topGaps.length > 0 && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
-            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-1.5">Key gaps identified</p>
+          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wide mb-1.5">Key gaps identified</p>
             <div className="flex flex-wrap gap-2">
               {topGaps.map((gap, i) => (
-                <span key={i} className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2.5 py-0.5">
+                <span key={i} className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 rounded-full px-2.5 py-0.5">
                   {GAP_LABELS[gap.dimension]}
                 </span>
               ))}
@@ -488,13 +488,13 @@ export function ResultsDashboard({
           )}
           {isPending && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                 <span>Analyzing with AI…</span>
                 <span>~20 seconds</span>
               </div>
-              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#1e3a5f] rounded-full"
+                  className="h-full bg-[#1e3a5f] dark:bg-blue-600 rounded-full"
                   style={{
                     animation: "progress-fill 22s cubic-bezier(0.1, 0, 0.4, 1) forwards",
                   }}
@@ -517,16 +517,16 @@ export function ResultsDashboard({
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex border-b border-gray-200 overflow-x-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
           {tabs.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
               className={`shrink-0 px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === key
-                  ? "border-[#1e3a5f] text-[#1e3a5f]"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-[#1e3a5f] dark:border-blue-400 text-[#1e3a5f] dark:text-blue-300"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               }`}
             >
               {label}
@@ -571,7 +571,7 @@ export function ResultsDashboard({
         <RelatedSearchesSection gapAnalysis={localGapAnalysis} />
       )}
 
-      <p className="text-xs text-gray-600 text-center mt-6">
+      <p className="text-xs text-gray-600 dark:text-gray-400 text-center mt-6">
         Results sourced from PubMed, OpenAlex, Europe PMC (includes Cochrane abstracts), and Semantic Scholar. Trial counts via ClinicalTrials.gov. AI-generated analysis may contain errors — verify all findings with domain expertise.
       </p>
     </div>
@@ -607,17 +607,17 @@ export function ResultsDashboard({
 /* -------------------------------------------------------------------------- */
 
 function SkeletonLine({ width = "w-full" }: { width?: string }) {
-  return <div className={`h-3 ${width} bg-gray-200 rounded animate-pulse`} />;
+  return <div className={`h-3 ${width} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} />;
 }
 
 function SkeletonCard() {
   return (
-    <div className="border border-gray-200 rounded-lg p-4 space-y-3 animate-pulse">
-      <div className="h-4 w-3/4 bg-gray-200 rounded" />
-      <div className="h-3 w-1/2 bg-gray-100 rounded" />
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 animate-pulse">
+      <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-800 rounded" />
       <div className="space-y-2">
-        <div className="h-3 w-full bg-gray-100 rounded" />
-        <div className="h-3 w-5/6 bg-gray-100 rounded" />
+        <div className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded" />
+        <div className="h-3 w-5/6 bg-gray-100 dark:bg-gray-800 rounded" />
       </div>
     </div>
   );
@@ -626,7 +626,7 @@ function SkeletonCard() {
 function GapsSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-      <div className="bg-blue-50 border border-blue-100 rounded-md p-4 space-y-2">
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md p-4 space-y-2">
         <SkeletonLine width="w-full" />
         <SkeletonLine width="w-3/4" />
       </div>
@@ -644,12 +644,12 @@ function GapsSkeleton() {
 /* -------------------------------------------------------------------------- */
 
 const GAP_TYPE_COLORS: Record<string, string> = {
-  population:  "bg-violet-50 text-violet-700 border-violet-200",
-  methodology: "bg-blue-50 text-blue-700 border-blue-200",
-  outcome:     "bg-green-50 text-green-700 border-green-200",
-  geographic:  "bg-amber-50 text-amber-700 border-amber-200",
-  temporal:    "bg-pink-50 text-pink-700 border-pink-200",
-  theoretical: "bg-teal-50 text-teal-700 border-teal-200",
+  population:  "bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800",
+  methodology: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+  outcome:     "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
+  geographic:  "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+  temporal:    "bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800",
+  theoretical: "bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800",
 };
 
 const GAP_TYPE_LABELS: Record<string, string> = {
@@ -662,9 +662,9 @@ const GAP_TYPE_LABELS: Record<string, string> = {
 };
 
 const RELATED_FEASIBILITY_BADGE: Record<string, string> = {
-  high:     "bg-green-50 text-green-700",
-  moderate: "bg-amber-50 text-amber-700",
-  low:      "bg-gray-50 text-gray-500",
+  high:     "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300",
+  moderate: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
+  low:      "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
 };
 
 function RelatedSearchCard({ search }: { search: RelatedSearch }) {
@@ -676,7 +676,7 @@ function RelatedSearchCard({ search }: { search: RelatedSearch }) {
   return (
     <a
       href={href}
-      className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-[#4a90d9] hover:shadow-sm transition-all group"
+      className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-[#4a90d9] dark:hover:border-blue-500 hover:shadow-sm transition-all group"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex flex-wrap gap-1.5">
@@ -689,7 +689,7 @@ function RelatedSearchCard({ search }: { search: RelatedSearch }) {
         </div>
         {/* Chevron icon */}
         <svg
-          className="w-4 h-4 text-gray-300 group-hover:text-[#4a90d9] transition-colors shrink-0 mt-0.5"
+          className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-[#4a90d9] dark:group-hover:text-blue-400 transition-colors shrink-0 mt-0.5"
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth={2}
@@ -699,10 +699,10 @@ function RelatedSearchCard({ search }: { search: RelatedSearch }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
         </svg>
       </div>
-      <p className="text-sm font-medium text-gray-800 group-hover:text-[#1e3a5f] leading-snug mb-1.5">
+      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 group-hover:text-[#1e3a5f] dark:group-hover:text-blue-300 leading-snug mb-1.5">
         {search.label}
       </p>
-      <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+      <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
         {search.snippet}
       </p>
     </a>
@@ -716,8 +716,8 @@ function RelatedSearchesSection({ gapAnalysis }: { gapAnalysis: import("@/types"
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-700">Explore Related Topics</h2>
-        <span className="text-xs text-gray-600">Click to search on Blindspot</span>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Explore Related Topics</h2>
+        <span className="text-xs text-gray-600 dark:text-gray-400">Click to search on Blindspot</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {suggestions.map((s, i) => (
@@ -764,13 +764,13 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
   if (reviews.length === 0) {
     return (
       <div className="text-center py-10">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
-          <span className="text-xl text-gray-600">0</span>
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 mb-3">
+          <span className="text-xl text-gray-600 dark:text-gray-400">0</span>
         </div>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           No existing systematic reviews found on this exact topic — this may indicate a genuine research gap.
         </p>
-        <p className="text-xs text-gray-600 mt-1">
+        <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
           Try broadening your search terms if you expected to find reviews.
         </p>
       </div>
@@ -783,7 +783,7 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
         <div className="relative">
           <button
             onClick={() => setExportOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-600 rounded-md hover:border-[#4a90d9] hover:text-[#4a90d9] transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-md hover:border-[#4a90d9] dark:hover:border-blue-400 hover:text-[#4a90d9] dark:hover:text-blue-400 transition-colors"
             aria-label="Export references"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -792,40 +792,40 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
             Export references
           </button>
           {exportOpen && (
-            <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1">
+            <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 py-1">
               <button
                 onClick={handleExportRis}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 RIS (.ris)
-                <span className="block text-[10px] text-gray-600">Zotero, Mendeley, EndNote</span>
+                <span className="block text-[10px] text-gray-600 dark:text-gray-400">Zotero, Mendeley, EndNote</span>
               </button>
               <button
                 onClick={handleExportBibtex}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 BibTeX (.bib)
-                <span className="block text-[10px] text-gray-600">LaTeX, Overleaf, JabRef</span>
+                <span className="block text-[10px] text-gray-600 dark:text-gray-400">LaTeX, Overleaf, JabRef</span>
               </button>
             </div>
           )}
         </div>
       </div>
 
-    <div className="divide-y divide-gray-100">
+    <div className="divide-y divide-gray-100 dark:divide-gray-700">
       {reviews.map((review, i) => (
         <div
           key={i}
-          className="py-4 first:pt-0 last:pb-0 group transition-colors hover:bg-gray-50 -mx-4 sm:-mx-6 px-4 sm:px-6"
+          className="py-4 first:pt-0 last:pb-0 group transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 -mx-4 sm:-mx-6 px-4 sm:px-6"
         >
           <div className="flex items-start gap-2 flex-wrap sm:flex-nowrap">
-            <p className="text-sm font-medium text-gray-800 leading-snug flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-200 leading-snug flex-1 min-w-0">
               {review.pmid ? (
                 <a
                   href={`https://pubmed.ncbi.nlm.nih.gov/${review.pmid}/`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-[#4a90d9] hover:underline transition-colors"
+                  className="hover:text-[#4a90d9] dark:hover:text-blue-400 hover:underline transition-colors"
                 >
                   {review.title}
                 </a>
@@ -834,7 +834,7 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
                   href={`https://doi.org/${review.doi}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-[#4a90d9] hover:underline transition-colors"
+                  className="hover:text-[#4a90d9] dark:hover:text-blue-400 hover:underline transition-colors"
                 >
                   {review.title}
                 </a>
@@ -844,14 +844,14 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
             </p>
             <SourceBadge source={review.source} />
           </div>
-          <p className="text-xs text-gray-600 mt-0.5">
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
             {review.journal} &middot; {review.year || "Year unknown"}
             {review.doi && (
-              <> &middot; <span className="text-gray-300">DOI: {review.doi.replace("https://doi.org/", "")}</span></>
+              <> &middot; <span className="text-gray-300 dark:text-gray-600">DOI: {review.doi.replace("https://doi.org/", "")}</span></>
             )}
           </p>
           {review.abstract_snippet && (
-            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed line-clamp-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed line-clamp-3">
               {review.abstract_snippet}
             </p>
           )}
@@ -882,15 +882,15 @@ function BooleanSearchBlock({ booleanString }: { booleanString: string }) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200">
+      <div className="flex items-center justify-between gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           {/* Search icon */}
-          <svg className="w-3.5 h-3.5 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+          <svg className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
-          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">PubMed Boolean Search String</span>
+          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">PubMed Boolean Search String</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Open in PubMed */}
@@ -909,7 +909,7 @@ function BooleanSearchBlock({ booleanString }: { booleanString: string }) {
           {/* Copy button */}
           <button
             onClick={handleCopy}
-            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors px-2 py-1 rounded border border-gray-200 hover:border-gray-400 bg-white"
+            className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 bg-white dark:bg-gray-900"
             title="Copy to clipboard"
           >
             {copied ? (
@@ -931,10 +931,10 @@ function BooleanSearchBlock({ booleanString }: { booleanString: string }) {
         </div>
       </div>
       {/* Query string */}
-      <pre className="px-4 py-3 text-xs text-gray-800 font-mono whitespace-pre-wrap break-all leading-relaxed bg-white overflow-x-auto">
+      <pre className="px-4 py-3 text-xs text-gray-800 dark:text-gray-200 font-mono whitespace-pre-wrap break-all leading-relaxed bg-white dark:bg-gray-900 overflow-x-auto">
         {sanitized}
       </pre>
-      <p className="px-4 py-2 text-[10px] text-gray-600 border-t border-gray-100 bg-gray-50">
+      <p className="px-4 py-2 text-[10px] text-gray-600 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         AI-generated draft — verify MeSH terms and adapt for your target database (e.g. Embase, CINAHL) before use in a formal review protocol.
       </p>
     </div>
@@ -946,12 +946,12 @@ function BooleanSearchBlock({ booleanString }: { booleanString: string }) {
 /* -------------------------------------------------------------------------- */
 
 const DIMENSION_CHIP_COLORS: Record<GapDimension, { active: string; inactive: string }> = {
-  population:  { active: "bg-violet-100 text-violet-800 border-violet-300", inactive: "text-gray-500 border-gray-200 hover:border-violet-300 hover:text-violet-700" },
-  methodology: { active: "bg-blue-100 text-blue-800 border-blue-300",       inactive: "text-gray-500 border-gray-200 hover:border-blue-300 hover:text-blue-700" },
-  outcome:     { active: "bg-green-100 text-green-800 border-green-300",    inactive: "text-gray-500 border-gray-200 hover:border-green-300 hover:text-green-700" },
-  geographic:  { active: "bg-amber-100 text-amber-800 border-amber-300",    inactive: "text-gray-500 border-gray-200 hover:border-amber-300 hover:text-amber-700" },
-  temporal:    { active: "bg-pink-100 text-pink-800 border-pink-300",       inactive: "text-gray-500 border-gray-200 hover:border-pink-300 hover:text-pink-700" },
-  theoretical: { active: "bg-teal-100 text-teal-800 border-teal-300",      inactive: "text-gray-500 border-gray-200 hover:border-teal-300 hover:text-teal-700" },
+  population:  { active: "bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-300 border-violet-300 dark:border-violet-600", inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-violet-300 dark:hover:border-violet-500 hover:text-violet-700 dark:hover:text-violet-300" },
+  methodology: { active: "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-600",             inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-500 hover:text-blue-700 dark:hover:text-blue-300" },
+  outcome:     { active: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-300 dark:border-green-600",        inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-500 hover:text-green-700 dark:hover:text-green-300" },
+  geographic:  { active: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-600",        inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-500 hover:text-amber-700 dark:hover:text-amber-300" },
+  temporal:    { active: "bg-pink-100 dark:bg-pink-900/40 text-pink-800 dark:text-pink-300 border-pink-300 dark:border-pink-600",              inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-pink-300 dark:hover:border-pink-500 hover:text-pink-700 dark:hover:text-pink-300" },
+  theoretical: { active: "bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-600",              inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-teal-300 dark:hover:border-teal-500 hover:text-teal-700 dark:hover:text-teal-300" },
 };
 
 function GapDimensionFilter({
@@ -970,7 +970,7 @@ function GapDimensionFilter({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-gray-600 mr-0.5 shrink-0">Filter:</span>
+      <span className="text-xs text-gray-600 dark:text-gray-400 mr-0.5 shrink-0">Filter:</span>
       {ALL_DIMENSIONS.map((d) => {
         const isActive = activeDimensions.has(d);
         const count = gapCounts[d];
@@ -998,7 +998,7 @@ function GapDimensionFilter({
       {filtered && (
         <button
           onClick={onReset}
-          className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-700 transition-colors ml-1 underline underline-offset-2"
+          className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ml-1 underline underline-offset-2"
           aria-label="Clear all gap dimension filters"
         >
           Clear
@@ -1045,18 +1045,18 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
   return (
     <div className="space-y-6">
       {gapAnalysis.overall_assessment && (
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <p className="text-sm text-blue-800 leading-relaxed">{gapAnalysis.overall_assessment}</p>
-          <p className="text-xs text-blue-500 mt-1">AI-generated assessment — verify with domain expertise</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-4">
+          <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">{gapAnalysis.overall_assessment}</p>
+          <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">AI-generated assessment — verify with domain expertise</p>
         </div>
       )}
 
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-gray-700 shrink-0">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 shrink-0">
             Identified Gaps
             {isFiltered && (
-              <span className="ml-2 text-xs font-normal text-gray-600">
+              <span className="ml-2 text-xs font-normal text-gray-600 dark:text-gray-400">
                 ({visibleGaps.length} of {gapAnalysis.gaps.length} shown)
               </span>
             )}
@@ -1090,10 +1090,10 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
                   <span className="text-xs font-semibold uppercase tracking-wide">{GAP_LABELS[gap.dimension]}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${
                     gap.importance === "high"
-                      ? "bg-red-100 text-red-600 border-red-200"
+                      ? "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300 border-red-200 dark:border-red-700"
                       : gap.importance === "medium"
-                      ? "bg-amber-100 text-amber-600 border-amber-200"
-                      : "bg-gray-100 text-gray-500 border-gray-200"
+                      ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                   }`}>
                     {gap.importance}
                   </span>
@@ -1106,10 +1106,10 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
           Suggested Review Topics
           {isFiltered && visibleTopics.length !== gapAnalysis.suggested_topics.length && (
-            <span className="ml-2 text-xs font-normal text-gray-600">
+            <span className="ml-2 text-xs font-normal text-gray-600 dark:text-gray-400">
               ({visibleTopics.length} of {gapAnalysis.suggested_topics.length} shown)
             </span>
           )}
@@ -1128,24 +1128,24 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
         ) : (
           <div className="space-y-3">
             {visibleTopics.map((topic, i) => (
-              <div key={i} className="border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-sm">
+              <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-shadow hover:shadow-sm">
                 <div className="flex items-start justify-between gap-3 mb-2">
-                  <p className="text-sm font-medium text-[#1e3a5f] break-words min-w-0">{i + 1}. {topic.title}</p>
+                  <p className="text-sm font-medium text-[#1e3a5f] dark:text-blue-300 break-words min-w-0">{i + 1}. {topic.title}</p>
                   <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
                     topic.feasibility === "high"
-                      ? "bg-green-100 text-green-700 border-green-200"
+                      ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
                       : topic.feasibility === "moderate"
-                      ? "bg-amber-100 text-amber-700 border-amber-200"
-                      : "bg-gray-100 text-gray-600 border-gray-200"
+                      ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
                   }`}>
                     {topic.feasibility} feasibility
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mb-2">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
                   <span>Gap: {GAP_LABELS[topic.gap_type]}</span>
                   <span>~{topic.estimated_studies.toLocaleString("en-US")} primary studies</span>
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed">{topic.rationale}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{topic.rationale}</p>
               </div>
             ))}
           </div>
@@ -1172,9 +1172,9 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
 /* -------------------------------------------------------------------------- */
 
 const FEASIBILITY_BADGE: Record<string, string> = {
-  high: "bg-green-100 text-green-800 border-green-200",
-  moderate: "bg-amber-100 text-amber-800 border-amber-200",
-  low: "bg-orange-100 text-orange-800 border-orange-200",
+  high: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700",
+  moderate: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-700",
+  low: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700",
 };
 
 function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAnalyze, error }: {
@@ -1218,50 +1218,50 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
               </span>
             </div>
           </div>
-          <div className="p-4 sm:p-5 space-y-4">
-            <p className="text-base font-semibold text-[#1e3a5f] leading-snug break-words">{topTopic.title}</p>
+          <div className="p-4 sm:p-5 space-y-4 bg-white dark:bg-gray-900">
+            <p className="text-base font-semibold text-[#1e3a5f] dark:text-blue-300 leading-snug break-words">{topTopic.title}</p>
 
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Expected outcomes</p>
-              <p className="text-sm text-gray-700 leading-relaxed">{topTopic.expected_outcomes}</p>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Expected outcomes</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{topTopic.expected_outcomes}</p>
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Why this review?</p>
-              <p className="text-sm text-gray-600 leading-relaxed">{topTopic.rationale}</p>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Why this review?</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{topTopic.rationale}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Study design method */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 sm:p-5 space-y-4">
+      <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-5 space-y-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-600 mb-1">Recommended study design</p>
+          <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">Recommended study design</p>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-lg font-bold text-gray-800">{studyDesign.primary}</p>
+            <p className="text-lg font-bold text-gray-800 dark:text-gray-100">{studyDesign.primary}</p>
             {studyDesign.confidence && (
               <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${
                 studyDesign.confidence === "high"
-                  ? "bg-green-50 text-green-700 border-green-200"
+                  ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
                   : studyDesign.confidence === "moderate"
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : "bg-gray-50 text-gray-500 border-gray-200"
+                  ? "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                  : "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700"
               }`}>
                 {studyDesign.confidence} confidence
               </span>
             )}
           </div>
-          <p className="mt-2 text-sm text-gray-600 leading-relaxed">{studyDesign.rationale}</p>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{studyDesign.rationale}</p>
         </div>
 
         {studyDesign.steps && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">How to conduct it</p>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">How to conduct it</p>
             <ol className="space-y-2">
               {studyDesign.steps.map((step, i) => (
-                <li key={i} className="flex gap-3 text-sm text-gray-700">
-                  <span className="shrink-0 w-5 h-5 rounded-full bg-[#1e3a5f] text-white text-xs font-bold flex items-center justify-center mt-0.5">
+                <li key={i} className="flex gap-3 text-sm text-gray-700 dark:text-gray-300">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-[#1e3a5f] dark:bg-blue-700 text-white text-xs font-bold flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
                   <span className="leading-relaxed">{step}</span>
@@ -1272,14 +1272,14 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
         )}
 
         {studyDesign.example_paper && (
-          <div className="border-t border-gray-200 pt-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Example published paper</p>
-            <p className="text-sm text-gray-700 leading-relaxed mb-1">{studyDesign.example_paper.citation}</p>
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Example published paper</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-1">{studyDesign.example_paper.citation}</p>
             <a
               href={studyDesign.example_paper.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-[#4a90d9] hover:underline transition-colors"
+              className="text-sm text-[#4a90d9] dark:text-blue-400 hover:underline transition-colors"
             >
               View paper →
             </a>
@@ -1289,12 +1289,12 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
 
       {studyDesign.alternatives.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Alternative Designs</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Alternative Designs</h3>
           <div className="space-y-2">
             {studyDesign.alternatives.map((alt, i) => (
-              <div key={i} className="border border-gray-200 rounded-md p-4 transition-shadow hover:shadow-sm">
-                <p className="text-sm font-medium text-gray-800 mb-1">{alt.type}</p>
-                <p className="text-sm text-gray-500">{alt.rationale}</p>
+              <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-md p-4 transition-shadow hover:shadow-sm">
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">{alt.type}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{alt.rationale}</p>
               </div>
             ))}
           </div>
@@ -1302,7 +1302,7 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
       )}
 
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Methodology Resources</h3>
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Methodology Resources</h3>
         <div className="flex flex-wrap gap-2">
           {studyDesign.methodology_links.map((link) => (
             <a
@@ -1310,7 +1310,7 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-[#4a90d9] hover:underline border border-[#4a90d9] rounded px-3 py-1 transition-colors hover:bg-blue-50"
+              className="text-sm text-[#4a90d9] dark:text-blue-400 hover:underline border border-[#4a90d9] dark:border-blue-500 rounded px-3 py-1 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/20"
             >
               {link.label} →
             </a>
@@ -1318,7 +1318,7 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
         </div>
       </div>
 
-      <p className="text-xs text-gray-600 italic">AI-generated — verify all recommendations with domain expertise.</p>
+      <p className="text-xs text-gray-600 dark:text-gray-400 italic">AI-generated — verify all recommendations with domain expertise.</p>
     </div>
   );
 }
@@ -1504,7 +1504,7 @@ function PrismaFlowTab({
       </div>
 
       {/* Reference + disclaimer */}
-      <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-xs text-gray-500 space-y-1">
+      <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
         <p>
           <strong>Reference:</strong> Page MJ, et al. The PRISMA 2020 statement: an updated
           guideline for reporting systematic reviews.{" "}
@@ -1512,7 +1512,7 @@ function PrismaFlowTab({
             href="https://doi.org/10.1136/bmj.n71"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#4a90d9] underline"
+            className="text-[#4a90d9] dark:text-blue-400 underline"
           >
             BMJ 2021;372:n71
           </a>
@@ -1544,8 +1544,8 @@ function AnalysisPrompt({ isPending, onAnalyze, error }: {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456Z" />
         </svg>
       </div>
-      <p className="text-gray-700 text-sm font-medium mb-1">AI analysis not yet run</p>
-      <p className="text-gray-600 text-xs mb-4">
+      <p className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">AI analysis not yet run</p>
+      <p className="text-gray-600 dark:text-gray-400 text-xs mb-4">
         Run the analysis to identify research gaps, suggested topics, and study design recommendations.
       </p>
       <button
@@ -1625,22 +1625,22 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
           {/* Document icon */}
-          <svg className="w-3.5 h-3.5 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+          <svg className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
           </svg>
-          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Protocol Draft</span>
+          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Protocol Draft</span>
         </div>
         {status === "done" && protocol && (
           <div className="flex items-center gap-2 shrink-0">
             {/* Copy button */}
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               aria-label="Copy protocol to clipboard"
             >
               {copied ? (
@@ -1662,7 +1662,7 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
             {/* Download button */}
             <button
               onClick={handleDownload}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               aria-label="Download protocol as Markdown file"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
@@ -1691,8 +1691,8 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
         {status === "idle" && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-700">Generate a Review Protocol Draft</p>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Generate a Review Protocol Draft</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 AI-generates a structured PROSPERO-ready protocol outline from this gap analysis — eligibility criteria, search strategy, methods, and a next-steps checklist.
               </p>
             </div>
@@ -1707,17 +1707,17 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
 
         {status === "loading" && (
           <div className="flex items-center gap-3 py-2">
-            <div className="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin shrink-0" aria-hidden="true" />
-            <p className="text-sm text-gray-500">Generating protocol draft… (~20 seconds)</p>
+            <div className="w-4 h-4 border-2 border-[#1e3a5f] dark:border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" aria-hidden="true" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">Generating protocol draft… (~20 seconds)</p>
           </div>
         )}
 
         {status === "error" && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <p className="text-sm text-red-600 flex-1">{errorMsg}</p>
+            <p className="text-sm text-red-600 dark:text-red-400 flex-1">{errorMsg}</p>
             <button
               onClick={handleGenerate}
-              className="shrink-0 px-3 py-1.5 border border-gray-300 text-gray-600 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors"
+              className="shrink-0 px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 text-xs font-medium rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Try again
             </button>
@@ -1725,7 +1725,7 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
         )}
 
         {status === "done" && protocol && (
-          <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-[480px] overflow-y-auto">
+          <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto max-h-[480px] overflow-y-auto">
             {protocol}
           </pre>
         )}
@@ -1733,7 +1733,7 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
 
       {status === "done" && (
         <div className="px-4 pb-3">
-          <p className="text-[10px] text-gray-600">
+          <p className="text-[10px] text-gray-600 dark:text-gray-400">
             AI-generated draft — review and adapt before PROSPERO registration. Verify eligibility criteria and search strategy with a medical librarian or domain expert.
           </p>
         </div>

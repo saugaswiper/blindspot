@@ -70,15 +70,15 @@ export function TopicInput() {
     <form onSubmit={handleSubmit} className="w-full">
       {/* Mode toggle */}
       <div className="flex items-center gap-3 mb-4">
-        <span className="text-sm text-gray-500">Search mode:</span>
-        <div className="flex rounded-md border border-gray-200 p-0.5 bg-gray-50">
+        <span className="text-sm text-gray-500 dark:text-gray-400">Search mode:</span>
+        <div className="flex rounded-md border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-800">
           <button
             type="button"
             onClick={() => handleModeToggle("simple")}
             className={`px-3 py-1 text-sm rounded transition-colors ${
               mode === "simple"
-                ? "bg-[#1e3a5f] text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-[#1e3a5f] dark:bg-blue-700 text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
             Simple
@@ -88,8 +88,8 @@ export function TopicInput() {
             onClick={() => handleModeToggle("pico")}
             className={`px-3 py-1 text-sm rounded transition-colors ${
               mode === "pico"
-                ? "bg-[#1e3a5f] text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-[#1e3a5f] dark:bg-blue-700 text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
             PICO
@@ -105,8 +105,8 @@ export function TopicInput() {
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
             placeholder="Enter a research area, e.g. 'cognitive behavioral therapy for insomnia in elderly patients'"
-            className={`w-full px-4 py-3 border rounded-lg text-sm text-gray-900 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
-              errors.queryText ? "border-red-400" : "border-gray-300"
+            className={`w-full px-4 py-3 border rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder:text-gray-600 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
+              errors.queryText ? "border-red-400" : "border-gray-300 dark:border-gray-600"
             }`}
           />
           {errors.queryText && (
@@ -128,7 +128,7 @@ export function TopicInput() {
       <button
         type="submit"
         disabled={loading}
-        className="mt-4 w-full py-3 px-6 bg-[#1e3a5f] text-white font-medium rounded-lg hover:bg-[#2d5a8e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-4 w-full py-3 px-6 bg-[#1e3a5f] dark:bg-blue-700 text-white font-medium rounded-lg hover:bg-[#2d5a8e] dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? "Searching..." : "Find Research Gaps"}
       </button>

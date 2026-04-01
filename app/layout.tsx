@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Blindspot — Find the systematic review no one's written yet",
@@ -13,8 +14,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="antialiased">{children}</body>
+    // suppressHydrationWarning: next-themes updates the `class` attribute on
+    // <html> client-side (to apply .dark / .light), which would otherwise
+    // produce a React hydration mismatch warning.
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for next-themes (adds .dark to <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,8 +15,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Class-based dark mode (used by next-themes) */
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+/* Fallback for users without JS (system preference) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
@@ -128,6 +138,63 @@ body {
   color: #9ca3af;
   line-height: 1;
   margin: 2px 0;
+}
+
+/* ── PRISMA flow diagram (dark mode overrides) ───────────────────────────── */
+.dark .prisma-phase-label span {
+  color: #9ca3af;
+  background: #374151;
+  border-color: #4b5563;
+}
+
+.dark .prisma-box {
+  background: #1e3a5f22;
+  border-color: #60a5fa;
+}
+
+.dark .prisma-box-source {
+  border-color: #60a5fa;
+  background: #1e3a5f33;
+}
+
+.dark .prisma-box-process {
+  border-color: #818cf8;
+  background: #312e8133;
+}
+
+.dark .prisma-box-included {
+  border-color: #4ade80;
+  background: #14532d33;
+}
+
+.dark .prisma-box-context {
+  border-color: #4b5563;
+  background: #1f293733;
+}
+
+.dark .prisma-box-excluded {
+  border-color: #f87171;
+  background: #7f1d1d33;
+}
+
+.dark .prisma-box-label {
+  color: #93c5fd;
+}
+
+.dark .prisma-box-sublabel {
+  color: #9ca3af;
+}
+
+.dark .prisma-box-count {
+  color: #f3f4f6;
+}
+
+.dark .prisma-box-note {
+  color: #6b7280;
+}
+
+.dark .prisma-arrow {
+  color: #6b7280;
 }
 
 /* ── Print styles ─────────────────────────────────────────────────────────── */
