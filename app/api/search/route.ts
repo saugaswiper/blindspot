@@ -71,16 +71,40 @@ function normalizeDoi(doi: string | undefined): string | undefined {
     .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
 }
 
+/**
+ * Extracts the AND-separated concept phrases from a boolean review query.
+ * e.g. `"psilocybin" AND "adolescents"` → ["psilocybin", "adolescents"]
+ */
+function extractQueryConcepts(reviewQuery: string): string[] {
+  return reviewQuery
+    .split(/\s+AND\s+/i)
+    .map((s) => s.trim().replace(/^"|"$/g, "").toLowerCase())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Filters reviews to only those that mention ALL query concepts in their
+ * title or abstract snippet. Removes tangentially-related reviews that the
+ * database returned due to partial keyword matching.
+ *
+ * Only applied when there are 2+ concepts (single-concept searches are
+ * already specific enough to rely on the API's own relevance ranking).
+ */
+function filterByRelevance(reviews: ExistingReview[], reviewQuery: string): ExistingReview[] {
+  const concepts = extractQueryConcepts(reviewQuery);
+  if (concepts.length <= 1) return reviews;
+  return reviews.filter((review) => {
+    const text = `${review.title} ${review.abstract_snippet}`.toLowerCase();
+    return concepts.every((concept) => text.includes(concept));
+  });
+}
+
 interface DedupeResult {
-  /** Deduplicated reviews, capped at 50 for display. */
+  /** All deduplicated reviews (uncapped — caller applies the display cap after relevance filtering). */
   reviews: ExistingReview[];
   /** Sum of all records across every source before deduplication. */
   totalIdentified: number;
-  /**
-   * Number of duplicate records removed (totalIdentified - unique count,
-   * computed before the 50-record display cap is applied so that true
-   * cross-database duplicates are counted accurately).
-   */
+  /** Number of duplicate records removed (totalIdentified - unique count). */
   deduplicationCount: number;
 }
 
@@ -111,9 +135,8 @@ function dedupeReviews(...sources: ExistingReview[][]): DedupeResult {
   }
 
   return {
-    reviews: unique.slice(0, 50),
+    reviews: unique,
     totalIdentified,
-    // Measure true duplicates before the display cap so the PRISMA count is accurate
     deduplicationCount: totalIdentified - unique.length,
   };
 }
@@ -259,7 +282,7 @@ export async function POST(request: Request) {
     }
 
     const {
-      reviews: existingReviews,
+      reviews: dedupedReviews,
       deduplicationCount,
     } = dedupeReviews(
       pubmedReviews,
@@ -267,6 +290,10 @@ export async function POST(request: Request) {
       europepmcReviews,
       semanticScholarReviews
     );
+
+    // Keep only reviews that mention all key concepts in title or abstract.
+    // Applied after dedup so PRISMA duplicate counts remain accurate.
+    const existingReviews = filterByRelevance(dedupedReviews, reviewQuery).slice(0, 50);
 
     // Build warnings for failed sources
     const failedSources = [
