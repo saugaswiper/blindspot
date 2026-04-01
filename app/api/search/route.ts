@@ -8,6 +8,7 @@ import { searchProspero, isQuerySubstantialEnough } from "@/lib/prospero";
 import { getCachedResult, saveSearchResult } from "@/lib/cache";
 import { validateSearchInput } from "@/lib/validators";
 import { toApiError } from "@/lib/errors";
+import { expandConcept } from "@/lib/synonyms";
 import type { ExistingReview } from "@/types";
 
 type SearchBody = { queryText?: string; pico?: { population: string; intervention: string; comparison?: string; outcome: string } };
@@ -83,9 +84,19 @@ function extractQueryConcepts(reviewQuery: string): string[] {
 }
 
 /**
+ * Returns true if `text` contains `term` as a whole word (case-insensitive).
+ * Uses \b word boundaries to avoid matching "aged" inside "managed", etc.
+ * Special regex characters in `term` are escaped before use.
+ */
+function textContainsTerm(text: string, term: string): boolean {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+}
+
+/**
  * Filters reviews to only those that mention ALL query concepts in their
- * title or abstract snippet. Removes tangentially-related reviews that the
- * database returned due to partial keyword matching.
+ * title or abstract snippet. Each concept is expanded to its synonym group
+ * so a review using "youth" satisfies a search for "adolescents", etc.
  *
  * Only applied when there are 2+ concepts (single-concept searches are
  * already specific enough to rely on the API's own relevance ranking).
@@ -94,8 +105,11 @@ function filterByRelevance(reviews: ExistingReview[], reviewQuery: string): Exis
   const concepts = extractQueryConcepts(reviewQuery);
   if (concepts.length <= 1) return reviews;
   return reviews.filter((review) => {
-    const text = `${review.title} ${review.abstract_snippet}`.toLowerCase();
-    return concepts.every((concept) => text.includes(concept));
+    const text = `${review.title} ${review.abstract_snippet}`;
+    return concepts.every((concept) => {
+      const synonyms = expandConcept(concept);
+      return synonyms.some((syn) => textContainsTerm(text, syn));
+    });
   });
 }
 
