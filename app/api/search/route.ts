@@ -10,11 +10,49 @@ import { validateSearchInput } from "@/lib/validators";
 import { toApiError } from "@/lib/errors";
 import type { ExistingReview } from "@/types";
 
-function buildQueryString(body: { queryText?: string; pico?: { population: string; intervention: string; comparison?: string; outcome: string } }): string {
+type SearchBody = { queryText?: string; pico?: { population: string; intervention: string; comparison?: string; outcome: string } };
+
+/**
+ * Builds the user-facing query string used as the cache key and stored label.
+ * Kept simple: PICO components are joined with spaces.
+ */
+function buildQueryString(body: SearchBody): string {
   if (body.queryText) return body.queryText;
   if (body.pico) {
     const { population, intervention, comparison, outcome } = body.pico;
     return [population, intervention, comparison, outcome].filter(Boolean).join(" ");
+  }
+  return "";
+}
+
+/**
+ * Builds a targeted boolean query for review searches.
+ *
+ * PICO mode: each component becomes a required AND clause, with multi-word
+ * phrases quoted — e.g. `"elderly patients" AND "cognitive behavioral therapy" AND "sleep quality"`.
+ *
+ * Simple mode: splits on common connector words (for / in / with / and / of /
+ * on / about / among / between) to extract distinct concept phrases, then ANDs
+ * them — e.g. "CBT for insomnia in elderly patients" →
+ * `"CBT" AND "insomnia" AND "elderly patients"`.
+ * Falls back to the raw text when the input is a single concept or short phrase.
+ */
+function buildReviewQuery(body: SearchBody): string {
+  if (body.pico) {
+    const { population, intervention, comparison, outcome } = body.pico;
+    const parts = [population, intervention, comparison, outcome]
+      .filter((p): p is string => Boolean(p))
+      .map((p) => (p.trim().includes(" ") ? `"${p.trim()}"` : p.trim()));
+    return parts.join(" AND ");
+  }
+  if (body.queryText) {
+    const raw = body.queryText.trim();
+    const concepts = raw
+      .split(/\s+(?:for|in|with|and|of|on|about|among|between)\s+/i)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (concepts.length <= 1) return raw;
+    return concepts.map((c) => (c.includes(" ") ? `"${c}"` : c)).join(" AND ");
   }
   return "";
 }
@@ -100,9 +138,10 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid input", details: validation.errors }, { status: 400 });
     }
 
-    const query = buildQueryString(
-      body as { queryText?: string; pico?: { population: string; intervention: string; comparison?: string; outcome: string } }
-    );
+    const query = buildQueryString(body as SearchBody);
+    // Targeted boolean query used for review searches — narrows results to the
+    // exact combination of concepts rather than any individual keyword match.
+    const reviewQuery = buildReviewQuery(body as SearchBody);
 
     // Check cache first
     const cached = await getCachedResult(user.id, query);
@@ -131,15 +170,17 @@ export async function POST(request: Request) {
       clinicalTrialsCount,
       prosperoCount,
     ] = await Promise.allSettled([
-      PubMed.searchExistingReviews(query),
-      OpenAlex.searchExistingReviews(query),
-      EuropePMC.searchExistingReviews(query),
-      SemanticScholar.searchExistingReviews(query),
+      // Review searches use the targeted boolean query for higher precision
+      PubMed.searchExistingReviews(reviewQuery),
+      OpenAlex.searchExistingReviews(reviewQuery),
+      EuropePMC.searchExistingReviews(reviewQuery),
+      SemanticScholar.searchExistingReviews(reviewQuery),
+      // Primary study counts stay broad (original query) for accurate feasibility scoring
       PubMed.countPrimaryStudies(query),
       OpenAlex.countPrimaryStudies(query),
       EuropePMC.countPrimaryStudies(query),
       ClinicalTrials.countPrimaryStudies(query),
-      isQuerySubstantialEnough(query) ? searchProspero(query) : Promise.resolve(0),
+      isQuerySubstantialEnough(query) ? searchProspero(reviewQuery) : Promise.resolve(0),
     ]);
 
     if (pubmedResult.status === "fulfilled") {
