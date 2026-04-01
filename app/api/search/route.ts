@@ -253,7 +253,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const apiError = toApiError(error);
-    console.error("Search error:", apiError.message);
+    console.error("[/api/search] Unhandled error:", apiError.message, error instanceof Error ? error.stack : error);
     return Response.json(
       { error: apiError.userMessage },
       { status: apiError.statusCode }
