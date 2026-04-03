@@ -29,6 +29,7 @@ import type { RelatedSearch } from "@/lib/related-searches";
 import { shouldIgnoreKeyEvent } from "@/lib/keyboard-shortcuts";
 import { KeyboardShortcutsHelp, ShortcutsButton, ShortcutsDiscoveryTooltip } from "@/components/KeyboardShortcutsHelp";
 import { deriveProtocolFilename, hasStoredProtocol } from "@/lib/protocol-storage";
+import { downloadProsperoRegistration, type ProsperoRegistration } from "@/lib/prospero-export";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
   High: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700",
@@ -1584,6 +1585,8 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isExportingProspero, setIsExportingProspero] = useState(false);
+  const [prosperoError, setProsperoError] = useState<string | null>(null);
 
   async function handleGenerate() {
     setStatus("loading");
@@ -1624,6 +1627,33 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
     downloadTextFile(deriveProtocolFilename(protocol), protocol, "text/markdown");
   }
 
+  async function handleExportProspero() {
+    setIsExportingProspero(true);
+    setProsperoError(null);
+    try {
+      const res = await fetch("/api/prospero-export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resultId }),
+      });
+      const data = (await res.json()) as { registration?: ProsperoRegistration; error?: string };
+      if (!res.ok || data.error) {
+        setProsperoError(data.error ?? "Export failed. Please try again.");
+        return;
+      }
+      if (data.registration) {
+        downloadProsperoRegistration(
+          data.registration,
+          `prospero-registration-draft-${new Date().toISOString().split("T")[0]}.txt`
+        );
+      }
+    } catch {
+      setProsperoError("Network error — please check your connection and try again.");
+    } finally {
+      setIsExportingProspero(false);
+    }
+  }
+
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       {/* Header bar */}
@@ -1636,7 +1666,7 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
           <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Protocol Draft</span>
         </div>
         {status === "done" && protocol && (
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             {/* Copy button */}
             <button
               onClick={handleCopy}
@@ -1670,10 +1700,34 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
               </svg>
               <span>Download .md</span>
             </button>
+            {/* PROSPERO export button */}
+            <button
+              onClick={handleExportProspero}
+              disabled={isExportingProspero}
+              className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors disabled:opacity-50"
+              aria-label="Export PROSPERO registration draft"
+              title="Generate a PROSPERO registration draft"
+            >
+              {isExportingProspero ? (
+                <>
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 12a8 8 0 0 1 8-8m0 0a8 8 0 0 1 8 8m-8-8v8m0-8a8 8 0 0 0-8 8m8-8v8" />
+                  </svg>
+                  <span>Exporting…</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.566.034-1.08.16-1.539.34m-5.4 0a2.25 2.25 0 0 0-2.25 2.25v12.75c0 1.24 1.01 2.25 2.25 2.25h15A2.25 2.25 0 0 0 21 18.75V6.108c0-1.135-.845-2.098-1.976-2.192a48.42 48.42 0 0 0-1.123-.08m-5.801 0c-.566.034-1.08.16-1.539.34" />
+                  </svg>
+                  <span>PROSPERO Export</span>
+                </>
+              )}
+            </button>
             {/* Regenerate button — lets users replace the stored draft */}
             <button
-              onClick={() => { setStatus("idle"); setProtocol(null); setErrorMsg(null); }}
-              className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-600 transition-colors"
+              onClick={() => { setStatus("idle"); setProtocol(null); setErrorMsg(null); setProsperoError(null); }}
+              className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
               aria-label="Regenerate protocol draft"
               title="Discard this draft and generate a new one"
             >
@@ -1732,9 +1786,14 @@ function ProtocolBlock({ resultId, initialProtocol = null }: { resultId: string;
       </div>
 
       {status === "done" && (
-        <div className="px-4 pb-3">
+        <div className="px-4 pb-3 space-y-2">
+          {prosperoError && (
+            <p className="text-xs text-red-600 dark:text-red-400">
+              PROSPERO export error: {prosperoError}
+            </p>
+          )}
           <p className="text-[10px] text-gray-600 dark:text-gray-400">
-            AI-generated draft — review and adapt before PROSPERO registration. Verify eligibility criteria and search strategy with a medical librarian or domain expert.
+            AI-generated draft — review and adapt before PROSPERO registration. Verify eligibility criteria and search strategy with a medical librarian or domain expert. Use the PROSPERO Export button to generate a pre-filled registration draft.
           </p>
         </div>
       )}
