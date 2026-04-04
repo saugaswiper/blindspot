@@ -338,7 +338,7 @@ export function ResultsDashboard({
       {!isOwner && localIsPublic && (
         <div
           className="mb-5 rounded-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-          style={{ background: "var(--brand)", color: "#f4f1ea" }}
+          style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
         >
           <div>
             <p className="text-sm font-semibold">You&apos;re viewing a shared Blindspot report.</p>
@@ -530,7 +530,7 @@ export function ResultsDashboard({
                 style={
                   localFeasibilityScore === "Insufficient"
                     ? { background: "var(--surface-2)", color: "var(--muted)", cursor: "not-allowed", opacity: 0.6 }
-                    : { background: "var(--brand)", color: "#f4f1ea" }
+                    : { background: "var(--brand-surface)", color: "#f4f1ea" }
                 }
               >
                 Run AI Gap Analysis
@@ -546,7 +546,7 @@ export function ResultsDashboard({
             <a
               href="/signup"
               className="inline-block px-4 py-2 text-sm font-medium rounded-md transition-opacity hover:opacity-90"
-              style={{ background: "var(--brand)", color: "#f4f1ea" }}
+              style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
             >
               Sign up free to run AI analysis
             </a>

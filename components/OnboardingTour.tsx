@@ -67,7 +67,7 @@ function ModalHeader({
   onClose: () => void;
 }) {
   return (
-    <div className="px-6 py-5" style={{ background: "var(--brand)" }}>
+    <div className="px-6 py-5" style={{ background: "var(--brand-surface)" }}>
       <div className="flex items-center justify-between">
         <span
           className="text-xs font-medium tracking-wide uppercase"
@@ -171,7 +171,7 @@ function ModalFooter({
           type="button"
           onClick={onAdvance}
           className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2"
-          style={{ background: "var(--brand)" }}
+          style={{ background: "var(--brand-surface)" }}
         >
           {isLast ? doneLabel : "Next →"}
         </button>

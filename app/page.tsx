@@ -11,7 +11,7 @@ export default function HomePage() {
       {/* Hero */}
       <section
         className="relative overflow-hidden"
-        style={{ background: "var(--brand)", color: "#f4f1ea" }}
+        style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
       >
         {/* Subtle grain texture overlay */}
         <div

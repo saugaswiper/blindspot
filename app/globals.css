@@ -11,6 +11,7 @@
   --surface-2: #edeae2;
   --border: #dedad0;
   --brand: #1c2b3a;
+  --brand-surface: #1c2b3a; /* always dark navy — safe for white text in any mode */
   --accent: #a67c2e;
   --accent-hover: #8a6424;
   --muted: #6b6560;
@@ -22,7 +23,8 @@ html.dark {
   --surface: #1a1820;
   --surface-2: #252230;
   --border: #2e2a38;
-  --brand: #8fb8d8;
+  --brand: #8fb8d8;        /* light blue — use for TEXT on dark backgrounds */
+  --brand-surface: #1c2b3a; /* stays dark navy — use for BACKGROUNDS with white text */
   --accent: #c49a2e;
   --accent-hover: #d4aa3e;
   --muted: #8b8690;
@@ -36,6 +38,7 @@ html.dark {
     --surface-2: #252230;
     --border: #2e2a38;
     --brand: #8fb8d8;
+    --brand-surface: #1c2b3a;
     --accent: #c49a2e;
     --accent-hover: #d4aa3e;
     --muted: #8b8690;

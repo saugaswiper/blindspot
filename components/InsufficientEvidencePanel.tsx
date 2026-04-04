@@ -98,7 +98,7 @@ export function InsufficientEvidencePanel({
               type="submit"
               disabled={!broaderQuery.trim()}
               className="text-xs font-medium px-3 py-2 rounded transition-opacity disabled:opacity-40"
-              style={{ background: "var(--brand)", color: "#f4f1ea" }}
+              style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
             >
               Search
             </button>

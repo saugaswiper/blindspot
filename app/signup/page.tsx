@@ -134,7 +134,7 @@ export default function SignupPage() {
                 type="submit"
                 disabled={loading}
                 className="w-full py-2 px-4 text-white text-sm font-medium rounded-md transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: "var(--brand)" }}
+                style={{ background: "var(--brand-surface)" }}
               >
                 {loading ? "Creating account..." : "Create free account"}
               </button>

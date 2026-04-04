@@ -145,7 +145,7 @@ export function TopicInput() {
         disabled={loading}
         className="mt-6 w-full py-3 px-6 text-sm font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
-          background: loading ? "var(--muted)" : "var(--brand)",
+          background: loading ? "var(--muted)" : "var(--brand-surface)",
           color: "#f4f1ea",
         }}
       >

@@ -61,7 +61,7 @@ export default async function DashboardPage() {
           <Link
             href="/"
             className="text-sm text-white px-4 py-2 rounded-md transition-opacity hover:opacity-90"
-            style={{ background: "var(--brand)" }}
+            style={{ background: "var(--brand-surface)" }}
           >
             New Search
           </Link>

@@ -74,7 +74,7 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
         {/* Header */}
         <div
           className="flex items-center justify-between px-4 py-3"
-          style={{ background: "var(--brand)", borderBottom: "1px solid var(--border)" }}
+          style={{ background: "var(--brand-surface)", borderBottom: "1px solid var(--border)" }}
         >
           <div className="flex items-center gap-2">
             <span className="text-white text-sm font-semibold tracking-wide">
@@ -208,7 +208,7 @@ export function ShortcutsDiscoveryTooltip({ onOpenShortcuts }: TooltipProps) {
       role="status"
       aria-live="polite"
       className="absolute top-full right-0 mt-2 z-40 flex items-center gap-2 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap"
-      style={{ background: "var(--brand)" }}
+      style={{ background: "var(--brand-surface)" }}
     >
       {/* Clickable label — opens shortcuts panel */}
       <button

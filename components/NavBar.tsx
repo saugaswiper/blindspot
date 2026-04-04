@@ -59,7 +59,7 @@ export async function NavBar() {
                 href="/signup"
                 className="text-sm font-medium px-3.5 py-1.5 rounded transition-colors whitespace-nowrap"
                 style={{
-                  background: "var(--brand)",
+                  background: "var(--brand-surface)",
                   color: "#f4f1ea",
                 }}
               >
