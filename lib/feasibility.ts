@@ -17,6 +17,21 @@ function getScore(primaryStudyCount: number): FeasibilityScore {
   return "Insufficient";
 }
 
+/**
+ * Returns a feasibility score based purely on primary study count.
+ * Exported for use in ACC-4: verifying AI-suggested topic feasibility
+ * against real PubMed counts.
+ *
+ * Thresholds (Cochrane-aligned):
+ *   ≥ 11 → High
+ *    6–10 → Moderate
+ *    3–5  → Low
+ *    < 3  → Insufficient
+ */
+export function getFeasibilityScore(primaryStudyCount: number): FeasibilityScore {
+  return getScore(primaryStudyCount);
+}
+
 function buildExplanation(
   score: FeasibilityScore,
   primaryStudyCount: number,

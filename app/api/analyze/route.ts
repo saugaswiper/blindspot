@@ -5,6 +5,7 @@ import { recommendStudyDesign } from "@/lib/study-design";
 import { buildGapAnalysisPrompt } from "@/lib/prompts";
 import { toApiError } from "@/lib/errors";
 import { countPrimaryStudies, countSystematicReviews as pubmedCountSRs } from "@/lib/pubmed";
+import { getFeasibilityScore } from "@/lib/feasibility";
 import { countSystematicReviews as europepmcCountSRs } from "@/lib/europepmc";
 import type { ExistingReview } from "@/types";
 
@@ -54,6 +55,20 @@ export async function POST(request: Request) {
     // Step 1: Feasibility scoring (pure logic — no AI)
     const feasibility = scoreFeasibility(primaryStudyCount, existingReviews);
 
+    // ACC-1: Hard gate — block AI analysis when evidence is insufficient
+    if (primaryStudyCount < 3) {
+      console.log("[analyze] Blocking AI analysis due to insufficient evidence (< 3 studies)");
+      return Response.json(
+        {
+          error: "insufficient_evidence",
+          primaryStudyCount,
+          feasibilityScore: feasibility.score,
+          message: "Not enough primary studies to identify meaningful gaps. A systematic review is not feasible on this exact topic.",
+        },
+        { status: 400 }
+      );
+    }
+
     // Step 2: Study design recommendation (pure logic — no AI)
     const studyDesign = recommendStudyDesign(feasibility);
 
@@ -73,20 +88,31 @@ export async function POST(request: Request) {
     }
 
     // Step 3: Gemini gap analysis
+    // ACC-3: Count how many reviews we actually send to Gemini (capped at 20 by the prompt builder)
+    const reviewsAnalyzedCount = Math.min(existingReviews.length, 20);
     const prompt = buildGapAnalysisPrompt(query, existingReviews, primaryStudyCount);
-    console.log("[analyze] Sending prompt to Gemini, length:", prompt.length);
+    console.log("[analyze] Sending prompt to Gemini, length:", prompt.length, "| reviews analyzed:", reviewsAnalyzedCount);
     const gapAnalysis = await generateGapAnalysis(prompt);
     console.log("[analyze] Gemini response received successfully");
 
+    // ACC-3: Attach the reviews_analyzed_count to the gap analysis before storing
+    gapAnalysis.reviews_analyzed_count = reviewsAnalyzedCount;
+
     // Step 4: Fetch real PubMed study counts for each suggested topic in parallel
+    // ACC-4: Also compute verified_feasibility from the actual count, overriding AI estimates
     const countResults = await Promise.allSettled(
       gapAnalysis.suggested_topics.map((topic) => countPrimaryStudies(topic.pubmed_query ?? topic.title))
     );
-    gapAnalysis.suggested_topics = gapAnalysis.suggested_topics.map((topic, i) => ({
-      ...topic,
-      estimated_studies: countResults[i].status === "fulfilled" ? countResults[i].value : 0,
-    }));
-    console.log("[analyze] PubMed counts fetched for", gapAnalysis.suggested_topics.length, "topics");
+    gapAnalysis.suggested_topics = gapAnalysis.suggested_topics.map((topic, i) => {
+      const actualCount = countResults[i].status === "fulfilled" ? countResults[i].value : 0;
+      return {
+        ...topic,
+        estimated_studies: actualCount,
+        // ACC-4: Override AI feasibility estimate with data-grounded score
+        verified_feasibility: getFeasibilityScore(actualCount),
+      };
+    });
+    console.log("[analyze] PubMed counts + verified feasibility computed for", gapAnalysis.suggested_topics.length, "topics");
 
     // Save all three back to the result row
     const { error: updateError } = await supabase

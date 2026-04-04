@@ -30,6 +30,7 @@ import { shouldIgnoreKeyEvent } from "@/lib/keyboard-shortcuts";
 import { KeyboardShortcutsHelp, ShortcutsButton, ShortcutsDiscoveryTooltip } from "@/components/KeyboardShortcutsHelp";
 import { deriveProtocolFilename, hasStoredProtocol } from "@/lib/protocol-storage";
 import { downloadProsperoRegistration, type ProsperoRegistration } from "@/lib/prospero-export";
+import { InsufficientEvidencePanel } from "@/components/InsufficientEvidencePanel";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
   High: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700",
@@ -59,6 +60,49 @@ const IMPORTANCE_STYLES = {
   medium: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
   low: "bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700",
 };
+
+/**
+ * ACC-3: Derives an AI confidence label and color scheme from the number of
+ * existing reviews Gemini analyzed (capped at 20 by the prompt builder).
+ *
+ * Tiers (from market research spec/026-market-research.md):
+ *   ≥ 20 → High Confidence
+ *   10–19 → Moderate Confidence
+ *   5–9  → Low Confidence
+ *   < 5  → Very Low Confidence
+ */
+function getAnalysisConfidence(reviewsAnalyzedCount: number): {
+  label: string;
+  badgeClass: string;
+  tooltip: string;
+} {
+  if (reviewsAnalyzedCount >= 20) {
+    return {
+      label: "High Confidence",
+      badgeClass: "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600",
+      tooltip: `Based on ${reviewsAnalyzedCount} existing reviews analyzed by AI.`,
+    };
+  }
+  if (reviewsAnalyzedCount >= 10) {
+    return {
+      label: "Moderate Confidence",
+      badgeClass: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600",
+      tooltip: `Based on ${reviewsAnalyzedCount} existing reviews analyzed by AI. More reviews would increase confidence.`,
+    };
+  }
+  if (reviewsAnalyzedCount >= 5) {
+    return {
+      label: "Low Confidence",
+      badgeClass: "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600",
+      tooltip: `Based on only ${reviewsAnalyzedCount} existing reviews analyzed by AI. Interpret gaps with caution.`,
+    };
+  }
+  return {
+    label: "Very Low Confidence",
+    badgeClass: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600",
+    tooltip: `Based on only ${reviewsAnalyzedCount} existing review${reviewsAnalyzedCount === 1 ? "" : "s"} analyzed by AI. Results should be interpreted with significant caution.`,
+  };
+}
 
 const SOURCE_STYLES: Record<string, string> = {
   PubMed: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
@@ -188,9 +232,10 @@ export function ResultsDashboard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resultId }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { error?: string; message?: string };
 
       if (!res.ok || data.error) {
+        // insufficient_evidence is a special error type that gets caught and displayed as InsufficientEvidencePanel
         setAnalysisError(data.error ?? "Analysis failed. Please try again.");
         return;
       }
@@ -472,12 +517,24 @@ export function ResultsDashboard({
         {/* Analyze / Download buttons */}
         <div className="mt-4">
           {isOwner && !hasAnalysis && !isPending && (
-            <button
-              onClick={runAnalysis}
-              className="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] transition-colors"
-            >
-              Run AI Gap Analysis
-            </button>
+            <>
+              <button
+                onClick={runAnalysis}
+                disabled={localFeasibilityScore === "Insufficient"}
+                className={`px-4 py-2 text-white text-sm font-medium rounded-md transition-colors ${
+                  localFeasibilityScore === "Insufficient"
+                    ? "bg-gray-400 cursor-not-allowed opacity-60"
+                    : "bg-[#1e3a5f] hover:bg-[#2d5a8e]"
+                }`}
+              >
+                Run AI Gap Analysis
+              </button>
+              {localFeasibilityScore === "Insufficient" && (
+                <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                  Analysis is not available for topics with insufficient evidence (fewer than 3 studies).
+                </p>
+              )}
+            </>
           )}
           {!isOwner && !hasAnalysis && (
             <a
@@ -540,7 +597,7 @@ export function ResultsDashboard({
             <ReviewsTab reviews={existingReviews} />
           )}
           {activeTab === "gaps" && (
-            <GapsTab gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} />
+            <GapsTab gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} />
           )}
           {activeTab === "design" && (
             <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} />
@@ -1013,7 +1070,7 @@ function GapDimensionFilter({
 /* Gaps tab                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, protocolDraft }: {
+function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore }: {
   gapAnalysis: GapAnalysis | null;
   isPending: boolean;
   onAnalyze: () => void;
@@ -1021,11 +1078,18 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
   resultId: string;
   isOwner: boolean;
   protocolDraft?: string | null;
+  primaryStudyCount: number;
+  feasibilityScore: FeasibilityScore | null;
 }) {
   const [activeDimensions, setActiveDimensions] = useState<Set<GapDimension>>(resetFilter);
 
   if (isPending) {
     return <GapsSkeleton />;
+  }
+
+  // ACC-1: Show InsufficientEvidencePanel when evidence is insufficient
+  if (feasibilityScore === "Insufficient" && !gapAnalysis) {
+    return <InsufficientEvidencePanel primaryStudyCount={primaryStudyCount} />;
   }
 
   if (!gapAnalysis) {
@@ -1048,7 +1112,25 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
       {gapAnalysis.overall_assessment && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-4">
           <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">{gapAnalysis.overall_assessment}</p>
-          <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">AI-generated assessment — verify with domain expertise</p>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <p className="text-xs text-blue-500 dark:text-blue-400">AI-generated assessment — verify with domain expertise</p>
+            {/* ACC-3: Confidence badge — only rendered when reviews_analyzed_count is present */}
+            {typeof gapAnalysis.reviews_analyzed_count === "number" && (() => {
+              const confidence = getAnalysisConfidence(gapAnalysis.reviews_analyzed_count!);
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${confidence.badgeClass}`}
+                  title={confidence.tooltip}
+                  aria-label={`Analysis confidence: ${confidence.label}. ${confidence.tooltip}`}
+                >
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  {confidence.label} · {gapAnalysis.reviews_analyzed_count} reviews analyzed
+                </span>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -1128,27 +1210,66 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
           </div>
         ) : (
           <div className="space-y-3">
-            {visibleTopics.map((topic, i) => (
-              <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-shadow hover:shadow-sm">
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <p className="text-sm font-medium text-[#1e3a5f] dark:text-blue-300 break-words min-w-0">{i + 1}. {topic.title}</p>
-                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
-                    topic.feasibility === "high"
-                      ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
-                      : topic.feasibility === "moderate"
-                      ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
-                  }`}>
-                    {topic.feasibility} feasibility
-                  </span>
+            {visibleTopics.map((topic, i) => {
+              // ACC-4: Use verified_feasibility (PubMed-verified) when available;
+              // fall back to AI estimate for pre-v028 results.
+              const verifiedScore = topic.verified_feasibility;
+              const feasibilityBadgeClass = verifiedScore === "High"
+                ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
+                : verifiedScore === "Moderate"
+                ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                : verifiedScore === "Low"
+                ? "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700"
+                : verifiedScore === "Insufficient"
+                ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"
+                // Legacy fallback: use AI estimate styling
+                : topic.feasibility === "high"
+                ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
+                : topic.feasibility === "moderate"
+                ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700";
+              const feasibilityLabel = verifiedScore
+                ? `${verifiedScore} feasibility`
+                : `${topic.feasibility} feasibility`;
+              const isInsufficient = verifiedScore === "Insufficient";
+              return (
+                <div
+                  key={i}
+                  className={`border rounded-lg p-4 transition-shadow hover:shadow-sm ${
+                    isInsufficient
+                      ? "border-red-200 dark:border-red-800 opacity-70"
+                      : "border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <p className="text-sm font-medium text-[#1e3a5f] dark:text-blue-300 break-words min-w-0">{i + 1}. {topic.title}</p>
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full border font-medium ${feasibilityBadgeClass}`}
+                        title={verifiedScore ? "Feasibility verified against real PubMed data" : "AI-estimated feasibility — not yet verified"}
+                      >
+                        {feasibilityLabel}
+                      </span>
+                      {verifiedScore && (
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                          ✓ PubMed-verified
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {isInsufficient && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mb-2 italic">
+                      AI suggested this gap, but PubMed found fewer than 3 primary studies — a systematic review is not yet feasible on this exact topic.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    <span>Gap: {GAP_LABELS[topic.gap_type]}</span>
+                    <span>~{topic.estimated_studies.toLocaleString("en-US")} primary studies</span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{topic.rationale}</p>
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  <span>Gap: {GAP_LABELS[topic.gap_type]}</span>
-                  <span>~{topic.estimated_studies.toLocaleString("en-US")} primary studies</span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{topic.rationale}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

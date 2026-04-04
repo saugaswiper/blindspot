@@ -84,6 +84,13 @@ export interface SuggestedTopic {
   rationale: string;
   feasibility: "high" | "moderate" | "low";
   expected_outcomes: string;
+  /**
+   * ACC-4: Actual PubMed-verified feasibility score, overriding the AI estimate.
+   * Absent on results that predate this field (before v028).
+   * When present, use this for badge color and labeling; show AI estimate as
+   * secondary context only.
+   */
+  verified_feasibility?: FeasibilityScore;
 }
 
 export interface GapAnalysis {
@@ -96,6 +103,16 @@ export interface GapAnalysis {
    * Uses MeSH terms and [tiab] qualifiers in standard PubMed syntax.
    */
   boolean_search_string?: string;
+  /**
+   * ACC-3: Number of existing reviews actually sent to Gemini for analysis
+   * (capped at 20 by the prompt builder). Absent on pre-v028 results.
+   * Used to display an AI confidence badge:
+   *   ≥ 20 → "High Confidence"
+   *   10–19 → "Moderate Confidence"
+   *   5–9  → "Low Confidence"
+   *   < 5  → "Very Low Confidence"
+   */
+  reviews_analyzed_count?: number;
 }
 
 export type StudyDesignType =
