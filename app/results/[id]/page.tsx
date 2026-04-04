@@ -80,7 +80,7 @@ export default async function ResultsPage({
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen" style={{ background: "var(--background)" }}>
       <NavBar />
 
       <ResultsDashboard

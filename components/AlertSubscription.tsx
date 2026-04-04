@@ -60,11 +60,16 @@ export function AlertSubscription({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
+    <div
+      className="rounded-lg p-4 sm:p-5 mt-4"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Email Alerts</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <h3 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+            Email Alerts
+          </h3>
+          <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
             Get weekly email updates when new systematic reviews are discovered
             on this topic.
           </p>
@@ -72,22 +77,33 @@ export function AlertSubscription({
         <button
           onClick={handleToggleSubscription}
           disabled={isLoading}
-          className={`shrink-0 px-4 py-2 text-sm font-medium rounded-md border transition-colors disabled:opacity-50 ${
+          className="shrink-0 px-4 py-2 text-sm font-medium rounded-md transition-all disabled:opacity-50"
+          style={
             subscribed
-              ? "bg-blue-50 dark:bg-blue-900/30 border-[#4a90d9] dark:border-blue-500 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50"
-              : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-[#4a90d9] dark:hover:border-blue-400 hover:text-[#4a90d9] dark:hover:text-blue-400"
-          }`}
+              ? {
+                  background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                  border: "1px solid var(--accent)",
+                  color: "var(--accent)",
+                }
+              : {
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  color: "var(--muted)",
+                }
+          }
         >
-          {isLoading ? "Updating..." : subscribed ? "Subscribed" : "Subscribe"}
+          {isLoading ? "Updating…" : subscribed ? "Subscribed ✓" : "Subscribe"}
         </button>
       </div>
 
       {message && (
-        <p className={`text-xs mt-3 ${
-          subscribed
-            ? "text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20"
-            : "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20"
-        } px-3 py-2 rounded`}>
+        <p
+          className="text-xs mt-3 px-3 py-2 rounded"
+          style={{
+            color: subscribed ? "var(--accent)" : "var(--foreground)",
+            background: "var(--surface-2)",
+          }}
+        >
           {message}
         </p>
       )}

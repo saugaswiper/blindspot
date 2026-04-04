@@ -24,7 +24,7 @@ import {
   countByDimension,
   isUnfiltered,
 } from "@/lib/gap-filter";
-import { deriveRelatedSearches } from "@/lib/related-searches";
+import { deriveRelatedSearches, cleanPubMedQuery } from "@/lib/related-searches";
 import type { RelatedSearch } from "@/lib/related-searches";
 import { shouldIgnoreKeyEvent } from "@/lib/keyboard-shortcuts";
 import { KeyboardShortcutsHelp, ShortcutsButton, ShortcutsDiscoveryTooltip } from "@/components/KeyboardShortcutsHelp";
@@ -155,6 +155,54 @@ interface Props {
   protocolDraft?: string | null;
   /** Whether the owner is subscribed to email alerts for this search. */
   isAlertSubscribed?: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Public viewer banner with copy-link                                        */
+/* -------------------------------------------------------------------------- */
+
+function PublicViewerBanner({ query }: { query: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable — silently skip */
+    }
+  }
+
+  return (
+    <div
+      className="mb-5 rounded-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+      style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+    >
+      <div>
+        <p className="text-sm font-semibold">You&apos;re viewing a shared Blindspot report.</p>
+        <p className="text-xs mt-0.5" style={{ opacity: 0.7 }}>
+          Run your own gap analysis on <em>{query}</em> or any other topic.
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={handleCopy}
+          className="text-xs font-medium px-3 py-1.5 rounded-md transition-opacity hover:opacity-80"
+          style={{ background: "rgba(255,255,255,0.15)", color: "#f4f1ea" }}
+        >
+          {copied ? "Copied ✓" : "Copy link"}
+        </button>
+        <a
+          href="/signup"
+          className="text-sm font-semibold px-4 py-2 rounded-md transition-opacity hover:opacity-90 whitespace-nowrap"
+          style={{ background: "var(--surface)", color: "var(--brand)" }}
+        >
+          Sign up free →
+        </a>
+      </div>
+    </div>
+  );
 }
 
 export function ResultsDashboard({
@@ -336,31 +384,24 @@ export function ResultsDashboard({
 
       {/* Public viewer CTA banner — shown to non-owners viewing a shared result */}
       {!isOwner && localIsPublic && (
-        <div
-          className="mb-5 rounded-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-          style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
-        >
-          <div>
-            <p className="text-sm font-semibold">You&apos;re viewing a shared Blindspot report.</p>
-            <p className="text-xs mt-0.5" style={{ opacity: 0.7 }}>
-              Sign up free to run your own systematic review gap analysis.
-            </p>
-          </div>
-          <a
-            href="/signup"
-            className="shrink-0 text-sm font-semibold px-4 py-2 rounded-md transition-colors whitespace-nowrap"
-            style={{ background: "var(--surface)", color: "var(--brand)" }}
-          >
-            Sign up free →
-          </a>
-        </div>
+        <PublicViewerBanner query={query} />
       )}
 
     <div data-screen-content>
       {/* Header */}
       <div className="rounded-lg p-4 sm:p-6 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
         <div className="flex items-start justify-between gap-3 mb-1">
+          <div className="flex items-center gap-3">
           <p className="text-xs uppercase tracking-[0.15em]" style={{ color: "var(--muted)" }}>Topic searched</p>
+          <a
+            href={`/?q=${encodeURIComponent(query)}`}
+            className="text-xs transition-opacity hover:opacity-70"
+            style={{ color: "var(--muted)" }}
+            title="Start a new search with this query"
+          >
+            ← New search
+          </a>
+        </div>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Keyboard shortcuts button + one-time discovery tooltip */}
@@ -402,7 +443,7 @@ export function ResultsDashboard({
               </button>
               {/* Toast notification */}
               {shareToast && (
-                <p className="text-xs text-gray-500 max-w-[220px] text-right leading-tight">
+                <p className="text-xs max-w-[220px] text-right leading-tight" style={{ color: "var(--muted)" }}>
                   {shareToast}
                 </p>
               )}
@@ -435,12 +476,13 @@ export function ResultsDashboard({
                 className="inline-flex items-center gap-1 group"
                 title="View on ClinicalTrials.gov"
               >
-                <p className="text-2xl font-bold text-gray-800 dark:text-gray-100 group-hover:text-[#4a90d9] dark:group-hover:text-blue-400 transition-colors">
+                <p className="text-2xl font-bold transition-colors group-hover:opacity-70" style={{ color: "var(--foreground)" }}>
                   {clinicalTrialsCount.toLocaleString("en-US")}
                 </p>
                 {/* External link icon */}
                 <svg
-                  className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400 group-hover:text-[#4a90d9] dark:group-hover:text-blue-400 transition-colors mt-1 shrink-0"
+                  className="w-3.5 h-3.5 mt-1 shrink-0 transition-opacity group-hover:opacity-70"
+                  style={{ color: "var(--muted)" }}
                   fill="none"
                   viewBox="0 0 24 24"
                   strokeWidth={2}
@@ -454,7 +496,7 @@ export function ResultsDashboard({
                   />
                 </svg>
               </a>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
                 via ClinicalTrials.gov
               </p>
             </div>
@@ -471,7 +513,7 @@ export function ResultsDashboard({
         </div>
 
         {localFeasibilityExplanation && (
-          <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{localFeasibilityExplanation}</p>
+          <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>{localFeasibilityExplanation}</p>
         )}
 
         {/* PROSPERO warning banner */}
@@ -744,7 +786,8 @@ function RelatedSearchCard({ search }: { search: RelatedSearch }) {
   return (
     <a
       href={href}
-      className="block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-[#4a90d9] dark:hover:border-blue-500 hover:shadow-sm transition-all group"
+      className="block rounded-lg p-4 hover:shadow-sm transition-all group"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex flex-wrap gap-1.5">
@@ -757,7 +800,8 @@ function RelatedSearchCard({ search }: { search: RelatedSearch }) {
         </div>
         {/* Chevron icon */}
         <svg
-          className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-[#4a90d9] dark:group-hover:text-blue-400 transition-colors shrink-0 mt-0.5"
+          className="w-4 h-4 shrink-0 mt-0.5 transition-opacity group-hover:opacity-60"
+          style={{ color: "var(--border)" }}
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth={2}
@@ -767,10 +811,10 @@ function RelatedSearchCard({ search }: { search: RelatedSearch }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
         </svg>
       </div>
-      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 group-hover:text-[#1e3a5f] dark:group-hover:text-blue-300 leading-snug mb-1.5">
+      <p className="text-sm font-medium leading-snug mb-1.5 group-hover:opacity-80 transition-opacity" style={{ color: "var(--foreground)" }}>
         {search.label}
       </p>
-      <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+      <p className="text-xs leading-relaxed line-clamp-2" style={{ color: "var(--muted)" }}>
         {search.snippet}
       </p>
     </a>
@@ -784,8 +828,8 @@ function RelatedSearchesSection({ gapAnalysis }: { gapAnalysis: import("@/types"
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Explore Related Topics</h2>
-        <span className="text-xs text-gray-600 dark:text-gray-400">Click to search on Blindspot</span>
+        <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>Explore Related Topics</h2>
+        <span className="text-xs" style={{ color: "var(--muted)" }}>Click to search on Blindspot</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {suggestions.map((s, i) => (
@@ -832,13 +876,16 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
   if (reviews.length === 0) {
     return (
       <div className="text-center py-10">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 mb-3">
-          <span className="text-xl text-gray-600 dark:text-gray-400">0</span>
+        <div
+          className="inline-flex items-center justify-center w-12 h-12 rounded-full mb-3"
+          style={{ background: "var(--surface-2)" }}
+        >
+          <span className="text-xl" style={{ color: "var(--muted)" }}>0</span>
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
           No existing systematic reviews found on this exact topic — this may indicate a genuine research gap.
         </p>
-        <p className="text-xs text-gray-600 dark:text-gray-500 mt-1">
+        <p className="text-xs mt-1" style={{ color: "var(--muted)", opacity: 0.7 }}>
           Try broadening your search terms if you expected to find reviews.
         </p>
       </div>
@@ -1200,10 +1247,10 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--foreground)" }}>
           Suggested Review Topics
           {isFiltered && visibleTopics.length !== gapAnalysis.suggested_topics.length && (
-            <span className="ml-2 text-xs font-normal text-gray-600 dark:text-gray-400">
+            <span className="ml-2 text-xs font-normal" style={{ color: "var(--muted)" }}>
               ({visibleTopics.length} of {gapAnalysis.suggested_topics.length} shown)
             </span>
           )}
@@ -1250,17 +1297,21 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
                 ? `${effectiveVerifiedScore} feasibility`
                 : `${topic.feasibility} feasibility`;
               const isInsufficient = effectiveVerifiedScore === "Insufficient";
+              // Build a plain-language search query from this topic's pubmed_query
+              const topicSearchQuery = cleanPubMedQuery(topic.pubmed_query || topic.title);
               return (
                 <div
                   key={i}
-                  className={`border rounded-lg p-4 transition-shadow hover:shadow-sm ${
-                    isInsufficient
-                      ? "border-red-200 dark:border-red-800 opacity-70"
-                      : "border-gray-200 dark:border-gray-700"
-                  }`}
+                  className={`rounded-lg p-4 transition-shadow hover:shadow-sm ${isInsufficient ? "opacity-70" : ""}`}
+                  style={{
+                    border: isInsufficient
+                      ? "1px solid #fca5a5"
+                      : "1px solid var(--border)",
+                    background: "var(--surface)",
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <p className="text-sm font-medium text-[#1e3a5f] dark:text-blue-300 break-words min-w-0">{i + 1}. {topic.title}</p>
+                    <p className="text-sm font-medium break-words min-w-0" style={{ color: "var(--brand)" }}>{i + 1}. {topic.title}</p>
                     <div className="shrink-0 flex flex-col items-end gap-1">
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full border font-medium ${feasibilityBadgeClass}`}
@@ -1275,7 +1326,7 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
                         {feasibilityLabel}
                       </span>
                       {isDataBacked && (
-                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                        <span className="text-[10px]" style={{ color: "var(--muted)" }}>
                           {topic.verified_feasibility ? "✓ PubMed-verified" : "✓ 0 studies found"}
                         </span>
                       )}
@@ -1288,11 +1339,20 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
                         : "AI suggested this gap, but PubMed found fewer than 3 primary studies — a systematic review is not yet feasible on this exact topic."}
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-2" style={{ color: "var(--muted)" }}>
                     <span>Gap: {GAP_LABELS[topic.gap_type]}</span>
                     <span>~{topic.estimated_studies.toLocaleString("en-US")} primary studies</span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">{topic.rationale}</p>
+                  <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--muted)" }}>{topic.rationale}</p>
+                  {!isInsufficient && (
+                    <a
+                      href={`/?q=${encodeURIComponent(topicSearchQuery)}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      Search this topic →
+                    </a>
+                  )}
                 </div>
               );
             })}
