@@ -9,24 +9,39 @@ export async function NavBar() {
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-        <Link href="/" className="text-lg font-bold text-[#1e3a5f] dark:text-blue-300">
+    <nav
+      style={{
+        borderBottom: "1px solid var(--border)",
+        background: "var(--surface)",
+      }}
+    >
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+        {/* Wordmark */}
+        <Link
+          href="/"
+          className="font-serif text-xl tracking-tight transition-opacity hover:opacity-80"
+          style={{ color: "var(--foreground)" }}
+        >
           Blindspot
         </Link>
 
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1 sm:gap-3">
           <NavHelpButton />
           <ThemeToggle />
+
           {user ? (
             <>
               <Link
                 href="/dashboard"
-                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 whitespace-nowrap"
+                className="text-sm transition-opacity hover:opacity-100 hidden sm:block px-2 py-1"
+                style={{ color: "var(--muted)", opacity: 0.8 }}
               >
                 My Searches
               </Link>
-              <span className="hidden sm:block text-xs text-gray-600 dark:text-gray-400 truncate max-w-[160px]">
+              <span
+                className="hidden md:block text-xs truncate max-w-[140px]"
+                style={{ color: "var(--muted)" }}
+              >
                 {user.email}
               </span>
               <SignOutButton />
@@ -35,13 +50,18 @@ export async function NavBar() {
             <>
               <Link
                 href="/login"
-                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                className="text-sm px-2 py-1 transition-opacity hover:opacity-100"
+                style={{ color: "var(--muted)", opacity: 0.8 }}
               >
                 Sign in
               </Link>
               <Link
                 href="/signup"
-                className="text-sm bg-[#1e3a5f] dark:bg-blue-700 text-white px-3 py-1.5 rounded-md hover:bg-[#2d5a8e] dark:hover:bg-blue-600 transition-colors whitespace-nowrap"
+                className="text-sm font-medium px-3.5 py-1.5 rounded transition-colors whitespace-nowrap"
+                style={{
+                  background: "var(--brand)",
+                  color: "#f4f1ea",
+                }}
               >
                 Sign up free
               </Link>

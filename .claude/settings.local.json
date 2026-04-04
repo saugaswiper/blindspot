@@ -9,7 +9,18 @@
       "Bash(git merge:*)",
       "Bash(git push:*)",
       "Bash(git branch:*)",
-      "Bash(rm /Users/dharmayudesai/blindspot/.git/index.lock)"
+      "Bash(rm /Users/dharmayudesai/blindspot/.git/index.lock)",
+      "Bash(git commit:*)",
+      "Bash(git -C:*)",
+      "mcp__plugin_bio-research_pubmed__search_articles",
+      "mcp__plugin_bio-research_pubmed__get_article_metadata",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(gh api:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(command -v node)",
+      "Bash(/usr/local/bin/npx tsc:*)",
+      "Read(//Users/dharmayudesai/**)"
     ]
   }
 }

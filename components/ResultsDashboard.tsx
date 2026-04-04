@@ -33,17 +33,17 @@ import { downloadProsperoRegistration, type ProsperoRegistration } from "@/lib/p
 import { InsufficientEvidencePanel } from "@/components/InsufficientEvidencePanel";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
-  High: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700",
-  Moderate: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-700",
-  Low: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700",
-  Insufficient: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-700",
+  High: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 font-medium",
+  Moderate: "bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700 font-medium",
+  Low: "bg-orange-50 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700 font-medium",
+  Insufficient: "bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700 font-medium",
 };
 
 const FEASIBILITY_ICONS: Record<FeasibilityScore, string> = {
-  High: "✓",
-  Moderate: "~",
-  Low: "!",
-  Insufficient: "✕",
+  High: "●",
+  Moderate: "◑",
+  Low: "◔",
+  Insufficient: "○",
 };
 
 const GAP_LABELS: Record<GapDimension, string> = {
@@ -56,9 +56,9 @@ const GAP_LABELS: Record<GapDimension, string> = {
 };
 
 const IMPORTANCE_STYLES = {
-  high: "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
-  medium: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
-  low: "bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700",
+  high: "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800 font-medium",
+  medium: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800",
+  low: "bg-stone-50 dark:bg-stone-800/60 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700",
 };
 
 /**
@@ -336,16 +336,20 @@ export function ResultsDashboard({
 
       {/* Public viewer CTA banner — shown to non-owners viewing a shared result */}
       {!isOwner && localIsPublic && (
-        <div className="mb-5 bg-[#1e3a5f] text-white rounded-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div
+          className="mb-5 rounded-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+          style={{ background: "var(--brand)", color: "#f4f1ea" }}
+        >
           <div>
             <p className="text-sm font-semibold">You&apos;re viewing a shared Blindspot report.</p>
-            <p className="text-xs text-white/70 mt-0.5">
+            <p className="text-xs mt-0.5" style={{ opacity: 0.7 }}>
               Sign up free to run your own systematic review gap analysis.
             </p>
           </div>
           <a
             href="/signup"
-            className="shrink-0 bg-white text-[#1e3a5f] text-sm font-semibold px-4 py-2 rounded-md hover:bg-gray-100 transition-colors whitespace-nowrap"
+            className="shrink-0 text-sm font-semibold px-4 py-2 rounded-md transition-colors whitespace-nowrap"
+            style={{ background: "var(--surface)", color: "var(--brand)" }}
           >
             Sign up free →
           </a>
@@ -354,9 +358,9 @@ export function ResultsDashboard({
 
     <div data-screen-content>
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4 sm:p-6 mb-6">
+      <div className="rounded-lg p-4 sm:p-6 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
         <div className="flex items-start justify-between gap-3 mb-1">
-          <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide">Topic searched</p>
+          <p className="text-xs uppercase tracking-[0.15em]" style={{ color: "var(--muted)" }}>Topic searched</p>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Keyboard shortcuts button + one-time discovery tooltip */}
@@ -372,11 +376,12 @@ export function ResultsDashboard({
                 onClick={handleToggleShare}
                 disabled={isSharing}
                 aria-pressed={localIsPublic}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
-                  localIsPublic
-                    ? "bg-blue-50 border-[#4a90d9] text-[#4a90d9] hover:bg-blue-100"
-                    : "border-gray-300 text-gray-600 hover:border-[#4a90d9] hover:text-[#4a90d9]"
-                }`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all disabled:opacity-50"
+              style={{
+                border: "1px solid var(--border)",
+                color: localIsPublic ? "var(--accent)" : "var(--muted)",
+                background: localIsPublic ? "var(--surface-2)" : "transparent",
+              }}
               >
                 {/* Share icon */}
                 <svg
@@ -405,22 +410,22 @@ export function ResultsDashboard({
           )}
           </div>{/* end flex items-center gap-2 wrapper */}
         </div>
-        <h1 className="text-lg sm:text-xl font-semibold text-[#1e3a5f] dark:text-blue-300 break-words">{query}</h1>
+        <h1 className="font-serif text-lg sm:text-xl break-words" style={{ color: "var(--foreground)" }}>{query}</h1>
 
         {/* Key metrics row */}
         <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap items-start gap-4 sm:gap-6">
           <div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Primary studies</p>
-            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{primaryStudyCount.toLocaleString("en-US")}</p>
+            <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Primary studies</p>
+            <p className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>{primaryStudyCount.toLocaleString("en-US")}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Existing reviews</p>
-            <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{existingReviews.length}</p>
+            <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Existing reviews</p>
+            <p className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>{existingReviews.length}</p>
           </div>
           {/* ClinicalTrials.gov count — only shown when data is available (non-null) */}
           {clinicalTrialsCount !== null && clinicalTrialsCount !== undefined && (
             <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">
+              <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>
                 Registered trials
               </p>
               <a
@@ -456,7 +461,7 @@ export function ResultsDashboard({
           )}
           {localFeasibilityScore && (
             <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Feasibility</p>
+              <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Feasibility</p>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${FEASIBILITY_STYLES[localFeasibilityScore]}`}>
                 <span className="text-xs">{FEASIBILITY_ICONS[localFeasibilityScore]}</span>
                 {localFeasibilityScore}
@@ -521,16 +526,17 @@ export function ResultsDashboard({
               <button
                 onClick={runAnalysis}
                 disabled={localFeasibilityScore === "Insufficient"}
-                className={`px-4 py-2 text-white text-sm font-medium rounded-md transition-colors ${
+                className="px-4 py-2 text-sm font-medium rounded-md transition-all"
+                style={
                   localFeasibilityScore === "Insufficient"
-                    ? "bg-gray-400 cursor-not-allowed opacity-60"
-                    : "bg-[#1e3a5f] hover:bg-[#2d5a8e]"
-                }`}
+                    ? { background: "var(--surface-2)", color: "var(--muted)", cursor: "not-allowed", opacity: 0.6 }
+                    : { background: "var(--brand)", color: "#f4f1ea" }
+                }
               >
                 Run AI Gap Analysis
               </button>
               {localFeasibilityScore === "Insufficient" && (
-                <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
                   Analysis is not available for topics with insufficient evidence (fewer than 3 studies).
                 </p>
               )}
@@ -539,7 +545,8 @@ export function ResultsDashboard({
           {!isOwner && !hasAnalysis && (
             <a
               href="/signup"
-              className="inline-block px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] transition-colors"
+              className="inline-block px-4 py-2 text-sm font-medium rounded-md transition-opacity hover:opacity-90"
+              style={{ background: "var(--brand)", color: "#f4f1ea" }}
             >
               Sign up free to run AI analysis
             </a>
@@ -550,10 +557,11 @@ export function ResultsDashboard({
                 <span>Analyzing with AI…</span>
                 <span>~20 seconds</span>
               </div>
-              <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
                 <div
-                  className="h-full bg-[#1e3a5f] dark:bg-blue-600 rounded-full"
+                  className="h-full rounded-full"
                   style={{
+                    background: "var(--accent)",
                     animation: "progress-fill 22s cubic-bezier(0.1, 0, 0.4, 1) forwards",
                   }}
                 />
@@ -563,7 +571,8 @@ export function ResultsDashboard({
           {hasAnalysis && (
             <button
               onClick={() => window.print()}
-              className="px-4 py-2 border border-[#1e3a5f] text-[#1e3a5f] text-sm font-medium rounded-md hover:bg-[#1e3a5f] hover:text-white transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-md transition-all hover:opacity-90"
+              style={{ border: "1px solid var(--border)", color: "var(--foreground)", background: "transparent" }}
             >
               Download PDF
             </button>
@@ -575,17 +584,18 @@ export function ResultsDashboard({
       </div>
 
       {/* Tabs */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <div className="rounded-lg" style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+        <div className="flex overflow-x-auto" style={{ borderBottom: "1px solid var(--border)" }}>
           {tabs.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`shrink-0 px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === key
-                  ? "border-[#1e3a5f] dark:border-blue-400 text-[#1e3a5f] dark:text-blue-300"
-                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              }`}
+              className="shrink-0 px-3 sm:px-5 py-3 text-xs sm:text-sm transition-colors whitespace-nowrap"
+              style={{
+                fontWeight: activeTab === key ? 600 : 400,
+                color: activeTab === key ? "var(--foreground)" : "var(--muted)",
+                borderBottom: activeTab === key ? "2px solid var(--accent)" : "2px solid transparent",
+              }}
             >
               {label}
             </button>
@@ -629,7 +639,7 @@ export function ResultsDashboard({
         <RelatedSearchesSection gapAnalysis={localGapAnalysis} />
       )}
 
-      <p className="text-xs text-gray-600 dark:text-gray-400 text-center mt-6">
+      <p className="text-xs text-center mt-6 leading-relaxed" style={{ color: "var(--muted)" }}>
         Results sourced from PubMed, OpenAlex, Europe PMC (includes Cochrane abstracts), and Semantic Scholar. Trial counts via ClinicalTrials.gov. AI-generated analysis may contain errors — verify all findings with domain expertise.
       </p>
     </div>

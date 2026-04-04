@@ -1,6 +1,20 @@
 import type { Metadata } from "next";
+import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+
+const dmSerif = DM_Serif_Display({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-dm-serif",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Blindspot — Find the systematic review no one's written yet",
@@ -14,11 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    // suppressHydrationWarning: next-themes updates the `class` attribute on
-    // <html> client-side (to apply .dark / .light), which would otherwise
-    // produce a React hydration mismatch warning.
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased">
+      <body className={`${dmSans.variable} ${dmSerif.variable} antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>
