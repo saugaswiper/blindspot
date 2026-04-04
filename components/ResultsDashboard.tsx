@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback } from "react";
+import { useState, useTransition, useEffect, useCallback, useRef } from "react";
 import type {
   ExistingReview,
   FeasibilityScore,
   GapAnalysis,
   StudyDesignRecommendation,
   GapDimension,
+  StudyTrend,
 } from "@/types";
 import { PrintableReport } from "@/components/PrintableReport";
 import { AlertSubscription } from "@/components/AlertSubscription";
@@ -111,6 +112,213 @@ const SOURCE_STYLES: Record<string, string> = {
   "Semantic Scholar": "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
 };
 
+/**
+ * NEW-2: Visual styles and labels for the study trend indicator.
+ * "growing" = large share of recent publications → emerging field
+ * "stable"  = typical publication rate
+ * "declining" = few recent publications → mature or waning field
+ */
+const STUDY_TREND_CONFIG: Record<
+  StudyTrend,
+  { icon: string; label: string; colorClass: string; tooltip: string }
+> = {
+  growing: {
+    icon: "↑",
+    label: "Growing",
+    colorClass: "text-emerald-700 dark:text-emerald-400",
+    tooltip: "More than 35% of primary studies on this topic were published in the last 3 years — this is an actively expanding research field.",
+  },
+  stable: {
+    icon: "→",
+    label: "Stable",
+    colorClass: "text-amber-700 dark:text-amber-400",
+    tooltip: "15–34% of primary studies on this topic were published in the last 3 years — this field is publishing at a steady rate.",
+  },
+  declining: {
+    icon: "↓",
+    label: "Declining",
+    colorClass: "text-slate-500 dark:text-slate-400",
+    tooltip: "Fewer than 15% of primary studies on this topic were published in the last 3 years — publication in this field may be slowing.",
+  },
+};
+
+/**
+ * UI-1: Per-source study count breakdown.
+ *
+ * Shows an expandable inline detail below the "primary studies" metric:
+ *   PubMed: 67 · OpenAlex: 81 · Europe PMC: 43
+ *
+ * Only rendered when at least one of the three source counts is non-null
+ * (i.e. the result was created after migration 012 and all relevant APIs
+ * responded successfully).
+ */
+function SourceBreakdown({
+  pubmedCount,
+  openalexCount,
+  europepmcCount,
+}: {
+  pubmedCount: number | null | undefined;
+  openalexCount: number | null | undefined;
+  europepmcCount: number | null | undefined;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Only render when at least one source count is available
+  const hasAny =
+    pubmedCount !== null && pubmedCount !== undefined ||
+    openalexCount !== null && openalexCount !== undefined ||
+    europepmcCount !== null && europepmcCount !== undefined;
+
+  if (!hasAny) return null;
+
+  const entries: { label: string; count: number }[] = [];
+  if (pubmedCount !== null && pubmedCount !== undefined) entries.push({ label: "PubMed", count: pubmedCount });
+  if (openalexCount !== null && openalexCount !== undefined) entries.push({ label: "OpenAlex", count: openalexCount });
+  if (europepmcCount !== null && europepmcCount !== undefined) entries.push({ label: "Europe PMC", count: europepmcCount });
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="mt-1 text-xs transition-opacity hover:opacity-70"
+        style={{ color: "var(--accent)" }}
+        aria-label="Show per-database study counts"
+      >
+        Sources ↓
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1.5">
+      <div
+        className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs"
+        aria-label="Study counts by database"
+      >
+        {entries.map(({ label, count }, i) => (
+          <span key={label} style={{ color: "var(--muted)" }}>
+            <span style={{ color: "var(--foreground)", fontWeight: 500 }}>{label}:</span>{" "}
+            {count.toLocaleString("en-US")}
+            {i < entries.length - 1 && <span aria-hidden="true"> ·</span>}
+          </span>
+        ))}
+      </div>
+      <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: "var(--muted)" }}>
+        Primary studies only (systematic reviews excluded). Counts may overlap across sources before deduplication.
+      </p>
+      <button
+        type="button"
+        onClick={() => setExpanded(false)}
+        className="mt-0.5 text-xs transition-opacity hover:opacity-70"
+        style={{ color: "var(--accent)" }}
+        aria-label="Hide per-database study counts"
+      >
+        Hide ↑
+      </button>
+    </div>
+  );
+}
+
+/**
+ * UI-2: "Why This Score?" Explainer
+ *
+ * A small "?" button that toggles an inline popover explaining the feasibility
+ * scoring methodology. Rendered adjacent to the feasibility badge in the
+ * metrics header.
+ *
+ * Uses a click-outside handler to dismiss the popover.
+ */
+function FeasibilityExplainer() {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Why this score? Learn how feasibility is calculated"
+        aria-expanded={open}
+        className="ml-1.5 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center transition-colors"
+        style={{
+          background: "var(--surface-2)",
+          color: "var(--muted)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        ?
+      </button>
+
+      {open && (
+        <div
+          role="tooltip"
+          className="absolute left-0 top-6 z-50 w-72 rounded-lg p-4 shadow-lg text-xs leading-relaxed"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            color: "var(--foreground)",
+          }}
+        >
+          <p className="font-semibold mb-2" style={{ color: "var(--foreground)" }}>
+            How feasibility is calculated
+          </p>
+          <p className="mb-2" style={{ color: "var(--muted)" }}>
+            Blindspot counts primary studies (excluding systematic reviews) across
+            PubMed, OpenAlex, and Europe PMC. The score is based on real database
+            queries — not AI estimation.
+          </p>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr style={{ color: "var(--muted)" }}>
+                <th className="text-left pb-1 font-medium">Score</th>
+                <th className="text-left pb-1 font-medium">Studies found</th>
+                <th className="text-left pb-1 font-medium">Recommendation</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+              <tr>
+                <td className="py-1 pr-2 font-medium text-emerald-700 dark:text-emerald-400">High</td>
+                <td className="py-1 pr-2">11+</td>
+                <td className="py-1">Systematic review or meta-analysis</td>
+              </tr>
+              <tr>
+                <td className="py-1 pr-2 font-medium text-amber-700 dark:text-amber-400">Moderate</td>
+                <td className="py-1 pr-2">6–10</td>
+                <td className="py-1">Systematic review with narrative synthesis</td>
+              </tr>
+              <tr>
+                <td className="py-1 pr-2 font-medium text-orange-700 dark:text-orange-400">Low</td>
+                <td className="py-1 pr-2">3–5</td>
+                <td className="py-1">Scoping review first</td>
+              </tr>
+              <tr>
+                <td className="py-1 pr-2 font-medium text-red-700 dark:text-red-400">Insufficient</td>
+                <td className="py-1 pr-2">&lt; 3</td>
+                <td className="py-1">Primary research needed</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="mt-2" style={{ color: "var(--muted)", fontSize: "10px" }}>
+            Thresholds are aligned with Cochrane Handbook recommendations for systematic review methodology.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type Tab = "reviews" | "gaps" | "design" | "prisma";
 
 interface Props {
@@ -147,6 +355,20 @@ interface Props {
    * side-box and a "Records identified" total.
    */
   deduplicationCount?: number | null;
+  /**
+   * NEW-2: Whether the research field is growing, stable, or declining.
+   * Derived from primary_study_count vs recent_primary_study_count (last 3 yrs).
+   * Null when the recent count is unavailable (pre-v030 result or API failure).
+   */
+  studyTrend?: StudyTrend | null;
+  /**
+   * UI-1: Individual per-source primary study counts.
+   * Null when the source API was unavailable or the result predates migration 012.
+   * Shown as an expandable breakdown below the main primary studies metric.
+   */
+  pubmedCount?: number | null;
+  openalexCount?: number | null;
+  europepmcCount?: number | null;
   /**
    * Previously-generated protocol draft text (from `search_results.protocol_draft`).
    * When non-null, ProtocolBlock skips the generate-prompt CTA and shows the
@@ -214,6 +436,10 @@ export function ResultsDashboard({
   clinicalTrialsCount = null,
   prosperoRegistrationsCount = null,
   deduplicationCount = null,
+  studyTrend = null,
+  pubmedCount = null,
+  openalexCount = null,
+  europepmcCount = null,
   feasibilityScore,
   feasibilityExplanation,
   gapAnalysis,
@@ -457,7 +683,22 @@ export function ResultsDashboard({
         <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap items-start gap-4 sm:gap-6">
           <div>
             <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Primary studies</p>
-            <p className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>{primaryStudyCount.toLocaleString("en-US")}</p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>{primaryStudyCount.toLocaleString("en-US")}</p>
+              {/* NEW-2: Study trend indicator */}
+              {studyTrend !== null && studyTrend !== undefined && (
+                <span
+                  className={`text-xs font-semibold ${STUDY_TREND_CONFIG[studyTrend].colorClass}`}
+                  title={STUDY_TREND_CONFIG[studyTrend].tooltip}
+                  aria-label={`Field trend: ${STUDY_TREND_CONFIG[studyTrend].label}`}
+                >
+                  {STUDY_TREND_CONFIG[studyTrend].icon} {STUDY_TREND_CONFIG[studyTrend].label}
+                </span>
+              )}
+            </div>
+            <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>primary studies</p>
+            {/* UI-1: Per-source breakdown — only shown when at least one source count is available */}
+            <SourceBreakdown pubmedCount={pubmedCount} openalexCount={openalexCount} europepmcCount={europepmcCount} />
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Existing reviews</p>
@@ -503,7 +744,11 @@ export function ResultsDashboard({
           )}
           {localFeasibilityScore && (
             <div>
-              <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Feasibility</p>
+              {/* UI-2: Label row with "Why This Score?" explainer */}
+              <div className="flex items-center gap-0.5 mb-1">
+                <p className="text-xs uppercase tracking-[0.15em]" style={{ color: "var(--muted)" }}>Feasibility</p>
+                <FeasibilityExplainer />
+              </div>
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${FEASIBILITY_STYLES[localFeasibilityScore]}`}>
                 <span className="text-xs">{FEASIBILITY_ICONS[localFeasibilityScore]}</span>
                 {localFeasibilityScore}

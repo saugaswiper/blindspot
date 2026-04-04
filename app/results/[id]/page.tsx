@@ -8,6 +8,7 @@ import type {
   GapAnalysis,
   StudyDesignRecommendation,
 } from "@/types";
+import { deriveStudyTrend } from "@/types";
 
 async function getResult(id: string) {
   const supabase = await createClient();
@@ -16,9 +17,13 @@ async function getResult(id: string) {
     .select(`
       id,
       primary_study_count,
+      recent_primary_study_count,
       clinical_trials_count,
       prospero_registrations_count,
       deduplication_count,
+      pubmed_count,
+      openalex_count,
+      europepmc_count,
       existing_reviews,
       feasibility_score,
       feasibility_explanation,
@@ -98,6 +103,13 @@ export default async function ResultsPage({
         deduplicationCount={
           (result.deduplication_count as number | null | undefined) ?? null
         }
+        studyTrend={deriveStudyTrend(
+          result.primary_study_count as number,
+          (result.recent_primary_study_count as number | null | undefined) ?? null
+        )}
+        pubmedCount={(result.pubmed_count as number | null | undefined) ?? null}
+        openalexCount={(result.openalex_count as number | null | undefined) ?? null}
+        europepmcCount={(result.europepmc_count as number | null | undefined) ?? null}
         feasibilityScore={result.feasibility_score as FeasibilityScore | null}
         feasibilityExplanation={
           result.feasibility_explanation as string | null

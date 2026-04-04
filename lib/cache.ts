@@ -15,6 +15,19 @@ export interface CachedSearchResult {
    * Null for results created before migration 007 was applied.
    */
   deduplication_count: number | null;
+  /**
+   * Number of primary studies published in the last 3 years (PubMed).
+   * Null for results created before migration 011 was applied, or when the
+   * PubMed API was unavailable during the search.
+   */
+  recent_primary_study_count: number | null;
+  /**
+   * UI-1: Per-source primary study counts (reviews excluded).
+   * Null for results created before migration 012, or when a source API failed.
+   */
+  pubmed_count: number | null;
+  openalex_count: number | null;
+  europepmc_count: number | null;
 }
 
 // Normalize query for cache key comparison
@@ -45,7 +58,7 @@ export async function getCachedResult(
 
   const { data: result } = await supabase
     .from("search_results")
-    .select("id, existing_reviews, primary_study_count, clinical_trials_count, prospero_registrations_count, deduplication_count, expires_at")
+    .select("id, existing_reviews, primary_study_count, clinical_trials_count, prospero_registrations_count, deduplication_count, recent_primary_study_count, pubmed_count, openalex_count, europepmc_count, expires_at")
     .eq("search_id", match.id)
     .gt("expires_at", new Date().toISOString())
     .single();
@@ -59,6 +72,10 @@ export async function getCachedResult(
     clinical_trials_count: (result.clinical_trials_count as number | null) ?? null,
     prospero_registrations_count: (result.prospero_registrations_count as number | null) ?? null,
     deduplication_count: (result.deduplication_count as number | null) ?? null,
+    recent_primary_study_count: (result.recent_primary_study_count as number | null) ?? null,
+    pubmed_count: (result.pubmed_count as number | null) ?? null,
+    openalex_count: (result.openalex_count as number | null) ?? null,
+    europepmc_count: (result.europepmc_count as number | null) ?? null,
   };
 }
 
@@ -74,6 +91,12 @@ export async function saveSearchResult(
     prospero_registrations_count: number | null;
     /** Number of cross-database duplicate records removed during deduplication. */
     deduplication_count: number;
+    /** Pass null when the PubMed recent-count API was unavailable. */
+    recent_primary_study_count: number | null;
+    /** UI-1: Per-source primary study counts. Pass null when a source API was unavailable. */
+    pubmed_count: number | null;
+    openalex_count: number | null;
+    europepmc_count: number | null;
   }
 ): Promise<string> {
   const supabase = await createClient();
@@ -90,7 +113,7 @@ export async function saveSearchResult(
     throw new Error(`Failed to save search: ${searchError?.message}`);
   }
 
-  // Try inserting with all columns (including deduplication_count from migration 007).
+  // Try inserting with all columns (including per-source counts from migration 012).
   // Fall back without newer columns if older migrations haven't been applied yet.
   let { data: result, error: resultError } = await supabase
     .from("search_results")
@@ -101,11 +124,52 @@ export async function saveSearchResult(
       clinical_trials_count: data.clinical_trials_count,
       prospero_registrations_count: data.prospero_registrations_count,
       deduplication_count: data.deduplication_count,
+      recent_primary_study_count: data.recent_primary_study_count,
+      pubmed_count: data.pubmed_count,
+      openalex_count: data.openalex_count,
+      europepmc_count: data.europepmc_count,
     })
     .select("id")
     .single();
 
   // If insertion fails due to missing columns, try older schemas in order
+  if (resultError?.code === "42703") {
+    // per-source count columns don't exist yet (migration 012 not applied) — try without them
+    const fallbackPerSource = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        deduplication_count: data.deduplication_count,
+        recent_primary_study_count: data.recent_primary_study_count,
+      })
+      .select("id")
+      .single();
+    result = fallbackPerSource.data;
+    resultError = fallbackPerSource.error;
+  }
+
+  if (resultError?.code === "42703") {
+    // recent_primary_study_count column doesn't exist yet — try without it
+    const fallbackRecent = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        deduplication_count: data.deduplication_count,
+      })
+      .select("id")
+      .single();
+    result = fallbackRecent.data;
+    resultError = fallbackRecent.error;
+  }
+
   if (resultError?.code === "42703") {
     // deduplication_count column doesn't exist yet — try without it
     const fallback0 = await supabase
@@ -181,6 +245,11 @@ export async function saveGuestSearchResult(
     clinical_trials_count: number | null;
     prospero_registrations_count: number | null;
     deduplication_count: number;
+    recent_primary_study_count: number | null;
+    /** UI-1: Per-source primary study counts. Pass null when a source API was unavailable. */
+    pubmed_count: number | null;
+    openalex_count: number | null;
+    europepmc_count: number | null;
   }
 ): Promise<string> {
   const supabase = createServiceRoleClient();
@@ -196,7 +265,8 @@ export async function saveGuestSearchResult(
     throw new Error(`Failed to save guest search: ${searchError?.message}`);
   }
 
-  const { data: result, error: resultError } = await supabase
+  // Try with all columns including per-source counts (migration 012); fall back if columns don't exist
+  let { data: result, error: resultError } = await supabase
     .from("search_results")
     .insert({
       search_id: search.id,
@@ -205,10 +275,53 @@ export async function saveGuestSearchResult(
       clinical_trials_count: data.clinical_trials_count,
       prospero_registrations_count: data.prospero_registrations_count,
       deduplication_count: data.deduplication_count,
+      recent_primary_study_count: data.recent_primary_study_count,
+      pubmed_count: data.pubmed_count,
+      openalex_count: data.openalex_count,
+      europepmc_count: data.europepmc_count,
       is_public: true,
     })
     .select("id")
     .single();
+
+  if (resultError?.code === "42703") {
+    // per-source count columns don't exist yet (migration 012 not applied) — try without them
+    const fallbackPerSource = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        deduplication_count: data.deduplication_count,
+        recent_primary_study_count: data.recent_primary_study_count,
+        is_public: true,
+      })
+      .select("id")
+      .single();
+    result = fallbackPerSource.data;
+    resultError = fallbackPerSource.error;
+  }
+
+  if (resultError?.code === "42703") {
+    // recent_primary_study_count column doesn't exist yet — try without it
+    const fallback = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        deduplication_count: data.deduplication_count,
+        is_public: true,
+      })
+      .select("id")
+      .single();
+    result = fallback.data;
+    resultError = fallback.error;
+  }
 
   if (resultError || !result) {
     console.error("[cache] guest search_results INSERT failed:", resultError?.message);

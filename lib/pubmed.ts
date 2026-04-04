@@ -104,3 +104,30 @@ export async function countSystematicReviews(query: string): Promise<number> {
   const { count } = await esearch(`${query} AND systematic[sb]`, 1);
   return count;
 }
+
+/**
+ * Counts primary studies published within the last `years` years.
+ * Uses PubMed's `datetype=pdat` filter with `mindate` set to (currentYear - years).
+ * Excludes systematic reviews for the same reason as `countPrimaryStudies`.
+ *
+ * Used for NEW-2: Study Count Trend to determine if a research field is
+ * growing, stable, or declining.
+ */
+export async function countPrimaryStudiesRecent(query: string, years = 3): Promise<number> {
+  const minYear = new Date().getFullYear() - years;
+  const url = new URL(`${BASE}/esearch.fcgi`);
+  url.searchParams.set("db", "pubmed");
+  url.searchParams.set("term", `(${query}) AND NOT systematic[sb]`);
+  url.searchParams.set("retmax", "1");
+  url.searchParams.set("retmode", "json");
+  url.searchParams.set("datetype", "pdat");
+  url.searchParams.set("mindate", String(minYear));
+  url.searchParams.set("maxdate", String(new Date().getFullYear()));
+  if (API_KEY) url.searchParams.set("api_key", API_KEY);
+
+  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+  if (!res.ok) throw new ApiError(`PubMed ESearch (recent) failed: ${res.status}`, 502);
+
+  const data = (await res.json()) as ESearchResult;
+  return parseInt(data.esearchresult.count) || 0;
+}

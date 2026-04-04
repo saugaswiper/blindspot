@@ -134,11 +134,51 @@ export interface StudyDesignRecommendation {
   confidence?: "high" | "moderate" | "low";
 }
 
+export type StudyTrend = "growing" | "stable" | "declining";
+
+/**
+ * Derives a study field trend from total vs recent primary study counts.
+ *
+ * Heuristic (NEW-2):
+ *   ≥ 35% of studies published in the last 3 years → "growing"
+ *   15–34% of studies in the last 3 years          → "stable"
+ *   < 15% in the last 3 years                      → "declining"
+ *
+ * Returns null when:
+ *   - recentCount is null (data unavailable or pre-v030 result)
+ *   - totalCount < 5 (too few studies for a meaningful trend)
+ */
+export function deriveStudyTrend(
+  totalCount: number,
+  recentCount: number | null
+): StudyTrend | null {
+  if (recentCount === null) return null;
+  if (totalCount < 5) return null;
+  const ratio = recentCount / totalCount;
+  if (ratio >= 0.35) return "growing";
+  if (ratio >= 0.15) return "stable";
+  return "declining";
+}
+
 export interface SearchResult {
   id: string;
   search_id: string;
   existing_reviews: ExistingReview[];
   primary_study_count: number;
+  /**
+   * Number of primary studies published in the last 3 years.
+   * Null if unavailable (API failure, or pre-v030 result).
+   * Used with primary_study_count to derive a StudyTrend indicator.
+   */
+  recent_primary_study_count: number | null;
+  /**
+   * UI-1: Individual source counts (primary studies only, reviews excluded).
+   * Null when the source API was unavailable or the result predates migration 012.
+   * Displayed as an expandable breakdown under the blended primary_study_count.
+   */
+  pubmed_count: number | null;
+  openalex_count: number | null;
+  europepmc_count: number | null;
   /**
    * Number of studies registered on ClinicalTrials.gov for this query.
    * Null if the count was not available when the search was run (e.g. the

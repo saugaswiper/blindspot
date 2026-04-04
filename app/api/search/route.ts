@@ -218,6 +218,7 @@ export async function POST(request: Request) {
       europepmcCount,
       clinicalTrialsCount,
       prosperoCount,
+      pubmedRecentCount,
     ] = await Promise.allSettled([
       // Review searches use the targeted boolean query for higher precision
       PubMed.searchExistingReviews(reviewQuery),
@@ -230,6 +231,8 @@ export async function POST(request: Request) {
       EuropePMC.countPrimaryStudies(query),
       ClinicalTrials.countPrimaryStudies(query),
       isQuerySubstantialEnough(query) ? searchProspero(reviewQuery) : Promise.resolve(0),
+      // NEW-2: Count primary studies published in the last 3 years (PubMed only)
+      PubMed.countPrimaryStudiesRecent(query, 3),
     ]);
 
     if (pubmedResult.status === "fulfilled") {
@@ -279,6 +282,9 @@ export async function POST(request: Request) {
       clinicalTrialsCount.status === "fulfilled" ? clinicalTrialsCount.value : null;
     const prosperoCountVal =
       prosperoCount.status === "fulfilled" ? prosperoCount.value : null;
+    // NEW-2: Recent count is from PubMed only; null means unavailable (API failure)
+    const recentPrimaryStudyCountVal =
+      pubmedRecentCount.status === "fulfilled" ? pubmedRecentCount.value : null;
 
     const clinicalCounts = [pubmedCountVal, europepmcCountVal].filter(
       (c): c is number => c !== null
@@ -338,6 +344,11 @@ export async function POST(request: Request) {
       clinical_trials_count: clinicalTrialsCountVal,
       prospero_registrations_count: prosperoCountVal,
       deduplication_count: deduplicationCount,
+      recent_primary_study_count: recentPrimaryStudyCountVal,
+      // UI-1: Per-source primary study counts — stored for breakdown display
+      pubmed_count: pubmedCountVal,
+      openalex_count: openalexCountVal,
+      europepmc_count: europepmcCountVal,
     };
 
     const resultId = isGuest
