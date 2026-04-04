@@ -53,52 +53,73 @@ export default function LoginPage() {
     }
   }
 
+  const inputClass =
+    "w-full px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent placeholder:opacity-40";
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--background)" }}
+    >
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-blue-300">Blindspot</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">Sign in to your account</p>
+          <h1 className="text-2xl font-bold font-serif" style={{ color: "var(--brand)" }}>
+            Blindspot
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+            Sign in to your account
+          </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-8">
+        <div
+          className="rounded-lg shadow-sm p-8"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
           {/* Mode toggle */}
-          <div className="flex rounded-md border border-gray-200 dark:border-gray-700 p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => { setMode("password"); setError(null); }}
-              className={`flex-1 text-sm py-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:ring-offset-1 ${
-                mode === "password"
-                  ? "bg-[#1e3a5f] dark:bg-blue-700 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
-              }`}
-            >
-              Password
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode("magic-link"); setError(null); }}
-              className={`flex-1 text-sm py-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:ring-offset-1 ${
-                mode === "magic-link"
-                  ? "bg-[#1e3a5f] dark:bg-blue-700 text-white"
-                  : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
-              }`}
-            >
-              Magic Link
-            </button>
+          <div
+            className="flex rounded-md p-1 mb-6"
+            style={{ border: "1px solid var(--border)" }}
+          >
+            {(["password", "magic-link"] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => { setMode(m); setError(null); }}
+                className="flex-1 text-sm py-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-1"
+                style={
+                  mode === m
+                    ? { background: "var(--brand)", color: "#fff" }
+                    : { color: "var(--muted)" }
+                }
+              >
+                {m === "password" ? "Password" : "Magic Link"}
+              </button>
+            ))}
           </div>
 
           {magicLinkSent ? (
             <div className="text-center py-4">
-              <p className="text-gray-700 dark:text-gray-300 font-medium">Check your email</p>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+              <p className="font-medium" style={{ color: "var(--foreground)" }}>
+                Check your email
+              </p>
+              <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
                 We sent a sign-in link to <span className="font-medium">{email}</span>
               </p>
             </div>
           ) : (
-            <form onSubmit={mode === "password" ? handlePasswordLogin : handleMagicLink} className="space-y-4">
+            <form
+              onSubmit={mode === "password" ? handlePasswordLogin : handleMagicLink}
+              className="space-y-4"
+            >
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--foreground)" }}
+                >
                   Email address
                 </label>
                 <input
@@ -107,14 +128,23 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:border-transparent"
+                  className={inputClass}
+                  style={{
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--border)",
+                  }}
                   placeholder="you@university.edu"
                 />
               </div>
 
               {mode === "password" && (
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium mb-1"
+                    style={{ color: "var(--foreground)" }}
+                  >
                     Password
                   </label>
                   <input
@@ -123,14 +153,19 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:border-transparent"
+                    className={inputClass}
+                    style={{
+                      background: "var(--surface)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--border)",
+                    }}
                     placeholder="••••••••"
                   />
                 </div>
               )}
 
               {error && (
-                <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded px-3 py-2">
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800">
                   {error}
                 </p>
               )}
@@ -138,7 +173,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 px-4 bg-[#1e3a5f] dark:bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:ring-offset-2 transition-colors disabled:bg-[#4a6580] disabled:text-white disabled:cursor-not-allowed"
+                className="w-full py-2 px-4 text-white text-sm font-medium rounded-md transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "var(--brand)" }}
               >
                 {loading
                   ? "Signing in..."
@@ -150,9 +186,13 @@ export default function LoginPage() {
           )}
         </div>
 
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
+        <p className="text-center text-sm mt-4" style={{ color: "var(--muted)" }}>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-[#1e3a5f] dark:text-blue-400 hover:text-[#2d5a8e] dark:hover:text-blue-300 underline underline-offset-2 font-medium focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:ring-offset-1 rounded">
+          <Link
+            href="/signup"
+            className="underline underline-offset-2 font-medium hover:opacity-70 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-1 rounded"
+            style={{ color: "var(--brand)" }}
+          >
             Sign up free
           </Link>
         </p>

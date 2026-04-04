@@ -38,27 +38,50 @@ export default function SignupPage() {
     }
   }
 
+  const inputClass =
+    "w-full px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent placeholder:opacity-40";
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--background)" }}
+    >
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-blue-300">Blindspot</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">Create a free account to save your searches</p>
+          <h1 className="text-2xl font-bold font-serif" style={{ color: "var(--brand)" }}>
+            Blindspot
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
+            Create a free account to save your searches
+          </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-8">
+        <div
+          className="rounded-lg shadow-sm p-8"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
           {success ? (
             <div className="text-center py-4">
-              <p className="text-gray-700 dark:text-gray-300 font-medium">Check your email</p>
-              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                We sent a confirmation link to <span className="font-medium">{email}</span>.
+              <p className="font-medium" style={{ color: "var(--foreground)" }}>
+                Check your email
+              </p>
+              <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
+                We sent a confirmation link to{" "}
+                <span className="font-medium">{email}</span>.
                 Click it to activate your account.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSignup} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--foreground)" }}
+                >
                   Email address
                 </label>
                 <input
@@ -67,13 +90,22 @@ export default function SignupPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:border-transparent"
+                  className={inputClass}
+                  style={{
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--border)",
+                  }}
                   placeholder="you@university.edu"
                 />
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--foreground)" }}
+                >
                   Password
                 </label>
                 <input
@@ -82,13 +114,18 @@ export default function SignupPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:border-transparent"
+                  className={inputClass}
+                  style={{
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--border)",
+                  }}
                   placeholder="Min. 8 characters"
                 />
               </div>
 
               {error && (
-                <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded px-3 py-2">
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800">
                   {error}
                 </p>
               )}
@@ -96,7 +133,8 @@ export default function SignupPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 px-4 bg-[#1e3a5f] dark:bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:ring-offset-2 transition-colors disabled:bg-[#4a6580] disabled:text-white disabled:cursor-not-allowed"
+                className="w-full py-2 px-4 text-white text-sm font-medium rounded-md transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "var(--brand)" }}
               >
                 {loading ? "Creating account..." : "Create free account"}
               </button>
@@ -104,9 +142,13 @@ export default function SignupPage() {
           )}
         </div>
 
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
+        <p className="text-center text-sm mt-4" style={{ color: "var(--muted)" }}>
           Already have an account?{" "}
-          <Link href="/login" className="text-[#1e3a5f] dark:text-blue-400 hover:text-[#2d5a8e] dark:hover:text-blue-300 underline underline-offset-2 font-medium focus:outline-none focus:ring-2 focus:ring-[#2d5a8e] focus:ring-offset-1 rounded">
+          <Link
+            href="/login"
+            className="underline underline-offset-2 font-medium hover:opacity-70 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-1 rounded"
+            style={{ color: "var(--brand)" }}
+          >
             Sign in
           </Link>
         </p>

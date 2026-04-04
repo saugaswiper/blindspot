@@ -27,11 +27,155 @@ function StepDots({
       {Array.from({ length: total }).map((_, i) => (
         <span
           key={i}
-          className={`block w-2 h-2 rounded-full transition-colors ${
-            i === current ? "bg-[#1e3a5f]" : "bg-gray-300"
-          }`}
+          className="block w-2 h-2 rounded-full transition-colors"
+          style={{ background: i === current ? "var(--brand)" : "var(--border)" }}
         />
       ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared modal markup helpers
+// ---------------------------------------------------------------------------
+
+function ModalCard({
+  children,
+  modalRef,
+}: {
+  children: React.ReactNode;
+  modalRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div
+      ref={modalRef}
+      className="rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ModalHeader({
+  icon,
+  title,
+  onClose,
+}: {
+  icon: string;
+  title: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="px-6 py-5" style={{ background: "var(--brand)" }}>
+      <div className="flex items-center justify-between">
+        <span
+          className="text-xs font-medium tracking-wide uppercase"
+          style={{ color: "rgba(255,255,255,0.65)" }}
+        >
+          How Blindspot works
+        </span>
+        <button
+          onClick={onClose}
+          className="text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded transition-opacity hover:opacity-100"
+          style={{ color: "rgba(255,255,255,0.65)" }}
+          aria-label="Close tour"
+        >
+          ×
+        </button>
+      </div>
+      <div className="mt-3 text-3xl" aria-hidden="true">
+        {icon}
+      </div>
+      <h2 className="mt-2 text-lg font-semibold leading-snug font-serif text-white">
+        {title}
+      </h2>
+    </div>
+  );
+}
+
+function ModalBody({
+  description,
+  hint,
+}: {
+  description: string;
+  hint: string;
+}) {
+  return (
+    <div className="px-6 py-5">
+      <p className="text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
+        {description}
+      </p>
+      <p
+        className="mt-3 text-xs italic pl-3"
+        style={{ color: "var(--muted)", borderLeft: "2px solid var(--border)" }}
+      >
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+function ModalFooter({
+  total,
+  step,
+  primaryRef,
+  onBack,
+  onSkipOrClose,
+  onAdvance,
+  isFirst,
+  isLast,
+  skipLabel = "Skip",
+  doneLabel = "Get started",
+}: {
+  total: number;
+  step: number;
+  primaryRef: React.RefObject<HTMLButtonElement | null>;
+  onBack: () => void;
+  onSkipOrClose: () => void;
+  onAdvance: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+  skipLabel?: string;
+  doneLabel?: string;
+}) {
+  return (
+    <div
+      className="px-6 pt-4 pb-5 flex items-center justify-between gap-4"
+      style={{ borderTop: "1px solid var(--border)" }}
+    >
+      <StepDots total={total} current={step} />
+      <div className="flex items-center gap-2">
+        {!isFirst && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-[#4a90d9] transition-opacity hover:opacity-70"
+            style={{ color: "var(--muted)" }}
+          >
+            Back
+          </button>
+        )}
+        {isFirst && (
+          <button
+            type="button"
+            onClick={onSkipOrClose}
+            className="px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-[#4a90d9] transition-opacity hover:opacity-70"
+            style={{ color: "var(--muted)" }}
+          >
+            {skipLabel}
+          </button>
+        )}
+        <button
+          ref={primaryRef}
+          type="button"
+          onClick={onAdvance}
+          className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2"
+          style={{ background: "var(--brand)" }}
+        >
+          {isLast ? doneLabel : "Next →"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -109,82 +253,27 @@ export function OnboardingTour() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
       role="dialog"
       aria-modal="true"
       aria-label="Blindspot onboarding tour"
     >
-      {/* Modal card */}
-      <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-
-        {/* Header */}
-        <div className="bg-[#1e3a5f] px-6 py-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-blue-200 tracking-wide uppercase">
-              How Blindspot works
-            </span>
-            <button
-              onClick={dismiss}
-              className="text-blue-200 hover:text-white text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded"
-              aria-label="Close tour"
-            >
-              ×
-            </button>
-          </div>
-          <div className="mt-3 text-3xl" aria-hidden="true">
-            {current.icon}
-          </div>
-          <h2 className="mt-2 text-lg font-semibold text-white leading-snug">
-            {current.title}
-          </h2>
-        </div>
-
-        {/* Body */}
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-700 leading-relaxed">
-            {current.description}
-          </p>
-          <p className="mt-3 text-xs text-gray-600 italic border-l-2 border-gray-200 pl-3">
-            {current.hint}
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 pb-5 flex items-center justify-between gap-4">
-          {/* Step dots */}
-          <StepDots total={total} current={step} />
-
-          {/* Navigation buttons */}
-          <div className="flex items-center gap-2">
-            {!isFirstStep(step) && (
-              <button
-                type="button"
-                onClick={back}
-                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
-              >
-                Back
-              </button>
-            )}
-            {isFirstStep(step) && (
-              <button
-                type="button"
-                onClick={dismiss}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
-              >
-                Skip
-              </button>
-            )}
-            <button
-              ref={primaryButtonRef}
-              type="button"
-              onClick={advance}
-              className="px-4 py-2 text-sm font-medium bg-[#1e3a5f] text-white rounded-lg hover:bg-[#2d5a8e] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2"
-            >
-              {isLastStep(step) ? "Get started" : "Next →"}
-            </button>
-          </div>
-        </div>
-      </div>
+      <ModalCard modalRef={modalRef}>
+        <ModalHeader icon={current.icon} title={current.title} onClose={dismiss} />
+        <ModalBody description={current.description} hint={current.hint} />
+        <ModalFooter
+          total={total}
+          step={step}
+          primaryRef={primaryButtonRef}
+          onBack={back}
+          onSkipOrClose={dismiss}
+          onAdvance={advance}
+          isFirst={isFirstStep(step)}
+          isLast={isLastStep(step)}
+          skipLabel="Skip"
+          doneLabel="Get started"
+        />
+      </ModalCard>
     </div>
   );
 }
@@ -210,7 +299,7 @@ export function TourRestartButton() {
     <button
       type="button"
       onClick={handleClick}
-      className="hover:text-gray-600 focus:outline-none focus:underline"
+      className="hover:opacity-70 transition-opacity focus:outline-none focus:underline"
     >
       Take the tour
     </button>
@@ -280,7 +369,8 @@ export function NavHelpButton() {
       <button
         type="button"
         onClick={() => { setStep(0); setOpen(true); }}
-        className="w-6 h-6 rounded-full border border-gray-300 text-gray-600 hover:text-[#1e3a5f] hover:border-[#1e3a5f] flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
+        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
+        style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
         aria-label="Open onboarding tour"
         title="How Blindspot works"
       >
@@ -290,77 +380,27 @@ export function NavHelpButton() {
       {/* Modal (same markup as OnboardingTour) */}
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
           role="dialog"
           aria-modal="true"
           aria-label="Blindspot onboarding tour"
         >
-          <div ref={navModalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            {/* Header */}
-            <div className="bg-[#1e3a5f] px-6 py-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-blue-200 tracking-wide uppercase">
-                  How Blindspot works
-                </span>
-                <button
-                  onClick={close}
-                  className="text-blue-200 hover:text-white text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded"
-                  aria-label="Close tour"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="mt-3 text-3xl" aria-hidden="true">
-                {current.icon}
-              </div>
-              <h2 className="mt-2 text-lg font-semibold text-white leading-snug">
-                {current.title}
-              </h2>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-5">
-              <p className="text-sm text-gray-700 leading-relaxed">
-                {current.description}
-              </p>
-              <p className="mt-3 text-xs text-gray-600 italic border-l-2 border-gray-200 pl-3">
-                {current.hint}
-              </p>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 pb-5 flex items-center justify-between gap-4">
-              <StepDots total={total} current={step} />
-              <div className="flex items-center gap-2">
-                {!isFirstStep(step) && (
-                  <button
-                    type="button"
-                    onClick={back}
-                    className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
-                  >
-                    Back
-                  </button>
-                )}
-                {isFirstStep(step) && (
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
-                  >
-                    Close
-                  </button>
-                )}
-                <button
-                  ref={primaryButtonRef}
-                  type="button"
-                  onClick={advance}
-                  className="px-4 py-2 text-sm font-medium bg-[#1e3a5f] text-white rounded-lg hover:bg-[#2d5a8e] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2"
-                >
-                  {isLastStep(step) ? "Done" : "Next →"}
-                </button>
-              </div>
-            </div>
-          </div>
+          <ModalCard modalRef={navModalRef}>
+            <ModalHeader icon={current.icon} title={current.title} onClose={close} />
+            <ModalBody description={current.description} hint={current.hint} />
+            <ModalFooter
+              total={total}
+              step={step}
+              primaryRef={primaryButtonRef}
+              onBack={back}
+              onSkipOrClose={close}
+              onAdvance={advance}
+              isFirst={isFirstStep(step)}
+              isLast={isLastStep(step)}
+              skipLabel="Close"
+              doneLabel="Done"
+            />
+          </ModalCard>
         </div>
       )}
     </>

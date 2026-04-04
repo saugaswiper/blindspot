@@ -67,11 +67,15 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
       {/* Panel — stops click propagation so clicking the panel itself doesn't close it */}
       <div
         ref={panelRef}
-        className="bg-white rounded-xl border border-gray-200 shadow-xl w-full sm:w-80 overflow-hidden"
+        className="rounded-xl shadow-xl w-full sm:w-80 overflow-hidden"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-[#1e3a5f]">
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ background: "var(--brand)", borderBottom: "1px solid var(--border)" }}
+        >
           <div className="flex items-center gap-2">
             <span className="text-white text-sm font-semibold tracking-wide">
               ⌨ Keyboard Shortcuts
@@ -81,7 +85,8 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
             ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close keyboard shortcuts"
-            className="text-white/70 hover:text-white transition-colors text-lg leading-none"
+            className="transition-opacity hover:opacity-100 text-lg leading-none"
+            style={{ color: "rgba(255,255,255,0.65)" }}
           >
             ×
           </button>
@@ -91,7 +96,10 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
         <div className="px-4 py-3 space-y-4 max-h-80 overflow-y-auto">
           {categories.map((cat) => (
             <div key={cat}>
-              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              <p
+                className="text-xs font-semibold uppercase tracking-wide mb-2"
+                style={{ color: "var(--muted)" }}
+              >
                 {CATEGORY_LABELS[cat]}
               </p>
               <div className="space-y-1.5">
@@ -104,8 +112,11 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
-          <p className="text-xs text-gray-600 text-center">
+        <div
+          className="px-4 py-2.5"
+          style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2, var(--surface))" }}
+        >
+          <p className="text-xs text-center" style={{ color: "var(--muted)" }}>
             Shortcuts are disabled when typing in a form field
           </p>
         </div>
@@ -117,9 +128,16 @@ export function KeyboardShortcutsHelp({ open, onClose }: Props) {
 function ShortcutRow({ shortcut }: { shortcut: KeyboardShortcut }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-sm text-gray-600 leading-tight">{shortcut.description}</span>
+      <span className="text-sm leading-tight" style={{ color: "var(--muted)" }}>
+        {shortcut.description}
+      </span>
       <kbd
-        className="shrink-0 inline-flex items-center justify-center min-w-[1.75rem] h-7 px-1.5 text-xs font-mono font-semibold text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm"
+        className="shrink-0 inline-flex items-center justify-center min-w-[1.75rem] h-7 px-1.5 text-xs font-mono font-semibold rounded-md shadow-sm"
+        style={{
+          background: "var(--surface-2, var(--background))",
+          color: "var(--foreground)",
+          border: "1px solid var(--border)",
+        }}
         aria-label={`Key ${shortcut.key}`}
       >
         {getDisplayKey(shortcut)}
@@ -139,7 +157,8 @@ export function ShortcutsButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Show keyboard shortcuts"
       title="Keyboard shortcuts"
-      className="inline-flex items-center justify-center w-7 h-7 text-xs font-mono font-semibold text-gray-500 border border-gray-300 rounded-full hover:border-[#4a90d9] hover:text-[#4a90d9] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
+      className="inline-flex items-center justify-center w-7 h-7 text-xs font-mono font-semibold rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
+      style={{ color: "var(--muted)", border: "1px solid var(--border)" }}
     >
       ⌨
     </button>
@@ -188,7 +207,8 @@ export function ShortcutsDiscoveryTooltip({ onOpenShortcuts }: TooltipProps) {
     <div
       role="status"
       aria-live="polite"
-      className="absolute top-full right-0 mt-2 z-40 flex items-center gap-2 bg-[#1e3a5f] text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap"
+      className="absolute top-full right-0 mt-2 z-40 flex items-center gap-2 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap"
+      style={{ background: "var(--brand)" }}
     >
       {/* Clickable label — opens shortcuts panel */}
       <button
@@ -196,7 +216,7 @@ export function ShortcutsDiscoveryTooltip({ onOpenShortcuts }: TooltipProps) {
           setVisible(false);
           onOpenShortcuts();
         }}
-        className="flex items-center gap-1.5 hover:text-white/90 transition-colors"
+        className="flex items-center gap-1.5 hover:opacity-90 transition-opacity"
         aria-label="Open keyboard shortcuts panel"
       >
         Press{" "}
@@ -210,7 +230,8 @@ export function ShortcutsDiscoveryTooltip({ onOpenShortcuts }: TooltipProps) {
       <button
         onClick={() => setVisible(false)}
         aria-label="Dismiss shortcuts hint"
-        className="ml-1 text-white/60 hover:text-white transition-colors text-base leading-none"
+        className="ml-1 transition-opacity hover:opacity-100 text-base leading-none"
+        style={{ color: "rgba(255,255,255,0.65)" }}
       >
         ×
       </button>

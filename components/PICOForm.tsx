@@ -49,10 +49,15 @@ export function PICOForm({ value, onChange, errors }: PICOFormProps) {
     <div className="space-y-3">
       {fields.map(({ key, label, placeholder, required }) => (
         <div key={key}>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            className="block text-sm font-medium mb-1"
+            style={{ color: "var(--foreground)" }}
+          >
             {label}
             {!required && (
-              <span className="ml-1 text-gray-600 dark:text-gray-400 font-normal">(optional)</span>
+              <span className="ml-1 font-normal" style={{ color: "var(--muted)" }}>
+                (optional)
+              </span>
             )}
           </label>
           <input
@@ -60,12 +65,15 @@ export function PICOForm({ value, onChange, errors }: PICOFormProps) {
             value={value[key] ?? ""}
             onChange={(e) => handleChange(key, e.target.value)}
             placeholder={placeholder}
-            className={`w-full px-3 py-2 border rounded-md text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder:text-gray-600 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
-              errors[key] ? "border-red-400" : "border-gray-300 dark:border-gray-600"
-            }`}
+            className="w-full px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent placeholder:opacity-50"
+            style={{
+              background: "var(--surface)",
+              color: "var(--foreground)",
+              border: errors[key] ? "1px solid #f87171" : "1px solid var(--border)",
+            }}
           />
           {errors[key] && (
-            <p className="text-xs text-red-600 mt-0.5">{errors[key]}</p>
+            <p className="text-xs text-red-500 mt-0.5">{errors[key]}</p>
           )}
         </div>
       ))}

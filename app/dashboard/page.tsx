@@ -5,10 +5,10 @@ import { NavBar } from "@/components/NavBar";
 import type { FeasibilityScore } from "@/types";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
-  High: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300",
-  Moderate: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300",
-  Low: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300",
-  Insufficient: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300",
+  High: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  Moderate: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  Low: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
+  Insufficient: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
 };
 
 async function getSearches(userId: string) {
@@ -42,27 +42,47 @@ export default async function DashboardPage() {
   const searches = await getSearches(user.id);
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <main className="min-h-screen" style={{ background: "var(--background)" }}>
       <NavBar />
 
       <div className="max-w-3xl mx-auto px-4 py-10">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-[#1e3a5f] dark:text-blue-300">My Searches</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{searches.length} search{searches.length !== 1 ? "es" : ""} saved</p>
+            <h1
+              className="text-2xl font-bold font-serif"
+              style={{ color: "var(--brand)" }}
+            >
+              My Searches
+            </h1>
+            <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
+              {searches.length} search{searches.length !== 1 ? "es" : ""} saved
+            </p>
           </div>
           <Link
             href="/"
-            className="text-sm bg-[#1e3a5f] dark:bg-blue-700 text-white px-4 py-2 rounded-md hover:bg-[#2d5a8e] dark:hover:bg-blue-600 transition-colors"
+            className="text-sm text-white px-4 py-2 rounded-md transition-opacity hover:opacity-90"
+            style={{ background: "var(--brand)" }}
           >
             New Search
           </Link>
         </div>
 
         {searches.length === 0 ? (
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">No searches yet.</p>
-            <Link href="/" className="text-[#4a90d9] dark:text-blue-400 hover:underline text-sm font-medium">
+          <div
+            className="rounded-lg p-12 text-center"
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
+              No searches yet.
+            </p>
+            <Link
+              href="/"
+              className="text-sm font-medium hover:opacity-70 transition-opacity underline underline-offset-2"
+              style={{ color: "var(--accent)" }}
+            >
               Run your first search →
             </Link>
           </div>
@@ -88,14 +108,23 @@ export default async function DashboardPage() {
                 <Link
                   key={search.id}
                   href={result ? `/results/${result.id}` : "#"}
-                  className="block bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-[#4a90d9] dark:hover:border-blue-500 hover:shadow-sm transition-all p-5"
+                  className="block rounded-lg hover:shadow-sm transition-all p-5"
+                  style={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                  }}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      <p
+                        className="text-sm font-medium truncate"
+                        style={{ color: "var(--foreground)" }}
+                      >
                         {search.query_text}
                       </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{date}</p>
+                      <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+                        {date}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {hasActiveAlert && (
@@ -108,16 +137,32 @@ export default async function DashboardPage() {
                         </span>
                       )}
                       {feasibility && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${FEASIBILITY_STYLES[feasibility]}`}>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${FEASIBILITY_STYLES[feasibility]}`}
+                        >
                           {feasibility}
                         </span>
                       )}
                       {hasAnalysis ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={{
+                            background: "color-mix(in srgb, var(--accent) 15%, transparent)",
+                            color: "var(--accent)",
+                            border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+                          }}
+                        >
                           Analyzed
                         </span>
                       ) : (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={{
+                            background: "var(--surface-2, var(--background))",
+                            color: "var(--muted)",
+                            border: "1px solid var(--border)",
+                          }}
+                        >
                           No analysis
                         </span>
                       )}
