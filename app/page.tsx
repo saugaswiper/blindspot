@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { TopicInput } from "@/components/TopicInput";
 import { NavBar } from "@/components/NavBar";
 import { OnboardingTour, TourRestartButton } from "@/components/OnboardingTour";
+import { HeroSourceLogos } from "@/components/HeroSourceLogos";
 
 export default function HomePage() {
   return (
@@ -36,10 +37,21 @@ export default function HomePage() {
             </em>
           </h1>
 
-          <p className="text-base sm:text-lg leading-relaxed max-w-xl opacity-80 mb-0" style={{ color: "#e8e4dc" }}>
-            Blindspot searches PubMed and OpenAlex to surface genuine research gaps,
-            score feasibility, and suggest specific review topics — in minutes, not weeks.
+          <p className="text-base sm:text-lg leading-relaxed max-w-xl mb-8" style={{ color: "#e8e4dc", opacity: 0.8 }}>
+            Search existing literature, score feasibility, and surface the specific
+            systematic review topics most worth writing — in minutes, not weeks.
           </p>
+
+          {/* Source logos — client component with favicon + text fallback */}
+          <div>
+            <p
+              className="text-[10px] font-semibold tracking-[0.18em] uppercase mb-3"
+              style={{ color: "rgba(244,241,234,0.35)" }}
+            >
+              Searches across
+            </p>
+            <HeroSourceLogos />
+          </div>
         </div>
       </section>
 
@@ -107,51 +119,6 @@ export default function HomePage() {
                   {body}
                 </p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Data sources strip */}
-      <section style={{ borderTop: "1px solid var(--border)" }}>
-        <div className="max-w-3xl mx-auto px-6 py-10 sm:py-12 text-center">
-          <p className="text-sm leading-relaxed mb-8 max-w-xl mx-auto" style={{ color: "var(--muted)" }}>
-            Blindspot queries six trusted databases to build a complete picture of the
-            existing evidence landscape before flagging genuine gaps.
-          </p>
-          <p className="text-[10px] tracking-[0.18em] uppercase font-semibold mb-5" style={{ color: "var(--muted)", opacity: 0.6 }}>
-            Searches across
-          </p>
-          <div className="flex flex-wrap justify-center items-center gap-x-7 gap-y-4">
-            {[
-              { name: "PubMed",            favicon: "https://pubmed.ncbi.nlm.nih.gov/favicon.ico",           href: "https://pubmed.ncbi.nlm.nih.gov/" },
-              { name: "OpenAlex",          favicon: "https://openalex.org/favicon.ico",                      href: "https://openalex.org/" },
-              { name: "Europe PMC",        favicon: "https://europepmc.org/favicon.ico",                     href: "https://europepmc.org/" },
-              { name: "Semantic Scholar",  favicon: "https://www.semanticscholar.org/favicon.ico",           href: "https://www.semanticscholar.org/" },
-              { name: "ClinicalTrials.gov",favicon: "https://clinicaltrials.gov/favicon.ico",                href: "https://clinicaltrials.gov/" },
-              { name: "PROSPERO",          favicon: "https://www.crd.york.ac.uk/prospero/favicon.ico",       href: "https://www.crd.york.ac.uk/prospero/" },
-            ].map(({ name, favicon, href }) => (
-              <a
-                key={name}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 transition-opacity hover:opacity-100 group"
-                style={{ opacity: 0.5 }}
-                title={`Search on ${name}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={favicon}
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="w-4 h-4 grayscale group-hover:grayscale-0 transition-all"
-                />
-                <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
-                  {name}
-                </span>
-              </a>
             ))}
           </div>
         </div>
