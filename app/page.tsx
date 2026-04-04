@@ -24,14 +24,6 @@ export default function HomePage() {
         />
 
         <div className="relative max-w-4xl mx-auto px-6 pt-16 pb-20 sm:pt-24 sm:pb-28">
-          {/* Eyebrow */}
-          <p
-            className="text-xs font-medium tracking-[0.2em] uppercase mb-6 opacity-60"
-            style={{ color: "#c49a2e" }}
-          >
-            Evidence Synthesis Intelligence
-          </p>
-
           {/* Main headline — serif, editorial, large */}
           <h1
             className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-[1.1] mb-6 max-w-3xl"
@@ -120,17 +112,46 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Credibility strip */}
+      {/* Data sources strip */}
       <section style={{ borderTop: "1px solid var(--border)" }}>
-        <div className="max-w-4xl mx-auto px-6 py-10">
-          <p className="text-xs text-center mb-6 tracking-[0.15em] uppercase font-medium" style={{ color: "var(--muted)" }}>
+        <div className="max-w-3xl mx-auto px-6 py-10 sm:py-12 text-center">
+          <p className="text-sm leading-relaxed mb-8 max-w-xl mx-auto" style={{ color: "var(--muted)" }}>
+            Blindspot queries six trusted databases to build a complete picture of the
+            existing evidence landscape before flagging genuine gaps.
+          </p>
+          <p className="text-[10px] tracking-[0.18em] uppercase font-semibold mb-5" style={{ color: "var(--muted)", opacity: 0.6 }}>
             Searches across
           </p>
-          <div className="flex flex-wrap justify-center gap-x-10 gap-y-3">
-            {["PubMed", "OpenAlex", "Europe PMC", "Semantic Scholar", "ClinicalTrials.gov", "PROSPERO"].map((db) => (
-              <span key={db} className="text-sm font-medium" style={{ color: "var(--foreground)", opacity: 0.6 }}>
-                {db}
-              </span>
+          <div className="flex flex-wrap justify-center items-center gap-x-7 gap-y-4">
+            {[
+              { name: "PubMed",            favicon: "https://pubmed.ncbi.nlm.nih.gov/favicon.ico",           href: "https://pubmed.ncbi.nlm.nih.gov/" },
+              { name: "OpenAlex",          favicon: "https://openalex.org/favicon.ico",                      href: "https://openalex.org/" },
+              { name: "Europe PMC",        favicon: "https://europepmc.org/favicon.ico",                     href: "https://europepmc.org/" },
+              { name: "Semantic Scholar",  favicon: "https://www.semanticscholar.org/favicon.ico",           href: "https://www.semanticscholar.org/" },
+              { name: "ClinicalTrials.gov",favicon: "https://clinicaltrials.gov/favicon.ico",                href: "https://clinicaltrials.gov/" },
+              { name: "PROSPERO",          favicon: "https://www.crd.york.ac.uk/prospero/favicon.ico",       href: "https://www.crd.york.ac.uk/prospero/" },
+            ].map(({ name, favicon, href }) => (
+              <a
+                key={name}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 transition-opacity hover:opacity-100 group"
+                style={{ opacity: 0.5 }}
+                title={`Search on ${name}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={favicon}
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="w-4 h-4 grayscale group-hover:grayscale-0 transition-all"
+                />
+                <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
+                  {name}
+                </span>
+              </a>
             ))}
           </div>
         </div>
