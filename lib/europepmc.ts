@@ -57,7 +57,11 @@ export async function searchExistingReviews(query: string): Promise<ExistingRevi
 }
 
 export async function countPrimaryStudies(query: string): Promise<number> {
-  const data = await search(query, false, 1);
+  // Exclude systematic reviews and meta-analyses from the primary study count.
+  // Europe PMC's PUB_TYPE filter matches publication types from MEDLINE.
+  // We wrap the user query in parens to safely append the NOT clauses.
+  const primaryQuery = `(${query}) NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"`;
+  const data = await search(primaryQuery, false, 1);
   return data.hitCount ?? 0;
 }
 

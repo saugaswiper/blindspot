@@ -98,21 +98,70 @@ export async function POST(request: Request) {
     // ACC-3: Attach the reviews_analyzed_count to the gap analysis before storing
     gapAnalysis.reviews_analyzed_count = reviewsAnalyzedCount;
 
-    // Step 4: Fetch real PubMed study counts for each suggested topic in parallel
-    // ACC-4: Also compute verified_feasibility from the actual count, overriding AI estimates
-    const countResults = await Promise.allSettled(
+    // Step 4: Fetch real PubMed study counts for each suggested topic — two-pass strategy
+    //
+    // Pass 1: use the AI-generated pubmed_query (specific keyword phrase).
+    //   Gemini generates 3-5 MeSH-style keywords — specific but can be too narrow.
+    //
+    // Pass 2 (fallback): for any topic where pass 1 returned 0 or failed, retry
+    //   with the topic title as a natural-language fallback. Titles are broader
+    //   and less likely to return 0 due to keyword mismatch.
+    //
+    // This prevents a narrow pubmed_query from producing a false "Insufficient"
+    // verdict on a topic that actually has primary studies.
+    //
+    // ACC-4: Set verified_feasibility only when at least one count call succeeded;
+    //   leave it undefined when all API calls failed (avoids false Insufficient
+    //   labels when PubMed is temporarily down).
+    const pass1Results = await Promise.allSettled(
       gapAnalysis.suggested_topics.map((topic) => countPrimaryStudies(topic.pubmed_query ?? topic.title))
     );
+
+    // Identify topics that need a broader fallback query (returned 0 or API error)
+    const needsFallback = pass1Results.map(
+      (r) => r.status === "rejected" || (r.status === "fulfilled" && r.value === 0)
+    );
+    const hasFallbacks = needsFallback.some(Boolean);
+
+    const pass2Results: PromiseSettledResult<number>[] = hasFallbacks
+      ? await Promise.allSettled(
+          gapAnalysis.suggested_topics.map((topic, i) =>
+            needsFallback[i]
+              ? countPrimaryStudies(topic.title)
+              : Promise.resolve(-1) // sentinel — pass1 already succeeded
+          )
+        )
+      : gapAnalysis.suggested_topics.map(() => ({ status: "fulfilled" as const, value: -1 }));
+
     gapAnalysis.suggested_topics = gapAnalysis.suggested_topics.map((topic, i) => {
-      const actualCount = countResults[i].status === "fulfilled" ? countResults[i].value : 0;
+      const p1 = pass1Results[i];
+      const p2 = pass2Results[i];
+
+      const count1 = p1.status === "fulfilled" ? p1.value : 0;
+      const count2 = needsFallback[i] && p2.status === "fulfilled" && p2.value !== -1
+        ? p2.value
+        : 0;
+      const bestCount = Math.max(count1, count2);
+
+      // Only set verified_feasibility when at least one API call returned data.
+      // If both p1 and the fallback p2 failed, leave it undefined so the UI
+      // falls back to the AI estimate rather than falsely showing "Insufficient".
+      const p1Succeeded = p1.status === "fulfilled";
+      const p2Succeeded = needsFallback[i] && p2.status === "fulfilled" && p2.value !== -1;
+      const anySucceeded = p1Succeeded || p2Succeeded;
+
       return {
         ...topic,
-        estimated_studies: actualCount,
-        // ACC-4: Override AI feasibility estimate with data-grounded score
-        verified_feasibility: getFeasibilityScore(actualCount),
+        estimated_studies: bestCount,
+        verified_feasibility: anySucceeded ? getFeasibilityScore(bestCount) : undefined,
       };
     });
-    console.log("[analyze] PubMed counts + verified feasibility computed for", gapAnalysis.suggested_topics.length, "topics");
+
+    const fallbackCount = needsFallback.filter(Boolean).length;
+    console.log(
+      "[analyze] PubMed counts computed for", gapAnalysis.suggested_topics.length, "topics",
+      fallbackCount > 0 ? `(${fallbackCount} used title fallback)` : ""
+    );
 
     // Save all three back to the result row
     const { error: updateError } = await supabase

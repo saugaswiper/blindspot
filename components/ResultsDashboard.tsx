@@ -1212,27 +1212,34 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
         ) : (
           <div className="space-y-3">
             {visibleTopics.map((topic, i) => {
-              // ACC-4: Use verified_feasibility (PubMed-verified) when available;
-              // fall back to AI estimate for pre-v028 results.
-              const verifiedScore = topic.verified_feasibility;
-              const feasibilityBadgeClass = verifiedScore === "High"
+              // Effective verified score — priority order:
+              // 1. verified_feasibility from API (v028+)
+              // 2. estimated_studies === 0 → always Insufficient, regardless of AI estimate
+              //    (client-side guard for pre-v028 results and API-failure fallbacks)
+              // 3. null → fall back to AI estimate label only (no color override)
+              const effectiveVerifiedScore: import("@/types").FeasibilityScore | undefined =
+                topic.verified_feasibility ??
+                (topic.estimated_studies === 0 ? "Insufficient" : undefined);
+
+              const isDataBacked = !!effectiveVerifiedScore;
+              const feasibilityBadgeClass = effectiveVerifiedScore === "High"
                 ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
-                : verifiedScore === "Moderate"
+                : effectiveVerifiedScore === "Moderate"
                 ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
-                : verifiedScore === "Low"
+                : effectiveVerifiedScore === "Low"
                 ? "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700"
-                : verifiedScore === "Insufficient"
+                : effectiveVerifiedScore === "Insufficient"
                 ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"
-                // Legacy fallback: use AI estimate styling
+                // No verified data: fall back to AI estimate styling
                 : topic.feasibility === "high"
                 ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
                 : topic.feasibility === "moderate"
                 ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
                 : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700";
-              const feasibilityLabel = verifiedScore
-                ? `${verifiedScore} feasibility`
+              const feasibilityLabel = effectiveVerifiedScore
+                ? `${effectiveVerifiedScore} feasibility`
                 : `${topic.feasibility} feasibility`;
-              const isInsufficient = verifiedScore === "Insufficient";
+              const isInsufficient = effectiveVerifiedScore === "Insufficient";
               return (
                 <div
                   key={i}
@@ -1247,20 +1254,28 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
                     <div className="shrink-0 flex flex-col items-end gap-1">
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full border font-medium ${feasibilityBadgeClass}`}
-                        title={verifiedScore ? "Feasibility verified against real PubMed data" : "AI-estimated feasibility — not yet verified"}
+                        title={
+                          topic.verified_feasibility
+                            ? "Feasibility verified against real PubMed data"
+                            : topic.estimated_studies === 0
+                            ? "0 primary studies found — not feasible regardless of AI estimate"
+                            : "AI-estimated feasibility — not yet verified against real data"
+                        }
                       >
                         {feasibilityLabel}
                       </span>
-                      {verifiedScore && (
+                      {isDataBacked && (
                         <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                          ✓ PubMed-verified
+                          {topic.verified_feasibility ? "✓ PubMed-verified" : "✓ 0 studies found"}
                         </span>
                       )}
                     </div>
                   </div>
                   {isInsufficient && (
                     <p className="text-xs text-red-600 dark:text-red-400 mb-2 italic">
-                      AI suggested this gap, but PubMed found fewer than 3 primary studies — a systematic review is not yet feasible on this exact topic.
+                      {topic.estimated_studies === 0
+                        ? "No primary studies found for this topic — a systematic review is not yet feasible. Consider broadening the population, intervention, or outcome scope."
+                        : "AI suggested this gap, but PubMed found fewer than 3 primary studies — a systematic review is not yet feasible on this exact topic."}
                     </p>
                   )}
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2">

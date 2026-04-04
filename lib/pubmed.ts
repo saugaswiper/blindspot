@@ -91,7 +91,12 @@ export async function searchExistingReviews(query: string): Promise<ExistingRevi
 }
 
 export async function countPrimaryStudies(query: string): Promise<number> {
-  const { count } = await esearch(query, 1);
+  // Exclude systematic reviews from the primary study count.
+  // We want to assess how much raw primary evidence exists — not whether
+  // there are existing reviews of that evidence.
+  // PubMed's systematic[sb] filter matches all systematic reviews, Cochrane
+  // reviews, and related secondary study types.
+  const { count } = await esearch(`(${query}) AND NOT systematic[sb]`, 1);
   return count;
 }
 
