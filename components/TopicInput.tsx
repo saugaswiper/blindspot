@@ -16,7 +16,6 @@ const EMPTY_PICO: PICOInput = {
 export function TopicInput() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Pre-populate the query from the ?q= URL param (used by Related Searches links).
   const [mode, setMode] = useState<SearchMode>("simple");
   const [queryText, setQueryText] = useState(searchParams.get("q") ?? "");
   const [pico, setPico] = useState<PICOInput>(EMPTY_PICO);
@@ -72,33 +71,26 @@ export function TopicInput() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      {/* Mode toggle */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-sm text-gray-500 dark:text-gray-400">Search mode:</span>
-        <div className="flex rounded-md border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-800">
+      {/* Mode toggle — underline style */}
+      <div className="flex items-center gap-1 mb-5">
+        <span className="text-xs mr-2" style={{ color: "var(--muted)" }}>
+          Search mode:
+        </span>
+        {(["simple", "pico"] as SearchMode[]).map((m) => (
           <button
+            key={m}
             type="button"
-            onClick={() => handleModeToggle("simple")}
-            className={`px-3 py-1 text-sm rounded transition-colors ${
-              mode === "simple"
-                ? "bg-[#1e3a5f] dark:bg-blue-700 text-white shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
+            onClick={() => handleModeToggle(m)}
+            className="px-3 py-1.5 text-sm font-medium rounded transition-all"
+            style={{
+              color: mode === m ? "var(--foreground)" : "var(--muted)",
+              background: mode === m ? "var(--surface-2)" : "transparent",
+              borderBottom: mode === m ? `2px solid var(--accent)` : "2px solid transparent",
+            }}
           >
-            Simple
+            {m === "simple" ? "Simple" : "PICO"}
           </button>
-          <button
-            type="button"
-            onClick={() => handleModeToggle("pico")}
-            className={`px-3 py-1 text-sm rounded transition-colors ${
-              mode === "pico"
-                ? "bg-[#1e3a5f] dark:bg-blue-700 text-white shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            PICO
-          </button>
-        </div>
+        ))}
       </div>
 
       {/* Input area */}
@@ -108,13 +100,30 @@ export function TopicInput() {
             type="text"
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
-            placeholder="Enter a research area, e.g. 'cognitive behavioral therapy for insomnia in elderly patients'"
-            className={`w-full px-4 py-3 border rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 placeholder:text-gray-600 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent ${
-              errors.queryText ? "border-red-400" : "border-gray-300 dark:border-gray-600"
-            }`}
+            placeholder="e.g. cognitive behavioral therapy for insomnia in elderly patients"
+            className="w-full px-0 py-3 text-sm bg-transparent outline-none transition-colors"
+            style={{
+              color: "var(--foreground)",
+              borderBottom: errors.queryText
+                ? "2px solid #dc2626"
+                : "2px solid var(--border)",
+              caretColor: "var(--accent)",
+            }}
+            onFocus={(e) => {
+              if (!errors.queryText) {
+                e.target.style.borderBottomColor = "var(--accent)";
+              }
+            }}
+            onBlur={(e) => {
+              if (!errors.queryText) {
+                e.target.style.borderBottomColor = "var(--border)";
+              }
+            }}
           />
           {errors.queryText && (
-            <p className="text-xs text-red-600 mt-1">{errors.queryText}</p>
+            <p className="text-xs mt-1.5" style={{ color: "#dc2626" }}>
+              {errors.queryText}
+            </p>
           )}
         </div>
       ) : (
@@ -126,15 +135,31 @@ export function TopicInput() {
       )}
 
       {errors.root && (
-        <p className="text-sm text-red-600 mt-2">{errors.root}</p>
+        <p className="text-sm mt-2" style={{ color: "#dc2626" }}>
+          {errors.root}
+        </p>
       )}
 
       <button
         type="submit"
         disabled={loading}
-        className="mt-4 w-full py-3 px-6 bg-[#1e3a5f] dark:bg-blue-700 text-white font-medium rounded-lg hover:bg-[#2d5a8e] dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-6 w-full py-3 px-6 text-sm font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{
+          background: loading ? "var(--muted)" : "var(--brand)",
+          color: "#f4f1ea",
+        }}
       >
-        {loading ? "Searching..." : "Find Research Gaps"}
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Searching…
+          </span>
+        ) : (
+          "Find Research Gaps"
+        )}
       </button>
     </form>
   );
