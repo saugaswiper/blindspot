@@ -14,7 +14,7 @@ import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 import { formatProsperoWarning } from "@/lib/prospero";
-import { computePrismaData, formatCount } from "@/lib/prisma-diagram";
+import { computePrimaryStudyPrismaData, type PrimaryStudyPrismaData, type ScreeningCriteria } from "@/lib/prisma-diagram";
 import {
   ALL_DIMENSIONS,
   DIMENSION_LABELS,
@@ -906,6 +906,11 @@ export function ResultsDashboard({
               clinicalTrialsCount={clinicalTrialsCount}
               prosperoRegistrationsCount={prosperoRegistrationsCount}
               deduplicationCount={deduplicationCount}
+              pubmedCount={pubmedCount}
+              openalexCount={openalexCount}
+              europepmcCount={europepmcCount}
+              studyDesign={localStudyDesign}
+              gapAnalysis={localGapAnalysis}
               query={query}
             />
           )}
@@ -1782,203 +1787,468 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
 /* PRISMA Flow tab                                                            */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/* PRISMA Flow tab — Primary Study Screening Funnel                           */
+/* -------------------------------------------------------------------------- */
+
+/** Small badge used to mark statistically estimated values in the diagram. */
+function EstBadge() {
+  return (
+    <span
+      className="inline-block text-[9px] font-semibold px-1 py-px rounded leading-none ml-1 align-middle"
+      style={{
+        background: "color-mix(in srgb, var(--accent) 15%, transparent)",
+        color: "var(--accent)",
+        border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+      }}
+      title="Statistically estimated based on published systematic review benchmarks"
+    >
+      est.
+    </span>
+  );
+}
+
+/** A single row in the PRISMA flow: main box on the left, exclusion side-box on the right. */
+function PrismaFlowRow({
+  mainBox,
+  sideBox,
+}: {
+  mainBox: React.ReactNode;
+  sideBox?: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-2 items-start mb-1">
+      <div className="flex-1 min-w-0">{mainBox}</div>
+      {sideBox && (
+        <div className="flex items-start gap-1 shrink-0 mt-1">
+          <div
+            className="text-xs mt-2 select-none"
+            style={{ color: "var(--muted)" }}
+            aria-hidden="true"
+          >
+            →
+          </div>
+          <div className="w-44 sm:w-52 shrink-0">{sideBox}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PrismaFlowTab({
   existingReviews,
   primaryStudyCount,
-  clinicalTrialsCount,
-  prosperoRegistrationsCount,
-  deduplicationCount,
+  clinicalTrialsCount = null,
+  prosperoRegistrationsCount = null,
+  pubmedCount = null,
+  openalexCount = null,
+  europepmcCount = null,
+  studyDesign = null,
+  gapAnalysis = null,
   query,
 }: {
   existingReviews: ExistingReview[];
   primaryStudyCount: number;
   clinicalTrialsCount?: number | null;
   prosperoRegistrationsCount?: number | null;
-  /** Number of cross-database duplicates removed. Null for pre-migration results. */
   deduplicationCount?: number | null;
+  pubmedCount?: number | null;
+  openalexCount?: number | null;
+  europepmcCount?: number | null;
+  studyDesign?: StudyDesignRecommendation | null;
+  gapAnalysis?: GapAnalysis | null;
   query: string;
 }) {
-  const data = computePrismaData(
-    existingReviews,
+  const [criteriaExpanded, setCriteriaExpanded] = useState(true);
+  const [reviewContextExpanded, setReviewContextExpanded] = useState(false);
+
+  const data: PrimaryStudyPrismaData = computePrimaryStudyPrismaData({
     primaryStudyCount,
-    clinicalTrialsCount ?? null,
-    prosperoRegistrationsCount ?? null,
-    deduplicationCount ?? null
-  );
+    pubmedCount,
+    openalexCount,
+    europepmcCount,
+    clinicalTrialsCount,
+    prosperoCount: prosperoRegistrationsCount,
+    studyDesign,
+    gapAnalysis,
+    query,
+  });
 
   const prosperoUrl = `https://www.crd.york.ac.uk/prospero/display_record.php?RecordID=&SearchKeyword=${encodeURIComponent(query)}`;
-
-  // When we have a deduplication count, we can show the full PRISMA 2020 flow:
-  // Records identified → Duplicates removed (side box) → Records screened → Included
-  const hasDedupData = data.deduplicationCount !== null && data.deduplicationCount >= 0;
-  const totalIdentified = hasDedupData
-    ? data.reviewsRetrieved + (data.deduplicationCount as number)
-    : null;
+  const hasAnalysis = studyDesign !== null;
 
   return (
     <div className="space-y-6">
+
       {/* Header */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-700">PRISMA 2020 Flow Diagram</h3>
-        <p className="text-xs text-gray-500 mt-1">
-          Based on Blindspot&apos;s initial scoping search. Use this as the starting point for your
-          systematic review protocol.{hasDedupData
-            ? " Identification counts show unique records attributed to each source. Duplicate removal reflects cross-database overlap by title, DOI, and PMID."
-            : " Counts are post-deduplication (cross-database duplicates removed by title, DOI, and PMID)."}
+        <div className="flex items-center gap-3 flex-wrap">
+          <h3 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+            Proposed Primary Study Screening Flow
+          </h3>
+          {data.studyDesignType && (
+            <span
+              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+              style={{
+                background: "color-mix(in srgb, var(--brand) 12%, transparent)",
+                color: "var(--brand)",
+                border: "1px solid color-mix(in srgb, var(--brand) 25%, transparent)",
+              }}
+            >
+              {data.studyDesignType}
+            </span>
+          )}
+        </div>
+        <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--muted)" }}>
+          PRISMA 2020 flow for the systematic review you are proposing to conduct.
+          Identification counts reflect primary studies found across databases (systematic reviews excluded).
+          Screening and eligibility numbers are estimated using published SR benchmarks
+          and are marked <EstBadge />.
         </p>
       </div>
 
-      {/* Flow diagram */}
-      <div className="prisma-flow-diagram" aria-label="PRISMA 2020 flow diagram">
+      {/* PRISMA flow diagram */}
+      <div className="prisma-flow-diagram" aria-label="PRISMA 2020 primary study screening flow">
 
-        {/* Phase label: Identification */}
+        {/* ── IDENTIFICATION ── */}
         <div className="prisma-phase-label">
-          <span>IDENTIFICATION</span>
+          <span>Identification</span>
         </div>
 
-        {/* Database boxes row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-1">
-          {data.sources
-            .filter((s) => ["PubMed", "OpenAlex", "Europe PMC", "Semantic Scholar"].includes(s.name))
-            .map((source) => (
-              <div key={source.name} className="prisma-box prisma-box-source">
-                <span className="prisma-box-label">{source.name}</span>
-                <span className="prisma-box-count">n&nbsp;=&nbsp;{source.count.toLocaleString("en-US")}</span>
+        {/* Database source boxes */}
+        {data.hasPerSourceData ? (
+          <div className="flex gap-2 mb-2 flex-wrap">
+            {data.perSourceCounts.map((s) => (
+              <div key={s.name} className="prisma-box prisma-box-source flex-1 min-w-[100px]">
+                <span className="prisma-box-label">{s.name}</span>
+                <span className="prisma-box-sublabel">Primary studies (SRs excluded)</span>
+                <span className="prisma-box-count">{s.count.toLocaleString("en-US")}</span>
               </div>
             ))}
-        </div>
-        <p className="text-[10px] text-gray-600 text-center mb-3">
-          {hasDedupData
-            ? "Records attributed to first source that found them (post-deduplication)."
-            : "Counts reflect unique records attributed to each database after cross-database deduplication."}
-        </p>
-
-        {/* Total identified box — shown only when deduplication data is available */}
-        {hasDedupData && totalIdentified !== null && (
-          <div className="flex justify-center mb-1">
-            <div className="prisma-box prisma-box-process w-full sm:w-2/3">
-              <span className="prisma-box-label">Records identified</span>
-              <span className="prisma-box-sublabel">Across all databases (before deduplication)</span>
-              <span className="prisma-box-count">n&nbsp;=&nbsp;{totalIdentified.toLocaleString("en-US")}</span>
+            {(data.clinicalTrialsCount !== null || data.prosperoCount !== null) && (
+              <div className="prisma-box prisma-box-source flex-1 min-w-[100px]">
+                <span className="prisma-box-label">Other sources</span>
+                {data.clinicalTrialsCount !== null && (
+                  <span className="prisma-box-sublabel">ClinicalTrials.gov: {data.clinicalTrialsCount.toLocaleString("en-US")}</span>
+                )}
+                {data.prosperoCount !== null && (
+                  <span className="prisma-box-sublabel">PROSPERO: {data.prosperoCount.toLocaleString("en-US")}</span>
+                )}
+                <span className="prisma-box-count">
+                  {((data.clinicalTrialsCount ?? 0) + (data.prosperoCount ?? 0)).toLocaleString("en-US")}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex justify-center mb-2">
+            <div className="prisma-box prisma-box-source w-full sm:w-2/3">
+              <span className="prisma-box-label">Databases searched</span>
+              <span className="prisma-box-sublabel">PubMed · OpenAlex · Europe PMC (primary studies, SRs excluded)</span>
+              <span className="prisma-box-count">{primaryStudyCount.toLocaleString("en-US")}</span>
+              {!data.hasPerSourceData && (
+                <span className="prisma-box-note">Per-source breakdown available for searches run after April 2026</span>
+              )}
             </div>
           </div>
         )}
 
-        {/* Arrow down */}
-        <div className="flex justify-center mb-1">
+        {/* Total identified + duplicates removed */}
+        {data.hasPerSourceData && (
+          <>
+            <div className="flex justify-center mb-1">
+              <div className="prisma-arrow" aria-hidden="true">↓</div>
+            </div>
+            <PrismaFlowRow
+              mainBox={
+                <div className="prisma-box prisma-box-process">
+                  <span className="prisma-box-label">Records identified from all sources</span>
+                  <span className="prisma-box-sublabel">Before deduplication</span>
+                  <span className="prisma-box-count">{data.totalIdentified.toLocaleString("en-US")}</span>
+                </div>
+              }
+              sideBox={
+                data.duplicatesRemoved !== null && data.duplicatesRemoved > 0 ? (
+                  <div className="prisma-box prisma-box-excluded">
+                    <span className="prisma-box-label">Estimated duplicates</span>
+                    <span className="prisma-box-sublabel">Cross-database overlap</span>
+                    <span className="prisma-box-count" style={{ color: "#dc2626" }}>
+                      {data.duplicatesRemoved.toLocaleString("en-US")}
+                    </span>
+                  </div>
+                ) : undefined
+              }
+            />
+          </>
+        )}
+
+        {/* Arrow to Screening */}
+        <div className="flex justify-center my-1">
           <div className="prisma-arrow" aria-hidden="true">↓</div>
         </div>
 
-        {/* Phase label: Screening */}
+        {/* ── SCREENING ── */}
         <div className="prisma-phase-label">
-          <span>SCREENING</span>
+          <span>Screening</span>
         </div>
 
-        {/* Screening row: main box + duplicates-removed side box (when data available) */}
-        <div className={`flex gap-2 items-start mb-1 ${hasDedupData ? "flex-col sm:flex-row" : "justify-center"}`}>
-          <div className={`prisma-box prisma-box-process ${hasDedupData ? "flex-1" : "w-full sm:w-2/3"}`}>
-            <span className="prisma-box-label">After deduplication</span>
-            <span className="prisma-box-sublabel">Records screened (title &amp; abstract)</span>
-            <span className="prisma-box-count">n&nbsp;=&nbsp;{data.reviewsRetrieved.toLocaleString("en-US")}</span>
-            {!hasDedupData && (
-              <span className="prisma-box-note">
-                (Blindspot deduplicates by title, DOI &amp; PMID before storing results)
+        <PrismaFlowRow
+          mainBox={
+            <div className="prisma-box prisma-box-process">
+              <span className="prisma-box-label">Records screened</span>
+              <span className="prisma-box-sublabel">Title &amp; abstract review (after deduplication)</span>
+              <span className="prisma-box-count">{data.afterDedup.toLocaleString("en-US")}</span>
+            </div>
+          }
+          sideBox={
+            <div className="prisma-box prisma-box-excluded">
+              <span className="prisma-box-label">
+                Excluded <EstBadge />
               </span>
+              <span className="prisma-box-sublabel">Title &amp; abstract</span>
+              <span className="prisma-box-count" style={{ color: "#dc2626" }}>
+                {data.excludedTitleAbstract.toLocaleString("en-US")}
+              </span>
+              <span className="prisma-box-note">Not relevant to review question; non-primary study type; non-human population</span>
+            </div>
+          }
+        />
+
+        {/* Arrow to Eligibility */}
+        <div className="flex justify-center my-1">
+          <div className="prisma-arrow" aria-hidden="true">↓</div>
+        </div>
+
+        {/* ── ELIGIBILITY ── */}
+        <div className="prisma-phase-label">
+          <span>Eligibility</span>
+        </div>
+
+        <PrismaFlowRow
+          mainBox={
+            <div className="prisma-box prisma-box-process">
+              <span className="prisma-box-label">
+                Full-text assessed for eligibility <EstBadge />
+              </span>
+              <span className="prisma-box-sublabel">Detailed review against inclusion criteria</span>
+              <span className="prisma-box-count">~{data.afterTitleAbstract.toLocaleString("en-US")}</span>
+            </div>
+          }
+          sideBox={
+            <div className="prisma-box prisma-box-excluded">
+              <span className="prisma-box-label">
+                Excluded <EstBadge />
+              </span>
+              <span className="prisma-box-sublabel">Full-text review</span>
+              <span className="prisma-box-count" style={{ color: "#dc2626" }}>
+                ~{data.excludedFullText.toLocaleString("en-US")}
+              </span>
+              <span className="prisma-box-note">
+                Intervention/population mismatch; insufficient outcome data; study design ineligible
+                {data.studyDesignType ? ` for ${data.studyDesignType.toLowerCase()}` : ""}
+              </span>
+            </div>
+          }
+        />
+
+        {/* Arrow to Included */}
+        <div className="flex justify-center my-1">
+          <div className="prisma-arrow" aria-hidden="true">↓</div>
+        </div>
+
+        {/* ── INCLUDED ── */}
+        <div className="prisma-phase-label">
+          <span>Included</span>
+        </div>
+
+        <div className="flex justify-center mb-2">
+          <div className="prisma-box prisma-box-included w-full sm:w-2/3">
+            <span className="prisma-box-label">
+              Studies included in synthesis <EstBadge />
+            </span>
+            <span className="prisma-box-sublabel">
+              {data.studyDesignType
+                ? `Eligible for ${data.studyDesignType.toLowerCase()}`
+                : "Meeting all inclusion criteria"}
+            </span>
+            <span className="prisma-box-count prisma-box-count-large">
+              ~{data.included.toLocaleString("en-US")}
+            </span>
+            {!hasAnalysis && (
+              <span className="prisma-box-note">Run AI analysis to refine this estimate based on study design</span>
             )}
           </div>
-          {hasDedupData && (
-            <div className="prisma-box prisma-box-excluded sm:w-48 shrink-0">
-              <span className="prisma-box-label">Duplicates removed</span>
-              <span className="prisma-box-sublabel">Title, DOI &amp; PMID match</span>
-              <span className="prisma-box-count text-red-700">n&nbsp;=&nbsp;{(data.deduplicationCount as number).toLocaleString("en-US")}</span>
-            </div>
-          )}
         </div>
 
-        {/* Arrow down */}
-        <div className="flex justify-center mb-1">
-          <div className="prisma-arrow" aria-hidden="true">↓</div>
-        </div>
+      </div>{/* end .prisma-flow-diagram */}
 
-        {/* Phase label: Included */}
-        <div className="prisma-phase-label">
-          <span>INCLUDED</span>
-        </div>
+      {/* Proposed inclusion/exclusion criteria */}
+      <div
+        className="rounded-lg overflow-hidden"
+        style={{ border: "1px solid var(--border)" }}
+      >
+        <button
+          type="button"
+          onClick={() => setCriteriaExpanded((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:opacity-80"
+          style={{ background: "var(--surface-2)" }}
+        >
+          <span className="text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--muted)" }}>
+            Proposed Inclusion &amp; Exclusion Criteria
+          </span>
+          <span className="text-xs" style={{ color: "var(--muted)" }}>
+            {criteriaExpanded ? "↑ Hide" : "↓ Show"}
+          </span>
+        </button>
 
-        {/* Included box */}
-        <div className="flex justify-center mb-4">
-          <div className="prisma-box prisma-box-included w-full sm:w-2/3">
-            <span className="prisma-box-label">Systematic reviews retrieved</span>
-            <span className="prisma-box-sublabel">Available for full-text review</span>
-            <span className="prisma-box-count prisma-box-count-large">
-              n&nbsp;=&nbsp;{data.reviewsRetrieved.toLocaleString("en-US")}
-            </span>
-          </div>
-        </div>
-
-        {/* Context row */}
-        {(data.primaryStudyCount > 0 || data.clinicalTrialsCount !== null || data.prosperoCount !== null) && (
-          <div className="border-t border-dashed border-gray-200 pt-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Background Evidence Context</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div className="prisma-box prisma-box-context">
-                <span className="prisma-box-label">Primary studies</span>
-                <span className="prisma-box-sublabel">PubMed + OpenAlex + Europe PMC</span>
-                <span className="prisma-box-count">{data.primaryStudyCount.toLocaleString("en-US")}</span>
+        {criteriaExpanded && (
+          <div className="p-4">
+            {data.criteria ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Inclusion */}
+                <div>
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2"
+                    style={{ color: "#16a34a" }}
+                  >
+                    ✓ Inclusion Criteria
+                  </p>
+                  <ol className="space-y-1.5">
+                    {data.criteria.inclusion.map((criterion, i) => (
+                      <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: "var(--foreground)" }}>
+                        <span className="shrink-0 font-semibold" style={{ color: "var(--muted)" }}>{i + 1}.</span>
+                        <span>{criterion}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+                {/* Exclusion */}
+                <div>
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2"
+                    style={{ color: "#dc2626" }}
+                  >
+                    ✗ Exclusion Criteria
+                  </p>
+                  <ol className="space-y-1.5">
+                    {data.criteria.exclusion.map((criterion, i) => (
+                      <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: "var(--foreground)" }}>
+                        <span className="shrink-0 font-semibold" style={{ color: "var(--muted)" }}>{i + 1}.</span>
+                        <span>{criterion}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </div>
-              {data.clinicalTrialsCount !== null && (
-                <div className="prisma-box prisma-box-context">
-                  <span className="prisma-box-label">Registered trials</span>
-                  <span className="prisma-box-sublabel">ClinicalTrials.gov</span>
-                  <span className="prisma-box-count">{formatCount(data.clinicalTrialsCount)}</span>
-                </div>
-              )}
-              {data.prosperoCount !== null && (
-                <div className="prisma-box prisma-box-context">
-                  <span className="prisma-box-label">PROSPERO registrations</span>
-                  <span className="prisma-box-sublabel">Reviews in progress</span>
-                  <span className="prisma-box-count">
-                    {data.prosperoCount > 0 ? (
-                      <a
-                        href={prosperoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-amber-700 underline hover:text-amber-900"
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm" style={{ color: "var(--muted)" }}>
+                  Run AI gap analysis to generate proposed inclusion and exclusion criteria
+                  tailored to the study design and identified evidence gaps.
+                </p>
+              </div>
+            )}
+            <p className="text-[10px] mt-4 pt-3 leading-relaxed" style={{ color: "var(--muted)", borderTop: "1px dashed var(--border)" }}>
+              These criteria are AI-derived from the study design recommendation and evidence gaps. Review and adapt them with your team before PROSPERO registration. Criteria are presented in PICO format aligned with Cochrane Handbook guidance.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Collapsible: Existing systematic reviews context */}
+      <div
+        className="rounded-lg overflow-hidden"
+        style={{ border: "1px solid var(--border)" }}
+      >
+        <button
+          type="button"
+          onClick={() => setReviewContextExpanded((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:opacity-80"
+          style={{ background: "var(--surface-2)" }}
+        >
+          <span className="text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--muted)" }}>
+            Existing Systematic Reviews Found ({existingReviews.length})
+          </span>
+          <span className="text-xs" style={{ color: "var(--muted)" }}>
+            {reviewContextExpanded ? "↑ Hide" : "↓ Show"}
+          </span>
+        </button>
+        {reviewContextExpanded && (
+          <div className="px-4 pb-4 pt-2">
+            <p className="text-xs mb-3 leading-relaxed" style={{ color: "var(--muted)" }}>
+              These secondary studies (existing systematic reviews) were identified during Blindspot&apos;s
+              scoping search and are <em>excluded</em> from the primary study funnel above.
+              They inform the gap analysis and represent the current evidence landscape.
+            </p>
+            {existingReviews.length > 0 ? (
+              <ul className="space-y-1.5">
+                {existingReviews.slice(0, 8).map((r, i) => (
+                  <li key={i} className="text-xs" style={{ color: "var(--foreground)" }}>
+                    <span className="font-medium">{r.year}</span>{" "}
+                    <span style={{ color: "var(--muted)" }}>— {r.title}</span>
+                    {r.source && (
+                      <span
+                        className="ml-1.5 px-1 py-px rounded text-[9px] font-medium"
+                        style={{ background: "var(--surface-2)", color: "var(--muted)" }}
                       >
-                        {formatCount(data.prosperoCount)} ⚠
-                      </a>
-                    ) : (
-                      formatCount(data.prosperoCount)
+                        {r.source}
+                      </span>
                     )}
-                  </span>
-                </div>
-              )}
-            </div>
+                  </li>
+                ))}
+                {existingReviews.length > 8 && (
+                  <li className="text-xs" style={{ color: "var(--muted)" }}>
+                    + {existingReviews.length - 8} more — see the Reviews tab for full list
+                  </li>
+                )}
+              </ul>
+            ) : (
+              <p className="text-xs" style={{ color: "var(--muted)" }}>No existing systematic reviews found for this topic.</p>
+            )}
+            {prosperoRegistrationsCount !== null && prosperoRegistrationsCount > 0 && (
+              <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>
+                Additionally, <a href={prosperoUrl} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>{prosperoRegistrationsCount} review{prosperoRegistrationsCount > 1 ? "s" : ""} registered on PROSPERO</a> may be in progress on this topic.
+              </p>
+            )}
           </div>
         )}
       </div>
 
       {/* Reference + disclaimer */}
-      <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+      <div
+        className="rounded-md p-3 text-xs space-y-1"
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid var(--border)",
+          color: "var(--muted)",
+        }}
+      >
         <p>
-          <strong>Reference:</strong> Page MJ, et al. The PRISMA 2020 statement: an updated
-          guideline for reporting systematic reviews.{" "}
+          <strong style={{ color: "var(--foreground)" }}>Reference:</strong>{" "}
+          Page MJ, et al. The PRISMA 2020 statement: an updated guideline for reporting systematic reviews.{" "}
           <a
             href="https://doi.org/10.1136/bmj.n71"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#4a90d9] dark:text-blue-400 underline"
+            style={{ color: "var(--accent)" }}
+            className="underline"
           >
             BMJ 2021;372:n71
           </a>
           .
         </p>
         <p>
-          This is a scoping search summary. Complete your full systematic review search strategy
-          before submitting your PRISMA flow to a journal. Counts above reflect Blindspot&apos;s
-          initial database search — your formal review may identify additional records.
+          Screening and eligibility numbers are statistical estimates based on published systematic review
+          benchmarks (marked <EstBadge />) and will change as you conduct your formal review. Complete
+          your full database search, apply inclusion criteria independently with a second reviewer, and
+          update this diagram before journal submission.
+        </p>
+        <p>
+          Identification counts reflect primary studies only — systematic reviews and meta-analyses are
+          excluded from the count and shown separately in the context section above.
         </p>
       </div>
+
     </div>
   );
 }
