@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "Next.js dev server",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["/Users/dharmayudesai/blindspot/node_modules/.bin/next", "dev"],
       "port": 3000
     },
     {

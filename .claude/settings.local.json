@@ -8,7 +8,29 @@
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
       "Bash(git push:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(rm /Users/dharmayudesai/blindspot/.git/index.lock)",
+      "mcp__plugin_bio-research_pubmed__search_articles",
+      "mcp__plugin_bio-research_pubmed__get_article_metadata",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(gh api:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/anthropics/claude-code/b543a256248ce5ff98804b8dfef4cd6247423d98/plugins/frontend-design/skills/frontend-design/SKILL.md\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/anthropics/claude-code/b543a256248ce5ff98804b8dfef4cd6247423d98/plugins/frontend-design/.claude-plugin/plugin.json\")",
+      "Bash(/opt/homebrew/bin/npx tsc:*)",
+      "Read(//Users/dharmayudesai/.volta/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(command -v node)",
+      "Bash(/usr/local/bin/npx tsc:*)",
+      "Bash(arch -arm64 /usr/local/bin/npx tsc --noEmit)",
+      "Read(//Users/dharmayudesai/Library/**)",
+      "Read(//Users/dharmayudesai/**)",
+      "Bash(git commit:*)",
+      "Bash(git -C /Users/dharmayudesai/blindspot/.claude/worktrees/distracted-northcutt status --short)",
+      "Bash(git -C /Users/dharmayudesai/blindspot/.claude/worktrees/distracted-northcutt log main..HEAD --oneline)",
+      "Bash(git -C /Users/dharmayudesai/blindspot/.claude/worktrees/distracted-northcutt add .claude/launch.json .claude/settings.local.json)",
+      "Bash(git -C:*)"
     ]
   }
 }
