@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import * as PubMed from "@/lib/pubmed";
 import * as OpenAlex from "@/lib/openalex";
@@ -5,11 +6,14 @@ import * as EuropePMC from "@/lib/europepmc";
 import * as ClinicalTrials from "@/lib/clinicaltrials";
 import * as SemanticScholar from "@/lib/semanticscholar";
 import { searchProspero, isQuerySubstantialEnough } from "@/lib/prospero";
-import { getCachedResult, saveSearchResult } from "@/lib/cache";
+import { getCachedResult, saveSearchResult, saveGuestSearchResult } from "@/lib/cache";
 import { validateSearchInput } from "@/lib/validators";
 import { toApiError } from "@/lib/errors";
 import { expandConcept } from "@/lib/synonyms";
 import type { ExistingReview } from "@/types";
+
+const GUEST_COOKIE = "blindspot_guest_search";
+const GUEST_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days — matches search result TTL
 
 type SearchBody = { queryText?: string; pico?: { population: string; intervention: string; comparison?: string; outcome: string } };
 
@@ -157,13 +161,19 @@ function dedupeReviews(...sources: ExistingReview[][]): DedupeResult {
 
 export async function POST(request: Request) {
   try {
-    // Auth check
+    // Resolve auth and guest cookie in parallel
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const [{ data: { user } }, cookieStore] = await Promise.all([
+      supabase.auth.getUser(),
+      cookies(),
+    ]);
 
-    if (!user) {
+    const isGuest = !user;
+
+    // Gate: unauthenticated users get exactly one free search (tracked by cookie).
+    if (isGuest && cookieStore.has(GUEST_COOKIE)) {
       return Response.json(
-        { error: "Please sign in to search." },
+        { error: "Create a free account to run more searches and save your results.", guestLimitReached: true },
         { status: 401 }
       );
     }
@@ -180,10 +190,12 @@ export async function POST(request: Request) {
     // exact combination of concepts rather than any individual keyword match.
     const reviewQuery = buildReviewQuery(body as SearchBody);
 
-    // Check cache first
-    const cached = await getCachedResult(user.id, query);
-    if (cached) {
-      return Response.json({ resultId: cached.id, cached: true });
+    // Check cache for authenticated users only (guests always run fresh)
+    if (!isGuest) {
+      const cached = await getCachedResult(user!.id, query);
+      if (cached) {
+        return Response.json({ resultId: cached.id, cached: true });
+      }
     }
 
     // Run all sources in parallel — fall back gracefully if any fail
@@ -319,18 +331,35 @@ export async function POST(request: Request) {
       ? `${failedSources.join(", ")} ${failedSources.length === 1 ? "was" : "were"} temporarily unavailable.`
       : undefined;
 
-    // Save and cache
-    const resultId = await saveSearchResult(user.id, query, {
+    // Save result — guest results are public and stored with no user_id
+    const searchData = {
       existing_reviews: existingReviews,
       primary_study_count: primaryStudyCount,
       clinical_trials_count: clinicalTrialsCountVal,
       prospero_registrations_count: prosperoCountVal,
       deduplication_count: deduplicationCount,
-    });
+    };
+
+    const resultId = isGuest
+      ? await saveGuestSearchResult(query, searchData)
+      : await saveSearchResult(user!.id, query, searchData);
+
+    // Set guest cookie after a successful guest search so subsequent
+    // unauthenticated requests are redirected to sign-up.
+    if (isGuest) {
+      cookieStore.set(GUEST_COOKIE, "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: GUEST_COOKIE_MAX_AGE,
+        path: "/",
+      });
+    }
 
     return Response.json({
       resultId,
       cached: false,
+      isGuest,
       ...(warning && { warning }),
     });
   } catch (error) {

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service";
 import type { ExistingReview } from "@/types";
 
 export interface CachedSearchResult {
@@ -158,6 +159,60 @@ export async function saveSearchResult(
   if (resultError || !result) {
     console.error("[cache] search_results INSERT failed:", resultError?.code, resultError?.message, resultError?.details, resultError?.hint);
     throw new Error(`Failed to save search result: ${resultError?.message}`);
+  }
+
+  return result.id;
+}
+
+/**
+ * Saves a search result for an unauthenticated guest user.
+ *
+ * Uses the service-role client (bypasses RLS) so the row can be inserted
+ * with user_id = NULL (requires migration 010). The result is always saved
+ * as public so the /results/[id] page is viewable without authentication.
+ *
+ * No cache check is performed for guests — every guest search runs fresh.
+ */
+export async function saveGuestSearchResult(
+  query: string,
+  data: {
+    existing_reviews: ExistingReview[];
+    primary_study_count: number;
+    clinical_trials_count: number | null;
+    prospero_registrations_count: number | null;
+    deduplication_count: number;
+  }
+): Promise<string> {
+  const supabase = createServiceRoleClient();
+
+  const { data: search, error: searchError } = await supabase
+    .from("searches")
+    .insert({ user_id: null, query_text: query })
+    .select("id")
+    .single();
+
+  if (searchError || !search) {
+    console.error("[cache] guest searches INSERT failed:", searchError?.message);
+    throw new Error(`Failed to save guest search: ${searchError?.message}`);
+  }
+
+  const { data: result, error: resultError } = await supabase
+    .from("search_results")
+    .insert({
+      search_id: search.id,
+      existing_reviews: data.existing_reviews,
+      primary_study_count: data.primary_study_count,
+      clinical_trials_count: data.clinical_trials_count,
+      prospero_registrations_count: data.prospero_registrations_count,
+      deduplication_count: data.deduplication_count,
+      is_public: true,
+    })
+    .select("id")
+    .single();
+
+  if (resultError || !result) {
+    console.error("[cache] guest search_results INSERT failed:", resultError?.message);
+    throw new Error(`Failed to save guest search result: ${resultError?.message}`);
   }
 
   return result.id;

@@ -600,7 +600,7 @@ export function ResultsDashboard({
             <GapsTab gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} />
           )}
           {activeTab === "design" && (
-            <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} />
+            <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} />
           )}
           {activeTab === "prisma" && (
             <PrismaFlowTab
@@ -1093,6 +1093,7 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
   }
 
   if (!gapAnalysis) {
+    if (!isOwner) return <GuestAnalysisPrompt />;
     return <AnalysisPrompt isPending={isPending} onAnalyze={onAnalyze} error={error} />;
   }
 
@@ -1299,13 +1300,14 @@ const FEASIBILITY_BADGE: Record<string, string> = {
   low: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700",
 };
 
-function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAnalyze, error }: {
+function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAnalyze, error, isOwner }: {
   studyDesign: StudyDesignRecommendation | null;
   gapAnalysis: GapAnalysis | null;
   feasibilityScore: FeasibilityScore | null;
   isPending: boolean;
   onAnalyze: () => void;
   error: string | null;
+  isOwner: boolean;
 }) {
   if (isPending) {
     return (
@@ -1317,6 +1319,7 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
   }
 
   if (!studyDesign || !gapAnalysis) {
+    if (!isOwner) return <GuestAnalysisPrompt />;
     return <AnalysisPrompt isPending={isPending} onAnalyze={onAnalyze} error={error} />;
   }
 
@@ -1653,6 +1656,28 @@ function PrismaFlowTab({
 /* -------------------------------------------------------------------------- */
 /* Analysis prompt (empty state)                                              */
 /* -------------------------------------------------------------------------- */
+
+function GuestAnalysisPrompt() {
+  return (
+    <div className="text-center py-10">
+      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1e3a5f]/10 dark:bg-blue-900/30 mb-3">
+        <svg className="w-6 h-6 text-[#1e3a5f] dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456Z" />
+        </svg>
+      </div>
+      <p className="text-gray-700 dark:text-gray-300 text-sm font-medium mb-1">Create a free account to run AI gap analysis</p>
+      <p className="text-gray-600 dark:text-gray-400 text-xs mb-4">
+        Identify research gaps, get suggested review topics, and receive a study design recommendation.
+      </p>
+      <a
+        href="/signup"
+        className="inline-block px-4 py-2 bg-[#1e3a5f] dark:bg-blue-700 text-white text-sm font-medium rounded-md hover:bg-[#2d5a8e] dark:hover:bg-blue-600 transition-colors"
+      >
+        Sign up free
+      </a>
+    </div>
+  );
+}
 
 function AnalysisPrompt({ isPending, onAnalyze, error }: {
   isPending: boolean;

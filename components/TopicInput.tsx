@@ -55,9 +55,13 @@ export function TopicInput() {
       body: JSON.stringify(body),
     });
 
-    const data = (await res.json()) as { resultId?: string; error?: string };
+    const data = (await res.json()) as { resultId?: string; error?: string; guestLimitReached?: boolean };
 
     if (!res.ok || !data.resultId) {
+      if (data.guestLimitReached) {
+        router.push("/signup");
+        return;
+      }
       setErrors({ root: data.error ?? "Search failed. Please try again." });
       setLoading(false);
       return;
