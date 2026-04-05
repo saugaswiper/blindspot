@@ -155,7 +155,17 @@ export async function GET(req: Request) {
 
         const searchId = searchData.id as string;
         const query = searchData.query_text as string;
-        const userEmail = profileData.email as string;
+
+        // Validate email format before attempting to send — an invalid address
+        // in the DB would cause a Resend API error and mark the alert as failed.
+        const rawEmail = profileData.email as string;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!rawEmail || !emailRegex.test(rawEmail)) {
+          console.warn(`[cron/send-alerts] Alert ${alert.id}: invalid email "${rawEmail}" — skipping`);
+          failureCount++;
+          continue;
+        }
+        const userEmail = rawEmail;
 
         // ── Fetch the stored review snapshot ─────────────────────────────
         const { data: resultData, error: resultError } = await supabase

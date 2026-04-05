@@ -1,5 +1,7 @@
 import { cookies } from "next/headers";
+import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service";
 import * as PubMed from "@/lib/pubmed";
 import * as OpenAlex from "@/lib/openalex";
 import * as EuropePMC from "@/lib/europepmc";
@@ -11,6 +13,26 @@ import { validateSearchInput } from "@/lib/validators";
 import { toApiError } from "@/lib/errors";
 import { expandConcept } from "@/lib/synonyms";
 import type { ExistingReview } from "@/types";
+
+/**
+ * Returns a short, one-way hash of the client IP address.
+ * The BLINDSPOT_IP_SALT env variable prevents rainbow-table reversal.
+ * We truncate to 32 hex chars — sufficient for collision resistance at
+ * the scale of guests per day while keeping the stored value compact.
+ */
+function hashIp(ip: string): string {
+  const salt = process.env.BLINDSPOT_IP_SALT ?? "blindspot-default-salt";
+  return createHash("sha256").update(ip + salt).digest("hex").slice(0, 32);
+}
+
+/** Extract the best-effort client IP from Next.js request headers. */
+function getClientIp(request: Request): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown"
+  );
+}
 
 const GUEST_COOKIE = "blindspot_guest_search";
 const GUEST_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days — matches search result TTL
@@ -170,12 +192,40 @@ export async function POST(request: Request) {
 
     const isGuest = !user;
 
-    // Gate: unauthenticated users get exactly one free search (tracked by cookie).
-    if (isGuest && cookieStore.has(GUEST_COOKIE)) {
-      return Response.json(
-        { error: "Create a free account to run more searches and save your results.", guestLimitReached: true },
-        { status: 401 }
-      );
+    if (isGuest) {
+      // Layer 1: cookie-based gate (first line of defence — fast, no DB call).
+      if (cookieStore.has(GUEST_COOKIE)) {
+        return Response.json(
+          { error: "Create a free account to run more searches and save your results.", guestLimitReached: true },
+          { status: 401 }
+        );
+      }
+
+      // Layer 2: server-side IP-hash rate limit (resistant to cookie clearing / incognito).
+      // Limits each IP to 3 guest searches per 24-hour window stored in Supabase.
+      // Uses the service-role client because guest rows have user_id = NULL which
+      // the normal RLS policy would block from reading.
+      try {
+        const ipHash = hashIp(getClientIp(request));
+        const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const svc = createServiceRoleClient();
+        const { count: recentGuestCount } = await svc
+          .from("searches")
+          .select("*", { count: "exact", head: true })
+          .is("user_id", null)
+          .eq("guest_ip_hash", ipHash)
+          .gte("created_at", windowStart);
+
+        if ((recentGuestCount ?? 0) >= 3) {
+          return Response.json(
+            { error: "Too many searches from this network. Create a free account to continue.", guestLimitReached: true },
+            { status: 429 }
+          );
+        }
+      } catch (err) {
+        // IP rate-limit check is best-effort; don't block the search if it fails.
+        console.warn("[search] IP rate-limit check failed:", err);
+      }
     }
 
     // Validate input
@@ -352,7 +402,7 @@ export async function POST(request: Request) {
     };
 
     const resultId = isGuest
-      ? await saveGuestSearchResult(query, searchData)
+      ? await saveGuestSearchResult(query, searchData, hashIp(getClientIp(request)))
       : await saveSearchResult(user!.id, query, searchData);
 
     // Set guest cookie after a successful guest search so subsequent

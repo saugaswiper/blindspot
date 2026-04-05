@@ -250,13 +250,19 @@ export async function saveGuestSearchResult(
     pubmed_count: number | null;
     openalex_count: number | null;
     europepmc_count: number | null;
-  }
+  },
+  /**
+   * SHA-256 hash of the client IP address (truncated to 32 hex chars).
+   * Stored for server-side guest rate limiting (migration 013).
+   * Pass undefined to omit — the column is nullable so older callers continue to work.
+   */
+  guestIpHash?: string
 ): Promise<string> {
   const supabase = createServiceRoleClient();
 
   const { data: search, error: searchError } = await supabase
     .from("searches")
-    .insert({ user_id: null, query_text: query })
+    .insert({ user_id: null, query_text: query, guest_ip_hash: guestIpHash ?? null })
     .select("id")
     .single();
 

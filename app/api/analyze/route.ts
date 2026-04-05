@@ -24,6 +24,24 @@ export async function POST(request: Request) {
       return Response.json({ error: "resultId is required." }, { status: 400 });
     }
 
+    // Per-user rate limit: max 20 AI analyses per 24-hour window.
+    // Counts distinct searches created today that belong to this user and already
+    // have a gap_analysis — each represent one completed /api/analyze call.
+    const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count: analysisCount } = await supabase
+      .from("searches")
+      .select("search_results!inner(gap_analysis)", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", windowStart)
+      .not("search_results.gap_analysis", "is", null);
+
+    if ((analysisCount ?? 0) >= 20) {
+      return Response.json(
+        { error: "You have reached the daily analysis limit (20 per day). Please try again tomorrow." },
+        { status: 429 }
+      );
+    }
+
     // Fetch the search result (RLS ensures it belongs to this user)
     const { data: result, error: fetchError } = await supabase
       .from("search_results")
