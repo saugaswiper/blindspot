@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { searchProspero, formatProsperoWarning, isQuerySubstantialEnough } from "./prospero";
+import { searchProspero, formatProsperoWarning, formatProsperoStatus, isQuerySubstantialEnough } from "./prospero";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -28,6 +28,32 @@ describe("prospero", () => {
       expect(formatProsperoWarning(10)).toBe(
         "⚠ 10 systematic reviews may already be registered on PROSPERO for this topic.",
       );
+    });
+  });
+
+  describe("formatProsperoStatus", () => {
+    it("returns no match when count is 0", () => {
+      const result = formatProsperoStatus(0);
+      expect(result.label).toBe("No match");
+      expect(result.hasMatch).toBe(false);
+    });
+
+    it("returns singular match label for count = 1", () => {
+      const result = formatProsperoStatus(1);
+      expect(result.label).toBe("1 match");
+      expect(result.hasMatch).toBe(true);
+    });
+
+    it("returns plural matches label for count = 2", () => {
+      const result = formatProsperoStatus(2);
+      expect(result.label).toBe("2 matches");
+      expect(result.hasMatch).toBe(true);
+    });
+
+    it("returns plural matches label for large counts", () => {
+      const result = formatProsperoStatus(42);
+      expect(result.label).toBe("42 matches");
+      expect(result.hasMatch).toBe(true);
     });
   });
 

@@ -82,6 +82,26 @@ export function formatProsperoWarning(count: number): string {
 }
 
 /**
+ * NEW-1: Formats a compact PROSPERO status for the persistent metric badge
+ * in the results summary header.
+ *
+ * Returns a label suitable for an inline badge, plus a flag indicating
+ * whether any matching registrations were found.
+ *
+ * @param count - Number of matching PROSPERO registrations
+ * @returns { label: string; hasMatch: boolean }
+ */
+export function formatProsperoStatus(count: number): { label: string; hasMatch: boolean } {
+  if (count === 0) {
+    return { label: "No match", hasMatch: false };
+  }
+  if (count === 1) {
+    return { label: "1 match", hasMatch: true };
+  }
+  return { label: `${count} matches`, hasMatch: true };
+}
+
+/**
  * Check if a query should trigger PROSPERO search.
  * Returns false for very short or generic queries to avoid noise.
  *

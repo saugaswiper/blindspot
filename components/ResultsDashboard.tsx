@@ -13,7 +13,7 @@ import { PrintableReport } from "@/components/PrintableReport";
 import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
-import { formatProsperoWarning } from "@/lib/prospero";
+import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
 import { computePrimaryStudyPrismaData, type PrimaryStudyPrismaData, type ScreeningCriteria } from "@/lib/prisma-diagram";
 import {
   ALL_DIMENSIONS,
@@ -598,6 +598,12 @@ export function ResultsDashboard({
     .filter((g) => g.importance === "high")
     .slice(0, 3) ?? [];
 
+  // NEW-1: Compute persistent PROSPERO badge status once, outside JSX
+  const prosperoStatus =
+    prosperoRegistrationsCount !== null && prosperoRegistrationsCount !== undefined
+      ? formatProsperoStatus(prosperoRegistrationsCount)
+      : null;
+
   const tabs: { key: Tab; label: string }[] = [
     { key: "reviews", label: `Existing Reviews (${existingReviews.length})` },
     { key: "gaps", label: "Gap Analysis" },
@@ -742,6 +748,32 @@ export function ResultsDashboard({
               </p>
             </div>
           )}
+          {/* NEW-1: Persistent PROSPERO indicator — always shown when count is non-null */}
+          {prosperoStatus !== null && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>PROSPERO</p>
+              <a
+                href={`https://www.crd.york.ac.uk/prospero/display_record.php?RecordID=&SearchTerm=${encodeURIComponent(query)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-opacity hover:opacity-80 ${
+                  prosperoStatus.hasMatch
+                    ? "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700"
+                    : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700"
+                }`}
+                title={
+                  prosperoStatus.hasMatch
+                    ? "Possible conflicts in PROSPERO — click to check the registry"
+                    : "No registered systematic reviews found in PROSPERO for this topic"
+                }
+                aria-label={`PROSPERO registry check: ${prosperoStatus.label}`}
+              >
+                <span aria-hidden="true">{prosperoStatus.hasMatch ? "⚠" : "✓"}</span>
+                {prosperoStatus.label}
+              </a>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>registry check</p>
+            </div>
+          )}
           {localFeasibilityScore && (
             <div>
               {/* UI-2: Label row with "Why This Score?" explainer */}
@@ -761,7 +793,9 @@ export function ResultsDashboard({
           <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>{localFeasibilityExplanation}</p>
         )}
 
-        {/* PROSPERO warning banner */}
+        {/* PROSPERO detail banner — shown only when matches > 0, provides action context.
+            The compact persistent badge in the metrics row above always shows
+            the status (✓ No match or ⚠ N matches) regardless of count. */}
         {prosperoRegistrationsCount !== null && prosperoRegistrationsCount !== undefined && prosperoRegistrationsCount > 0 && (
           <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md">
             <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
