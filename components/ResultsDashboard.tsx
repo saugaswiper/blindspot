@@ -894,7 +894,7 @@ export function ResultsDashboard({
             <ReviewsTab reviews={existingReviews} />
           )}
           {activeTab === "gaps" && (
-            <GapsTab gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} />
+            <GapsTab gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} />
           )}
           {activeTab === "design" && (
             <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} />
@@ -1377,7 +1377,7 @@ function GapDimensionFilter({
 /* Gaps tab                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore }: {
+function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query }: {
   gapAnalysis: GapAnalysis | null;
   isPending: boolean;
   onAnalyze: () => void;
@@ -1387,6 +1387,8 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
   protocolDraft?: string | null;
   primaryStudyCount: number;
   feasibilityScore: FeasibilityScore | null;
+  /** ACC-2: Original query text — passed to InsufficientEvidencePanel for alternatives fetch */
+  query?: string;
 }) {
   const [activeDimensions, setActiveDimensions] = useState<Set<GapDimension>>(resetFilter);
 
@@ -1395,8 +1397,9 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
   }
 
   // ACC-1: Show InsufficientEvidencePanel when evidence is insufficient
+  // ACC-2: Pass query so the panel can fetch verified alternative topics
   if (feasibilityScore === "Insufficient" && !gapAnalysis) {
-    return <InsufficientEvidencePanel primaryStudyCount={primaryStudyCount} />;
+    return <InsufficientEvidencePanel primaryStudyCount={primaryStudyCount} query={query} />;
   }
 
   if (!gapAnalysis) {
