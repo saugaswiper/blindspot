@@ -359,7 +359,15 @@ export async function POST(request: Request) {
           clinicalCounts.reduce((a, b) => a + b, 0) / clinicalCounts.length;
         primaryStudyCount = Math.round(clinicalAvg * 0.6 + openalexCountVal * 0.4);
       } else {
-        primaryStudyCount = Math.max(maxAll, clinicalTrialsCountVal ?? 0);
+        // Apply a dedup factor to account for ~25% inter-database overlap
+        // (PubMed+OpenAlex overlap ~50–70%; PubMed+EuropePMC ~40–60%).
+        // Taking Math.max() without adjustment inflates counts by ~20–50%.
+        // dedupFactor=0.75 is conservative; validate empirically once telemetry is in place.
+        const dedupFactor = 0.75;
+        primaryStudyCount = Math.max(
+          Math.round(maxAll * dedupFactor),
+          clinicalTrialsCountVal ?? 0
+        );
       }
     }
 
