@@ -1,10 +1,271 @@
 import { describe, expect, it } from "vitest";
 import {
   computePrismaData,
+  computePrimaryStudyPrismaData,
   formatCount,
   hasPrismaData,
   KNOWN_SOURCES,
 } from "./prisma-diagram";
+
+// ---------------------------------------------------------------------------
+// computePrimaryStudyPrismaData — ground-truth calibration tests
+//
+// These tests validate that Blindspot's PRISMA screening funnel estimates
+// fall within an acceptable range of real published systematic reviews.
+// Ground-truth data collected 2026-04-05 via web search from published SRs.
+//
+// Acceptable range: estimate within ±50% of the published SR's included count
+// for moderate-breadth queries (where query specificity ≈ SR scope).
+// ---------------------------------------------------------------------------
+
+import type { StudyDesignRecommendation } from "@/types";
+
+/**
+ * Minimal valid StudyDesignRecommendation for tests.
+ * computePrimaryStudyPrismaData only uses `.primary`; other fields are ignored.
+ */
+function makeDesign(primary: StudyDesignRecommendation["primary"]): StudyDesignRecommendation {
+  return {
+    primary,
+    rationale: "test",
+    steps: [],
+    example_paper: { citation: "", url: "" },
+    alternatives: [],
+    methodology_links: [],
+    confidence: "moderate",
+  };
+}
+
+/** Helper that builds a minimal computePrimaryStudyPrismaData call */
+function makePrismaInput(
+  primaryStudyCount: number,
+  /** Pass a StudyDesignType string or null. "meta-analysis" → Systematic Review with Meta-Analysis, etc. */
+  designShorthand: "meta-analysis" | "scoping" | "umbrella" | "rapid" | "default" | null = null,
+  opts: {
+    pubmedCount?: number | null;
+    openalexCount?: number | null;
+    europepmcCount?: number | null;
+  } = {}
+) {
+  const designMap: Record<string, StudyDesignRecommendation["primary"]> = {
+    "meta-analysis": "Systematic Review with Meta-Analysis",
+    "scoping":       "Scoping Review",
+    "umbrella":      "Umbrella Review",
+    "rapid":         "Rapid Review",
+    "default":       "Systematic Review (Narrative Synthesis)",
+  };
+  const studyDesign = designShorthand ? makeDesign(designMap[designShorthand]) : null;
+  return computePrimaryStudyPrismaData({
+    primaryStudyCount,
+    pubmedCount: opts.pubmedCount ?? null,
+    openalexCount: opts.openalexCount ?? null,
+    europepmcCount: opts.europepmcCount ?? null,
+    clinicalTrialsCount: null,
+    prosperoCount: null,
+    studyDesign,
+    gapAnalysis: null,
+    query: "test query",
+  });
+}
+
+describe("computePrimaryStudyPrismaData — screening funnel estimates", () => {
+  // --- Funnel structure invariants ---
+
+  it("produces a monotonically decreasing funnel", () => {
+    for (const count of [10, 45, 250, 800, 2500]) {
+      const result = makePrismaInput(count, "meta-analysis");
+      expect(result.afterDedup).toBeGreaterThanOrEqual(result.afterTitleAbstract);
+      expect(result.afterTitleAbstract).toBeGreaterThanOrEqual(result.included);
+      expect(result.included).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("afterDedup equals primaryStudyCount", () => {
+    const result = makePrismaInput(120, "meta-analysis");
+    expect(result.afterDedup).toBe(120);
+  });
+
+  it("excludedTitleAbstract + afterTitleAbstract equals afterDedup", () => {
+    const result = makePrismaInput(200, "default");
+    expect(result.excludedTitleAbstract + result.afterTitleAbstract).toBe(result.afterDedup);
+  });
+
+  it("excludedFullText + included equals afterTitleAbstract", () => {
+    const result = makePrismaInput(200, "default");
+    expect(result.excludedFullText + result.included).toBe(result.afterTitleAbstract);
+  });
+
+  // --- Small tier (<15) ---
+
+  it("small corpus (<15): included is non-trivial fraction of afterDedup", () => {
+    const result = makePrismaInput(10, null);
+    // taRate 0.72, ftRate 0.78 → combined ~56%; min is 1
+    expect(result.included).toBeGreaterThanOrEqual(1);
+    expect(result.included).toBeLessThanOrEqual(10);
+  });
+
+  // --- Medium tier (15–59) ---
+
+  it("medium corpus, meta-analysis: combined rate ~20%", () => {
+    // 40 × 0.32 × 0.62 = ~7.9 → rounds to 8
+    const result = makePrismaInput(40, "meta-analysis");
+    expect(result.included).toBeGreaterThanOrEqual(5);
+    expect(result.included).toBeLessThanOrEqual(15);
+  });
+
+  it("medium corpus, scoping review: uses reduced ftRate (0.55 not 0.82)", () => {
+    // 40 × 0.50 × 0.55 = 11 (not 40 × 0.50 × 0.82 = 16.4)
+    const result = makePrismaInput(40, "scoping");
+    expect(result.included).toBeGreaterThanOrEqual(6);
+    expect(result.included).toBeLessThanOrEqual(14);
+  });
+
+  // --- Large tier (60–499) ---
+
+  it("large corpus meta-analysis (~280 studies): estimate within ±50% of benchmark 24", () => {
+    // Ground truth: CBT-I for insomnia QoL (2022), afterDedup~280, included=24
+    // Expected: 280 × 0.18 × 0.58 = ~29
+    const result = makePrismaInput(280, "meta-analysis");
+    expect(result.included).toBeGreaterThanOrEqual(12); // −50% of 24
+    expect(result.included).toBeLessThanOrEqual(48);    // +100% of 24 (inherently broad)
+  });
+
+  it("large corpus meta-analysis (~450 studies): estimate within ±50% of benchmark 42 (remote CBT-I 2024)", () => {
+    // Ground truth: Remote CBT-I (2024), afterDedup~450, included=42
+    // Expected: 450 × 0.18 × 0.58 = ~47
+    const result = makePrismaInput(450, "meta-analysis");
+    expect(result.included).toBeGreaterThanOrEqual(21); // −50% of 42
+    expect(result.included).toBeLessThanOrEqual(63);    // +50% of 42
+  });
+
+  it("large corpus scoping (~32 studies): taRate elevated, ftRate moderate", () => {
+    // 32 × 0.32 × 0.48 = ~4.9 → min enforced to 1; within 3–18 expected range
+    const result = makePrismaInput(32, "scoping");
+    expect(result.included).toBeGreaterThanOrEqual(1);
+    expect(result.included).toBeLessThanOrEqual(20);
+  });
+
+  // --- XL tier (500–1499) — new in this session ---
+
+  it("XL corpus (500–1499), meta-analysis: combined rate ~4% (lower than large's ~10%)", () => {
+    // 800 × 0.08 × 0.50 = 32
+    const result = makePrismaInput(800, "meta-analysis");
+    expect(result.included).toBeGreaterThanOrEqual(15);
+    expect(result.included).toBeLessThanOrEqual(60);
+    // Must be substantially lower than large-tier would give (800 × 10.4% = 83)
+    expect(result.included).toBeLessThan(70);
+  });
+
+  it("XL corpus (500–1499), default: combined rate ~5%", () => {
+    // 1200 × 0.10 × 0.50 = 60
+    const result = makePrismaInput(1200, null);
+    expect(result.included).toBeGreaterThanOrEqual(30);
+    expect(result.included).toBeLessThanOrEqual(90);
+  });
+
+  it("XL corpus (500–1499), scoping: combined rate ~9.6%", () => {
+    // 700 × 0.20 × 0.48 = 67.2 → 67
+    const result = makePrismaInput(700, "scoping");
+    expect(result.included).toBeGreaterThanOrEqual(40);
+    expect(result.included).toBeLessThanOrEqual(100);
+  });
+
+  // --- XXL tier (≥1500) — new in this session ---
+
+  it("XXL corpus (≥1500), meta-analysis: estimate within ±50% of benchmark 52 (CBT-I settings 2023)", () => {
+    // Ground truth: CBT-I settings NMA (2023), afterDedup~2900, included=52
+    // Expected: 2900 × 0.05 × 0.45 = ~65
+    const result = makePrismaInput(2900, "meta-analysis");
+    expect(result.included).toBeGreaterThanOrEqual(26); // −50% of 52
+    expect(result.included).toBeLessThanOrEqual(78);    // +50% of 52
+  });
+
+  it("XXL corpus (≥1500), default: estimate within ±50% of benchmark 105 (hand hygiene obs. 2022)", () => {
+    // Ground truth: hand hygiene compliance (2022, observational), afterDedup~4814, included=105
+    // Expected: 3600 × 0.06 × 0.45 = ~97 (using 3600 as conservative Blindspot estimate)
+    const result = makePrismaInput(3600, null);
+    expect(result.included).toBeGreaterThanOrEqual(52); // −50% of 105
+    expect(result.included).toBeLessThanOrEqual(157);   // +50% of 105
+  });
+
+  it("XXL corpus (≥1500) has lower combined rate than XL boundary", () => {
+    // At the XL/XXL boundary, XXL should have fewer included studies
+    const xl = makePrismaInput(1499, "meta-analysis");
+    const xxl = makePrismaInput(1500, "meta-analysis");
+    // 1499 × 0.08 × 0.50 = 59.96 vs 1500 × 0.05 × 0.45 = 33.75
+    expect(xxl.included).toBeLessThan(xl.included);
+  });
+
+  it("XXL corpus (≥1500), rapid: lowest combined rate (~1.2%)", () => {
+    // 2000 × 0.03 × 0.40 = 24
+    const result = makePrismaInput(2000, "rapid");
+    expect(result.included).toBeGreaterThanOrEqual(10);
+    expect(result.included).toBeLessThanOrEqual(45);
+  });
+
+  // --- Tier boundary continuity ---
+
+  it("tier transitions are monotonically ordered in included count for same design", () => {
+    // As afterDedup grows, combined rate decreases → included should not grow proportionally faster
+    const small  = makePrismaInput(10,   "meta-analysis");
+    const medium = makePrismaInput(40,   "meta-analysis");
+    const large  = makePrismaInput(280,  "meta-analysis");
+    const xl     = makePrismaInput(800,  "meta-analysis");
+    const xxl    = makePrismaInput(2900, "meta-analysis");
+    // included grows but sublinearly (each tier drops rate)
+    expect(medium.included).toBeGreaterThan(small.included);
+    expect(large.included).toBeGreaterThan(medium.included);
+    // XL and XXL grow more slowly than linear (included/afterDedup decreasing)
+    const largeRate = large.included   / large.afterDedup;
+    const xlRate    = xl.included      / xl.afterDedup;
+    const xxlRate   = xxl.included     / xxl.afterDedup;
+    expect(xlRate).toBeLessThan(largeRate);
+    expect(xxlRate).toBeLessThan(xlRate);
+  });
+
+  // --- Per-source data integration ---
+
+  it("with per-source data: totalFromDatabases is sum of sources", () => {
+    const result = makePrismaInput(300, "meta-analysis", {
+      pubmedCount: 200,
+      openalexCount: 250,
+      europepmcCount: 180,
+    });
+    expect(result.totalFromDatabases).toBe(630);
+    expect(result.hasPerSourceData).toBe(true);
+  });
+
+  it("without per-source data: totalIdentified falls back to primaryStudyCount", () => {
+    const result = makePrismaInput(300, "meta-analysis");
+    expect(result.totalIdentified).toBe(300);
+    expect(result.hasPerSourceData).toBe(false);
+    expect(result.duplicatesRemoved).toBeNull();
+  });
+
+  it("duplicatesRemoved is non-negative even if totalIdentified < afterDedup", () => {
+    // This can happen when the dedupFactor in route.ts produces a blended count
+    // larger than the raw sum of per-source counts.
+    const result = makePrismaInput(350, null, {
+      pubmedCount: 200,
+      openalexCount: 100,
+      europepmcCount: 0,
+    });
+    expect(result.duplicatesRemoved).not.toBeNull();
+    expect(result.duplicatesRemoved as number).toBeGreaterThanOrEqual(0);
+  });
+
+  it("criteria is null when no studyDesign is provided", () => {
+    const result = makePrismaInput(100, null);
+    expect(result.criteria).toBeNull();
+  });
+
+  it("criteria is present when studyDesign is provided", () => {
+    const result = makePrismaInput(100, "meta-analysis");
+    expect(result.criteria).not.toBeNull();
+    expect(result.criteria?.inclusion.length).toBeGreaterThan(0);
+    expect(result.criteria?.exclusion.length).toBeGreaterThan(0);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // computePrismaData

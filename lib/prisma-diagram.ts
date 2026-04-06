@@ -146,7 +146,7 @@ export function computePrismaData(
  *   - O'Mara-Eves et al. Semi-automated screening benchmarks (2015)
  *   - Estimated from ~180 published Cochrane SRs (median pass rates)
  *
- * Ground-truth validation (2026-04-05) against 5 published SRs:
+ * Ground-truth validation (2026-04-05, run 1) against 5 published SRs:
  *   - CBT-I for insomnia (QoL, 2022):           T&A 23.3%, FT 11.6%, included 24
  *   - Aerobic exercise + depression (2023):      T&A 4.1%,  FT 19.4%, included 18
  *   - Omega-3 cardiovascular (2023):             FT 14.6%,            included 18
@@ -154,6 +154,30 @@ export function computePrismaData(
  *   - Citation screening benchmark:              T&A 6.2%,  FT 7.1%
  * Overall benchmark: 5.48% of identified records included (95% CI: 2.38–8.58%)
  * Empirical FT rate range: 7.1–26.0%, mean ≈ 16%
+ *
+ * Ground-truth validation (2026-04-05, run 2) against 8 published SRs using web search:
+ *   - Remote CBT-I (2024, MA, afterDedup~450):           T&A 17.2%, FT 16.7%, incl. 42
+ *   - CBT-I settings NMA (2023, NMA, afterDedup~2900):   initial 3,851, incl. 52
+ *   - Hand hygiene compliance (2022, MA, afterDedup~4814): T&A 9.2%, FT 23.8%, incl. 105
+ *   - Smoking cessation pregnant (2024, scoping, ~670):   T&A 17.1%, FT 30.8%, incl. 12
+ *   - Omega-3 coronary revasc (2024, MA, afterDedup~8576): T&A 1.4%, FT 14.6%, incl. 18
+ *   - Pedometer T2D PA (2023, MA, afterDedup~7131):       T&A 1.5%, FT 22.0%, incl. 24
+ *   - Mindfulness MBSR university (2024, SR, afterDedup~276): incl. 29
+ *   - Diet+exercise T2D (2024, MA, afterDedup~14706):    incl. 11
+ *
+ * Key finding from run 2: The "large" tier (≥60) applied identical rates for corpora
+ * from 60 to 15,000+ studies, causing systematic overestimates (10–100×) for queries
+ * returning >500 results. Two new tiers (XL, XXL) are added to correct this.
+ *
+ * Tier boundaries and calibration rationale:
+ *   Large  60–499:  query-targeted, most results plausibly relevant → ~10% combined
+ *   XL   500–1499:  moderately broad query → ~4–5% combined
+ *   XXL   ≥1500:    very broad query; high uncertainty → ~2–3% combined
+ *
+ * Limitation: for topics where the user's query is significantly broader than the
+ * target SR scope (e.g., "omega-3 cardiovascular" vs. a coronary revascularization MA),
+ * estimates will remain inflated regardless of tier. This is a query-specificity
+ * mismatch that cannot be resolved by rate calibration alone.
  */
 function getScreeningRatios(
   afterDedup: number,
@@ -165,7 +189,7 @@ function getScreeningRatios(
   if (afterDedup < 15) {
     return { taRate: 0.72, ftRate: 0.78 };
   }
-  // Medium corpus
+  // Medium corpus (15–59)
   if (afterDedup < 60) {
     // ftRate 0.55 (was 0.82): scoping reviews have broader criteria so taRate is higher,
     // but empirical FT rates (7–26%, mean 16%) show 78–82% was unrealistically high.
@@ -176,13 +200,38 @@ function getScreeningRatios(
     // ftRate 0.55 (was 0.67): combined 21% vs 25.5%, better fits typical clinical topics
     return { taRate: 0.38, ftRate: 0.55 };
   }
-  // Large corpus (>= 60 studies)
-  // ftRate 0.48 (was 0.78): same reasoning as medium scoping
-  if (lower.includes("scoping"))       return { taRate: 0.32, ftRate: 0.48 };
-  if (lower.includes("meta-analysis")) return { taRate: 0.18, ftRate: 0.58 };
-  if (lower.includes("umbrella"))      return { taRate: 0.28, ftRate: 0.65 };
-  if (lower.includes("rapid"))         return { taRate: 0.15, ftRate: 0.58 };
-  return { taRate: 0.22, ftRate: 0.62 };
+  // Large corpus (60–499): query-targeted; most retrieved records are plausibly on-topic.
+  // Combined rates ~8–16% align with remote CBT-I (10.4% MA) and mindfulness (13.6% default).
+  if (afterDedup < 500) {
+    // ftRate 0.48 (was 0.78): same reasoning as medium scoping
+    if (lower.includes("scoping"))       return { taRate: 0.32, ftRate: 0.48 };
+    if (lower.includes("meta-analysis")) return { taRate: 0.18, ftRate: 0.58 };
+    if (lower.includes("umbrella"))      return { taRate: 0.28, ftRate: 0.65 };
+    if (lower.includes("rapid"))         return { taRate: 0.15, ftRate: 0.58 };
+    return { taRate: 0.22, ftRate: 0.62 };
+  }
+  // XL corpus (500–1499): moderately broad query; still focused but returning more noise.
+  // Calibrated for combined rates of ~4–10%.
+  // Sources: hand hygiene obs. (was in XXL at 2.9%), CBT-I RCT (large at 2.9%).
+  if (afterDedup < 1500) {
+    if (lower.includes("scoping"))       return { taRate: 0.20, ftRate: 0.48 };
+    if (lower.includes("meta-analysis")) return { taRate: 0.08, ftRate: 0.50 };
+    if (lower.includes("umbrella"))      return { taRate: 0.14, ftRate: 0.55 };
+    if (lower.includes("rapid"))         return { taRate: 0.06, ftRate: 0.45 };
+    return { taRate: 0.10, ftRate: 0.50 };
+  }
+  // XXL corpus (≥1500): very broad query; high proportion of off-topic noise.
+  // Calibrated for combined rates of ~2–5%.
+  // Sources: CBT-I settings NMA (2,900→65 est. vs 52 actual, +25%),
+  //          hand hygiene obs. (3,600→97 est. vs 105 actual, −8%).
+  // NOTE: For highly specific SRs searched with broad queries (e.g., "omega-3
+  // cardiovascular" for a coronary-revascularization-only MA), estimates will still
+  // over-count by 5–50×. This is a query-specificity limitation, not a rate issue.
+  if (lower.includes("scoping"))       return { taRate: 0.12, ftRate: 0.42 };
+  if (lower.includes("meta-analysis")) return { taRate: 0.05, ftRate: 0.45 };
+  if (lower.includes("umbrella"))      return { taRate: 0.08, ftRate: 0.48 };
+  if (lower.includes("rapid"))         return { taRate: 0.03, ftRate: 0.40 };
+  return { taRate: 0.06, ftRate: 0.45 };
 }
 
 // ---------------------------------------------------------------------------
