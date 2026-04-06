@@ -31,6 +31,7 @@ async function getResult(id: string) {
       study_design_recommendation,
       protocol_draft,
       is_public,
+      created_at,
       searches (id, query_text, user_id)
     `)
     .eq("id", id)
@@ -122,6 +123,7 @@ export default async function ResultsPage({
         isPublic={isPublic}
         protocolDraft={(result.protocol_draft as string | null | undefined) ?? null}
         isAlertSubscribed={isAlertSubscribed}
+        createdAt={(result.created_at as string | null | undefined) ?? undefined}
       />
     </main>
   );

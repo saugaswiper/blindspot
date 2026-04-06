@@ -14,6 +14,7 @@ import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
+import { getCacheFreshnessStatus, formatResultAge } from "@/lib/cache-freshness";
 import { computePrimaryStudyPrismaData, type PrimaryStudyPrismaData, type ScreeningCriteria } from "@/lib/prisma-diagram";
 import {
   ALL_DIMENSIONS,
@@ -377,6 +378,13 @@ interface Props {
   protocolDraft?: string | null;
   /** Whether the owner is subscribed to email alerts for this search. */
   isAlertSubscribed?: boolean;
+  /**
+   * UI-3: ISO 8601 timestamp when this result was originally created.
+   * When provided, the dashboard shows a "Last checked" indicator and a
+   * prominent stale warning if the result is older than 30 days.
+   * Absent for results loaded via the inline search flow (which are always fresh).
+   */
+  createdAt?: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -448,6 +456,7 @@ export function ResultsDashboard({
   isPublic = false,
   protocolDraft = null,
   isAlertSubscribed = false,
+  createdAt,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("reviews");
   const [isPending, startTransition] = useTransition();
@@ -603,6 +612,11 @@ export function ResultsDashboard({
     prosperoRegistrationsCount !== null && prosperoRegistrationsCount !== undefined
       ? formatProsperoStatus(prosperoRegistrationsCount)
       : null;
+
+  // UI-3: Compute cache freshness when a createdAt timestamp is available.
+  // null means the prop was not provided (inline search flow — always fresh).
+  const freshness = createdAt ? getCacheFreshnessStatus(createdAt) : null;
+  const resultAge = createdAt ? formatResultAge(createdAt) : null;
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "reviews", label: `Existing Reviews (${existingReviews.length})` },
@@ -824,6 +838,57 @@ export function ResultsDashboard({
               </svg>
             </a>
           </div>
+        )}
+
+        {/* UI-3: Cache freshness indicator
+            - All results: subtle "Last checked N days ago" footer line
+            - Stale (>30 days): amber warning banner with a "Re-run search" link
+            - Aging (7–30 days): no banner, just the footer line
+            - Fresh (<7 days) or createdAt absent: no indicator shown */}
+        {resultAge && freshness && (
+          <>
+            {/* Stale warning banner — only shown when > 30 days old */}
+            {freshness === "stale" && (
+              <div
+                className="mt-4 p-3 rounded-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                style={{
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                }}
+                role="status"
+                aria-label="Stale search result warning"
+              >
+                <p className="text-xs leading-snug" style={{ color: "var(--muted)" }}>
+                  <span className="font-medium" style={{ color: "var(--foreground)" }}>
+                    ⚠ Results from {resultAge}
+                  </span>
+                  {" "}— study counts may have changed since this search was run.
+                </p>
+                <a
+                  href={`/?q=${encodeURIComponent(query)}`}
+                  className="shrink-0 text-xs font-medium px-3 py-1.5 rounded transition-opacity hover:opacity-80 whitespace-nowrap"
+                  style={{
+                    background: "var(--brand-surface)",
+                    color: "#f4f1ea",
+                  }}
+                  title="Run a new search with this topic to get updated results"
+                >
+                  Re-run search
+                </a>
+              </div>
+            )}
+
+            {/* Subtle "last checked" footer — shown for aging and stale results only */}
+            {(freshness === "aging" || freshness === "stale") && (
+              <p
+                className="mt-2 text-[10px]"
+                style={{ color: "var(--muted)" }}
+                aria-label={`Result last checked ${resultAge}`}
+              >
+                Last checked {resultAge}
+              </p>
+            )}
+          </>
         )}
 
         {/* Top gaps quick summary */}
