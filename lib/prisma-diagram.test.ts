@@ -3,6 +3,7 @@ import {
   computePrismaData,
   computePrimaryStudyPrismaData,
   formatCount,
+  getIncludedCI,
   hasPrismaData,
   KNOWN_SOURCES,
 } from "./prisma-diagram";
@@ -438,5 +439,153 @@ describe("hasPrismaData", () => {
   it("returns false when reviewsRetrieved is not a number", () => {
     const badData = { reviewsRetrieved: undefined } as unknown as Parameters<typeof hasPrismaData>[0];
     expect(hasPrismaData(badData)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getIncludedCI — confidence interval multipliers
+//
+// These tests verify the tier-based uncertainty multipliers documented in
+// the getIncludedCI JSDoc (handoffs 036 and 037).
+// ---------------------------------------------------------------------------
+
+describe("getIncludedCI", () => {
+  // Small tier (<15 afterDedup)
+  it("small tier: low ≥ 1", () => {
+    const { low } = getIncludedCI(1, 10);
+    expect(low).toBeGreaterThanOrEqual(1);
+  });
+
+  it("small tier: low < included (shrinks from point estimate)", () => {
+    const included = 8;
+    const { low } = getIncludedCI(included, 10);
+    expect(low).toBeLessThanOrEqual(included);
+  });
+
+  it("small tier: high > low", () => {
+    const { low, high } = getIncludedCI(8, 10);
+    expect(high).toBeGreaterThan(low);
+  });
+
+  it("small tier: high is within ×1.5 of included", () => {
+    const included = 10;
+    const { high } = getIncludedCI(included, 12);
+    // highFactor = 1.35 → high ≤ 14; give 1 rounding margin
+    expect(high).toBeLessThanOrEqual(Math.round(included * 1.35) + 1);
+  });
+
+  // Medium tier (15–59 afterDedup)
+  it("medium tier: high is within ×1.6 of included", () => {
+    const included = 10;
+    const { high } = getIncludedCI(included, 40);
+    expect(high).toBeLessThanOrEqual(Math.round(included * 1.55) + 1);
+  });
+
+  it("medium tier: low is at least ×0.6 of included", () => {
+    const included = 20;
+    const { low } = getIncludedCI(included, 40);
+    expect(low).toBeGreaterThanOrEqual(Math.round(included * 0.65) - 1);
+  });
+
+  // Large / XL / XXL tier (≥60 afterDedup): ÷2 to ×2 rule
+  it("large tier (60–499): high is ~2× included", () => {
+    const included = 50;
+    const { high } = getIncludedCI(included, 200);
+    // highFactor = 2.0 → high = 100; allow ±1 rounding
+    expect(high).toBeCloseTo(100, -1);
+  });
+
+  it("large tier: low is ~½ of included", () => {
+    const included = 50;
+    const { low } = getIncludedCI(included, 200);
+    // lowFactor = 0.5 → low = 25; allow ±1 rounding
+    expect(low).toBeCloseTo(25, -1);
+  });
+
+  it("XL tier (500–1499): high is ~2× included", () => {
+    const included = 65;
+    const { high } = getIncludedCI(included, 800);
+    expect(high).toBeCloseTo(130, -1);
+  });
+
+  it("XL tier: low is ~½ of included", () => {
+    const included = 65;
+    const { low } = getIncludedCI(included, 800);
+    expect(low).toBeCloseTo(33, -1);
+  });
+
+  it("XXL tier (≥1500): high is ~2× included", () => {
+    const included = 97;
+    const { high } = getIncludedCI(included, 3600);
+    expect(high).toBeCloseTo(194, -1);
+  });
+
+  it("XXL tier: low is ~½ of included", () => {
+    const included = 97;
+    const { low } = getIncludedCI(included, 3600);
+    expect(low).toBeCloseTo(49, -1);
+  });
+
+  it("always returns integers", () => {
+    for (const [inc, dedup] of [[5, 8], [20, 40], [47, 300], [65, 900], [97, 2900]] as [number, number][]) {
+      const { low, high } = getIncludedCI(inc, dedup);
+      expect(Number.isInteger(low)).toBe(true);
+      expect(Number.isInteger(high)).toBe(true);
+    }
+  });
+
+  it("low is always ≥ 1 even for included=1", () => {
+    const { low } = getIncludedCI(1, 5);
+    expect(low).toBeGreaterThanOrEqual(1);
+  });
+
+  it("high is always > low", () => {
+    for (const [inc, dedup] of [[1, 1], [3, 10], [10, 50], [50, 300], [100, 2000]] as [number, number][]) {
+      const { low, high } = getIncludedCI(inc, dedup);
+      expect(high).toBeGreaterThan(low);
+    }
+  });
+
+  // Integration: CI fields appear in computePrimaryStudyPrismaData output
+  it("computePrimaryStudyPrismaData exposes includedLow and includedHigh", () => {
+    const result = makePrismaInput(200, "meta-analysis");
+    expect(result.includedLow).toBeDefined();
+    expect(result.includedHigh).toBeDefined();
+    expect(result.includedHigh).toBeGreaterThan(result.includedLow);
+    expect(result.includedLow).toBeGreaterThanOrEqual(1);
+  });
+
+  it("CI bounds bracket the point estimate for large corpus", () => {
+    const result = makePrismaInput(800, "meta-analysis");
+    expect(result.includedLow).toBeLessThan(result.included);
+    expect(result.includedHigh).toBeGreaterThan(result.included);
+  });
+
+  it("CI bounds bracket the point estimate for small corpus", () => {
+    const result = makePrismaInput(8, null);
+    expect(result.includedLow).toBeLessThanOrEqual(result.included);
+    expect(result.includedHigh).toBeGreaterThanOrEqual(result.included);
+  });
+
+  // Ground-truth plausibility: published SR actuals should fall within CI
+  it("remote CBT-I (afterDedup 450, MA): actual 42 falls within [23, 94]", () => {
+    // point estimate = 47; CI = [24, 94]
+    const result = makePrismaInput(450, "meta-analysis");
+    expect(result.includedLow).toBeLessThanOrEqual(42);
+    expect(result.includedHigh).toBeGreaterThanOrEqual(42);
+  });
+
+  it("hand hygiene (afterDedup 3600, default): actual 105 falls within CI", () => {
+    // point estimate = 97; CI = [49, 194]
+    const result = makePrismaInput(3600, "default");
+    expect(result.includedLow).toBeLessThanOrEqual(105);
+    expect(result.includedHigh).toBeGreaterThanOrEqual(105);
+  });
+
+  it("CBT-I settings NMA (afterDedup 2900, MA): actual 52 falls within CI", () => {
+    // point estimate = 65; CI = [33, 130]
+    const result = makePrismaInput(2900, "meta-analysis");
+    expect(result.includedLow).toBeLessThanOrEqual(52);
+    expect(result.includedHigh).toBeGreaterThanOrEqual(52);
   });
 });

@@ -77,6 +77,10 @@ export interface PrimaryStudyPrismaData {
   included: number;
   excludedFullText: number;
 
+  // Confidence interval for the included count (based on corpus tier uncertainty)
+  includedLow: number;
+  includedHigh: number;
+
   // Proposed criteria — null if no AI analysis has been run
   criteria: ScreeningCriteria | null;
   studyDesignType: string | null;
@@ -235,6 +239,63 @@ function getScreeningRatios(
 }
 
 // ---------------------------------------------------------------------------
+// Primary Study PRISMA — confidence interval for included count
+// ---------------------------------------------------------------------------
+
+/**
+ * Computes a confidence interval (low, high) around the point estimate for
+ * the number of studies that would be included in the systematic review.
+ *
+ * The multipliers are derived from observed error rates in the ground-truth
+ * validation against published SRs (handoffs 035 and 036):
+ *
+ *   Small  (<15 afterDedup):   ~±30%  → ×0.75 – ×1.35
+ *   Medium (15–59):            ~±50%  → ×0.65 – ×1.55
+ *   Large  (60–499):           ~±100% → ×0.50 – ×2.00
+ *   XL     (500–1499):         ÷2–×2  → ×0.50 – ×2.00
+ *   XXL    (≥1500):            ÷2–×2  → ×0.50 – ×2.00
+ *
+ * The ÷2 to ×2 recommendation for XL/XXL is from the daily-improver agent
+ * review (handoffs 036 and 037). Broader queries have higher inherent
+ * uncertainty — the CI is wider to reflect that the estimate may be off
+ * substantially when the user's query is broader than the target SR scope.
+ *
+ * Note: for query-specificity mismatches (e.g. "omega-3 cardiovascular" for
+ * a coronary-revascularization-only MA), the true included count may lie
+ * outside even the ÷2 to ×2 bounds. The CI is based on typical error rates,
+ * not worst-case scenarios.
+ *
+ * @returns { low, high } — both are integers ≥ 1.
+ */
+export function getIncludedCI(
+  included: number,
+  afterDedup: number,
+): { low: number; high: number } {
+  let lowFactor: number;
+  let highFactor: number;
+
+  if (afterDedup < 15) {
+    // Small corpus: narrow topic, tighter estimate
+    lowFactor = 0.75;
+    highFactor = 1.35;
+  } else if (afterDedup < 60) {
+    // Medium corpus: moderate uncertainty
+    lowFactor = 0.65;
+    highFactor = 1.55;
+  } else {
+    // Large / XL / XXL corpus: ÷2 to ×2 range
+    // (recommended in handoffs 036 and 037 based on calibration data)
+    lowFactor = 0.50;
+    highFactor = 2.00;
+  }
+
+  const low = Math.max(1, Math.round(included * lowFactor));
+  const high = Math.max(low + 1, Math.round(included * highFactor));
+
+  return { low, high };
+}
+
+// ---------------------------------------------------------------------------
 // Primary Study PRISMA — criteria derivation
 // ---------------------------------------------------------------------------
 
@@ -379,6 +440,9 @@ export function computePrimaryStudyPrismaData({
   const excludedTitleAbstract = Math.max(0, afterDedup - afterTitleAbstract);
   const excludedFullText = Math.max(0, afterTitleAbstract - included);
 
+  // Compute confidence interval around the point estimate
+  const { low: includedLow, high: includedHigh } = getIncludedCI(included, afterDedup);
+
   const criteria = studyDesign
     ? deriveCriteria(query, studyDesign.primary, gapAnalysis)
     : null;
@@ -396,6 +460,8 @@ export function computePrimaryStudyPrismaData({
     excludedTitleAbstract,
     included,
     excludedFullText,
+    includedLow,
+    includedHigh,
     criteria,
     studyDesignType: studyDesign?.primary ?? null,
   };

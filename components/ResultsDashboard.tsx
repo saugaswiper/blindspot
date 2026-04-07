@@ -2009,6 +2009,29 @@ function PrismaFlowTab({
         </p>
       </div>
 
+      {/* Wide-query warning: shown when afterDedup ≥ 1,500 (XL/XXL tier) */}
+      {data.afterDedup >= 1500 && (
+        <div
+          className="flex items-start gap-2 rounded-md px-3 py-2.5 text-xs"
+          role="alert"
+          style={{
+            background: "color-mix(in srgb, #f59e0b 10%, transparent)",
+            border: "1px solid color-mix(in srgb, #f59e0b 35%, transparent)",
+            color: "var(--foreground)",
+          }}
+        >
+          <span aria-hidden="true" className="shrink-0 mt-px">⚠️</span>
+          <span>
+            <strong>Wide query detected</strong> — your search matched{" "}
+            <strong>{data.afterDedup.toLocaleString("en-US")}</strong> records after
+            deduplication. The estimated included-studies count assumes a focused review
+            question and may be higher than your actual eligibility criteria will yield.
+            Consider <strong>narrowing your search query</strong> for a more accurate estimate,
+            or treat the included count as an upper bound.
+          </span>
+        </div>
+      )}
+
       {/* PRISMA flow diagram */}
       <div className="prisma-flow-diagram" aria-label="PRISMA 2020 primary study screening flow">
 
@@ -2174,7 +2197,10 @@ function PrismaFlowTab({
                 : "Meeting all inclusion criteria"}
             </span>
             <span className="prisma-box-count prisma-box-count-large">
-              ~{data.included.toLocaleString("en-US")}
+              ~{data.includedLow.toLocaleString("en-US")}–{data.includedHigh.toLocaleString("en-US")}
+            </span>
+            <span className="prisma-box-note" style={{ marginTop: "2px" }}>
+              Point estimate: ~{data.included.toLocaleString("en-US")} &middot; range reflects calibration uncertainty
             </span>
             {!hasAnalysis && (
               <span className="prisma-box-note">Run AI analysis to refine this estimate based on study design</span>

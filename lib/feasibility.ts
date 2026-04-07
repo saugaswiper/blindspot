@@ -63,7 +63,8 @@ function buildExplanation(
 function buildFlags(
   score: FeasibilityScore,
   reviewStatus: ExistingReviewStatus,
-  reviews: ExistingReview[]
+  reviews: ExistingReview[],
+  primaryStudyCount: number
 ): string[] {
   const flags: string[] = [];
 
@@ -84,6 +85,12 @@ function buildFlags(
     flags.push("Limited evidence base — a scoping review is more appropriate than a systematic review.");
   }
 
+  if (primaryStudyCount > 2000) {
+    flags.push(
+      `Very large evidence base (${primaryStudyCount.toLocaleString("en-US")} studies) — the query appears very broad. A full systematic review would be resource-intensive; consider narrowing your PICO question or planning a scoping review to map the field first.`
+    );
+  }
+
   return flags;
 }
 
@@ -94,7 +101,7 @@ export function scoreFeasibility(
   const score = getScore(primaryStudyCount);
   const existingReviewStatus = getExistingReviewStatus(existingReviews);
   const explanation = buildExplanation(score, primaryStudyCount, existingReviewStatus, existingReviews);
-  const flags = buildFlags(score, existingReviewStatus, existingReviews);
+  const flags = buildFlags(score, existingReviewStatus, existingReviews, primaryStudyCount);
 
   return {
     score,
