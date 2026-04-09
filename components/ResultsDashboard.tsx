@@ -1519,6 +1519,38 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
 
   return (
     <div className="space-y-6">
+      {/* ACC-1 follow-up: Low-evidence disclaimer — shown when feasibilityScore is "Low" (3–5 studies).
+          The hard gate (ACC-1) already blocks AI for Insufficient (<3). For Low (3–5), AI runs but
+          the evidence base is sparse. Researchers need a clear caution before interpreting gaps. */}
+      {feasibilityScore === "Low" && (
+        <div
+          className="flex items-start gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/25 px-4 py-3"
+          role="alert"
+          aria-label="Limited evidence warning"
+        >
+          <svg
+            className="w-4 h-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Limited evidence base ({primaryStudyCount} primary {primaryStudyCount === 1 ? "study" : "studies"})
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+              Gap analysis results should be interpreted with caution. With fewer than 6 primary studies,
+              AI-identified gaps may not reflect the full research landscape. Supplement with a hand search
+              of grey literature and conference proceedings.
+            </p>
+          </div>
+        </div>
+      )}
+
       {gapAnalysis.overall_assessment && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md p-4">
           <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">{gapAnalysis.overall_assessment}</p>
