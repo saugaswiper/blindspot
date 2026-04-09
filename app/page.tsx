@@ -3,6 +3,7 @@ import { TopicInput } from "@/components/TopicInput";
 import { NavBar } from "@/components/NavBar";
 import { OnboardingTour, TourRestartButton } from "@/components/OnboardingTour";
 import { HeroSourceLogos } from "@/components/HeroSourceLogos";
+import { FieldExplorer } from "@/components/FieldExplorer";
 
 export default function HomePage() {
   return (
@@ -72,6 +73,28 @@ export default function HomePage() {
         <p className="text-center text-xs mt-3" style={{ color: "var(--muted)" }}>
           Free to use · No credit card required
         </p>
+      </section>
+
+      {/* Field Explorer */}
+      <section style={{ borderTop: "1px solid var(--border)" }}>
+        <div className="max-w-4xl mx-auto px-6 py-16 sm:py-20">
+          <div className="flex items-center gap-4 mb-8">
+            <div>
+              <span className="text-xs font-medium tracking-[0.18em] uppercase" style={{ color: "var(--muted)" }}>
+                Explore a research field
+              </span>
+              <h2 className="font-serif text-2xl sm:text-3xl mt-1 leading-snug" style={{ color: "var(--foreground)" }}>
+                Not sure where to start?
+              </h2>
+              <p className="text-sm mt-2 leading-relaxed max-w-lg" style={{ color: "var(--muted)" }}>
+                Enter a broad topic and Blindspot will surface specific review opportunities within it — each verified against real study counts.
+              </p>
+            </div>
+          </div>
+          <Suspense fallback={<div className="h-12 rounded-lg animate-pulse" style={{ background: "var(--surface-2)" }} />}>
+            <FieldExplorer />
+          </Suspense>
+        </div>
       </section>
 
       {/* How it works */}
