@@ -3,6 +3,7 @@ import {
   sanitizeBooleanString,
   looksLikeBooleanString,
   buildPubMedUrl,
+  isUserBooleanQuery,
 } from "./boolean-search";
 
 /* -------------------------------------------------------------------------- */
@@ -90,6 +91,91 @@ describe("looksLikeBooleanString", () => {
     const str =
       '("cognitive behavioral therapy"[MeSH Terms] OR "CBT"[tiab] OR "cognitive behaviour therapy"[tiab]) AND ("insomnia"[MeSH Terms] OR "sleep disorder"[tiab]) AND ("systematic review"[pt] OR "meta-analysis"[pt])';
     expect(looksLikeBooleanString(str)).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* isUserBooleanQuery                                                          */
+/* -------------------------------------------------------------------------- */
+
+describe("isUserBooleanQuery", () => {
+  // --- Positive cases: uppercase operators ---
+
+  it("returns true when query contains uppercase AND", () => {
+    expect(isUserBooleanQuery("CBT AND insomnia")).toBe(true);
+  });
+
+  it("returns true when query contains uppercase OR", () => {
+    expect(isUserBooleanQuery("CBT OR 'cognitive therapy'")).toBe(true);
+  });
+
+  it("returns true when query contains uppercase NOT", () => {
+    expect(isUserBooleanQuery("depression NOT seasonal")).toBe(true);
+  });
+
+  it("returns true for a multi-operator query", () => {
+    expect(
+      isUserBooleanQuery(
+        '"cognitive behavioral therapy" OR "CBT" AND "insomnia" NOT "subclinical"'
+      )
+    ).toBe(true);
+  });
+
+  it("returns true for a query with PubMed [MeSH Terms] tag", () => {
+    expect(isUserBooleanQuery('"insomnia"[MeSH Terms]')).toBe(true);
+  });
+
+  it("returns true for a query with [tiab] field tag", () => {
+    expect(isUserBooleanQuery('"cognitive therapy"[tiab]')).toBe(true);
+  });
+
+  it("returns true for a query with [pt] publication type tag", () => {
+    expect(isUserBooleanQuery('"systematic review"[pt]')).toBe(true);
+  });
+
+  it("returns true for a full realistic PubMed query string", () => {
+    const q =
+      '("insomnia"[MeSH Terms] OR "sleep disorder"[tiab]) AND ("CBT"[tiab]) NOT "pharmacotherapy"[tiab]';
+    expect(isUserBooleanQuery(q)).toBe(true);
+  });
+
+  // --- Negative cases: lowercase connectors are natural language ---
+
+  it("returns false when query contains lowercase 'and' only", () => {
+    expect(isUserBooleanQuery("CBT for insomnia and anxiety")).toBe(false);
+  });
+
+  it("returns false for a natural-language query with no operators", () => {
+    expect(
+      isUserBooleanQuery("cognitive behavioral therapy for insomnia in elderly patients")
+    ).toBe(false);
+  });
+
+  it("returns false for a single keyword", () => {
+    expect(isUserBooleanQuery("insomnia")).toBe(false);
+  });
+
+  it("returns false for an empty string", () => {
+    expect(isUserBooleanQuery("")).toBe(false);
+  });
+
+  it("returns false for a whitespace-only string", () => {
+    expect(isUserBooleanQuery("   ")).toBe(false);
+  });
+
+  // 'and' in the middle of a word (e.g. "randomized") must not trigger
+  it("returns false when AND appears only as a substring (e.g. 'randomized')", () => {
+    expect(isUserBooleanQuery("randomized controlled trial")).toBe(false);
+  });
+
+  // Boundary: mixed case should NOT trigger (not an intentional operator)
+  it("returns false for mixed-case 'And' (not an intentional operator)", () => {
+    expect(isUserBooleanQuery("CBT And insomnia")).toBe(false);
+  });
+
+  // Boundary: 'OR' at the start of a word should not false-positive
+  it("returns false when OR appears only as a substring (e.g. 'order')", () => {
+    expect(isUserBooleanQuery("order of operations")).toBe(false);
   });
 });
 

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NavBar } from "@/components/NavBar";
+import { isUserBooleanQuery } from "@/lib/boolean-search";
 import type { FeasibilityScore } from "@/types";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
@@ -22,7 +23,8 @@ async function getSearches(userId: string) {
       search_results (
         id,
         feasibility_score,
-        gap_analysis
+        gap_analysis,
+        prospero_registrations_count
       ),
       search_alerts (
         is_enabled
@@ -41,6 +43,9 @@ export default async function DashboardPage() {
 
   const searches = await getSearches(user.id);
 
+  // Dashboard summary counts
+  const booleanCount = searches.filter((s) => isUserBooleanQuery(s.query_text)).length;
+
   return (
     <main className="min-h-screen" style={{ background: "var(--background)" }}>
       <NavBar />
@@ -56,6 +61,9 @@ export default async function DashboardPage() {
             </h1>
             <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
               {searches.length} search{searches.length !== 1 ? "es" : ""} saved
+              {booleanCount > 0 && (
+                <span> · {booleanCount} Boolean</span>
+              )}
             </p>
           </div>
           <Link
@@ -98,6 +106,10 @@ export default async function DashboardPage() {
               const feasibility = result?.feasibility_score as FeasibilityScore | null;
               const hasAnalysis = !!(result?.gap_analysis);
               const hasActiveAlert = !!(alertRow?.is_enabled);
+              // PROSPERO badge: show warning when one or more registered reviews exist for this query.
+              // Indicates a gap may already be under review — important context for researchers.
+              const prosperoCount = (result as { prospero_registrations_count?: number | null } | null)?.prospero_registrations_count ?? null;
+              const hasProsperoMatches = typeof prosperoCount === "number" && prosperoCount > 0;
               const date = new Date(search.created_at).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -134,6 +146,32 @@ export default async function DashboardPage() {
                         >
                           <span aria-hidden="true">🔔</span>
                           <span>Monitoring</span>
+                        </span>
+                      )}
+                      {/* PROSPERO badge — shown when registry matches exist, signalling a review may already be in progress */}
+                      {hasProsperoMatches && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-700 flex items-center gap-1"
+                          title={`${prosperoCount} PROSPERO registration${prosperoCount === 1 ? "" : "s"} found — a review may already be in progress on this topic`}
+                          aria-label={`PROSPERO: ${prosperoCount} registration${prosperoCount === 1 ? "" : "s"} found`}
+                        >
+                          <span aria-hidden="true">⚠</span>
+                          <span>PROSPERO</span>
+                        </span>
+                      )}
+                      {/* Boolean query badge — shown when the search used PubMed Boolean syntax */}
+                      {isUserBooleanQuery(search.query_text) && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                          style={{
+                            background: "var(--surface-2)",
+                            border: "1px solid var(--border)",
+                            color: "var(--accent)",
+                          }}
+                          title="Boolean query — passed to PubMed as-is (AND, OR, NOT, field tags)"
+                          aria-label="Boolean query"
+                        >
+                          Boolean
                         </span>
                       )}
                       {feasibility && (

@@ -12,6 +12,7 @@ import { getCachedResult, saveSearchResult, saveGuestSearchResult } from "@/lib/
 import { validateSearchInput } from "@/lib/validators";
 import { toApiError } from "@/lib/errors";
 import { expandConcept } from "@/lib/synonyms";
+import { isUserBooleanQuery } from "@/lib/boolean-search";
 import type { ExistingReview } from "@/types";
 
 /**
@@ -74,6 +75,13 @@ function buildReviewQuery(body: SearchBody): string {
   }
   if (body.queryText) {
     const raw = body.queryText.trim();
+
+    // User has entered explicit Boolean operators or PubMed field tags:
+    // pass through verbatim so their syntax reaches the APIs unchanged.
+    if (isUserBooleanQuery(raw)) return raw;
+
+    // Otherwise, auto-split on natural-language connector words and build
+    // a simple AND query for better multi-concept precision.
     const concepts = raw
       .split(/\s+(?:for|in|with|and|of|on|about|among|between)\s+/i)
       .map((s) => s.trim())
@@ -124,10 +132,18 @@ function textContainsTerm(text: string, term: string): boolean {
  * title or abstract snippet. Each concept is expanded to its synonym group
  * so a review using "youth" satisfies a search for "adolescents", etc.
  *
- * Only applied when there are 2+ concepts (single-concept searches are
- * already specific enough to rely on the API's own relevance ranking).
+ * Only applied when there are 2+ AND-joined concepts (single-concept searches
+ * are already specific enough to rely on the API's own relevance ranking).
+ *
+ * When the query contains OR or NOT operators the API's own relevance ranking
+ * is authoritative — we skip the client-side filter to avoid discarding valid
+ * results that the user explicitly requested through those operators.
  */
 function filterByRelevance(reviews: ExistingReview[], reviewQuery: string): ExistingReview[] {
+  // OR / NOT queries: trust the API. Post-filtering against a single AND-model
+  // would incorrectly discard reviews that match only one branch of an OR clause.
+  if (/\b(OR|NOT)\b/.test(reviewQuery)) return reviews;
+
   const concepts = extractQueryConcepts(reviewQuery);
   if (concepts.length <= 1) return reviews;
   return reviews.filter((review) => {

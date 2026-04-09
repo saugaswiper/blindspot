@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PICOForm } from "@/components/PICOForm";
 import { validateSearchInput } from "@/lib/validators";
+import { isUserBooleanQuery } from "@/lib/boolean-search";
 import type { PICOInput, SearchMode } from "@/types";
 
 const EMPTY_PICO: PICOInput = {
@@ -21,6 +22,7 @@ export function TopicInput() {
   const [pico, setPico] = useState<PICOInput>(EMPTY_PICO);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [showBooleanHints, setShowBooleanHints] = useState(false);
 
   function handleModeToggle(next: SearchMode) {
     setMode(next);
@@ -124,6 +126,82 @@ export function TopicInput() {
             <p className="text-xs mt-1.5" style={{ color: "#dc2626" }}>
               {errors.queryText}
             </p>
+          )}
+          {!errors.queryText && isUserBooleanQuery(queryText) && (
+            <div className="mt-1.5">
+              <p className="text-xs flex items-center gap-1.5 flex-wrap" style={{ color: "var(--muted)" }}>
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium"
+                  style={{
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border)",
+                    color: "var(--accent)",
+                  }}
+                >
+                  Boolean
+                </span>
+                <span>Query passed to PubMed as-is — AND, OR, NOT and field tags are supported.</span>
+                <button
+                  type="button"
+                  onClick={() => setShowBooleanHints((v) => !v)}
+                  className="underline underline-offset-2 transition-opacity hover:opacity-70 text-[11px] ml-auto"
+                  style={{ color: "var(--accent)" }}
+                  aria-expanded={showBooleanHints}
+                  aria-controls="boolean-hints-panel"
+                >
+                  {showBooleanHints ? "Hide syntax ▴" : "Show syntax ▾"}
+                </button>
+              </p>
+
+              {showBooleanHints && (
+                <div
+                  id="boolean-hints-panel"
+                  className="mt-2 rounded-md p-3 text-[11px] leading-relaxed"
+                  style={{
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--border)",
+                    color: "var(--muted)",
+                  }}
+                >
+                  <p className="font-semibold mb-2" style={{ color: "var(--foreground)" }}>
+                    Common PubMed syntax
+                  </p>
+                  <table className="w-full border-collapse">
+                    <tbody>
+                      {[
+                        { tag: "AND", desc: "Both terms required — CBT AND insomnia" },
+                        { tag: "OR", desc: "Either term — CBT OR \"cognitive therapy\"" },
+                        { tag: "NOT", desc: "Exclude — insomnia NOT pediatric" },
+                        { tag: "[tiab]", desc: "Title/abstract field — \"CBT\"[tiab]" },
+                        { tag: "[MeSH Terms]", desc: "MeSH controlled vocabulary — \"Sleep Initiation and Maintenance Disorders\"[MeSH Terms]" },
+                        { tag: "[pt]", desc: "Publication type — \"Systematic Review\"[pt]" },
+                        { tag: "[dp]", desc: "Date published — 2020:2024[dp]" },
+                        { tag: "[au]", desc: "Author name — \"Smith J\"[au]" },
+                      ].map(({ tag, desc }) => (
+                        <tr key={tag} className="align-top">
+                          <td
+                            className="pr-3 pb-1 font-mono whitespace-nowrap"
+                            style={{ color: "var(--accent)" }}
+                          >
+                            {tag}
+                          </td>
+                          <td className="pb-1">{desc}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <a
+                    href="https://pubmed.ncbi.nlm.nih.gov/help/#search-tags"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block underline underline-offset-2 hover:opacity-70 transition-opacity"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    Full PubMed search tag reference →
+                  </a>
+                </div>
+              )}
+            </div>
           )}
         </div>
       ) : (
