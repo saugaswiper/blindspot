@@ -14,6 +14,7 @@ import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
+import { getPerGapBadgeConfig } from "@/lib/gap-badge";
 import { getCacheFreshnessStatus, formatResultAge } from "@/lib/cache-freshness";
 import { computePrimaryStudyPrismaData, type PrimaryStudyPrismaData, type ScreeningCriteria } from "@/lib/prisma-diagram";
 import {
@@ -1622,6 +1623,50 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
                   }`}>
                     {gap.importance}
                   </span>
+                  {/* Per-gap evidence quality indicator.
+                      Low feasibility  (3–5 studies)  → ◔ Low confidence   (gray, strong caution)
+                      Moderate feasibility (6–10 studies) → ◑ Moderate evidence (stone, mild caution)
+                      High / Insufficient               → no badge
+                      The amber banner at the top of this tab already warns for Low feasibility overall;
+                      this badge makes the caution persistent at the individual gap level. For Moderate
+                      feasibility, no top-of-tab banner is shown — the badge is the sole indicator,
+                      providing a lighter touch appropriate to the borderline evidence tier. */}
+                  {(() => {
+                    const badge = getPerGapBadgeConfig(feasibilityScore, primaryStudyCount);
+                    if (!badge) return null;
+                    return (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium inline-flex items-center gap-0.5 ${badge.className}`}
+                        title={badge.tooltip}
+                        aria-label={badge.ariaLabel}
+                      >
+                        {/* Partial circle SVG icon representing evidence completeness level:
+                            ◔ (iconVariant "low")      — upper-right quadrant filled (one quarter)
+                            ◑ (iconVariant "moderate") — right half filled */}
+                        <svg
+                          className="w-2.5 h-2.5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          {/* Full circle outline shared by both variants */}
+                          <circle cx="12" cy="12" r="9" />
+                          {badge.iconVariant === "low" ? (
+                            /* ◔ Upper-right quadrant: from center (12,12) to top (12,3),
+                               arc clockwise to right (21,12), back to center */
+                            <path d="M12 12 L12 3 A9 9 0 0 1 21 12 Z" fill="currentColor" stroke="none" />
+                          ) : (
+                            /* ◑ Right half: from top (12,3) arc clockwise to bottom (12,21),
+                               straight line back to top — fills the right semicircle */
+                            <path d="M12 3 A9 9 0 0 1 12 21 Z" fill="currentColor" stroke="none" />
+                          )}
+                        </svg>
+                        {badge.label}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-sm">{gap.description}</p>
               </div>
