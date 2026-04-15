@@ -14,6 +14,7 @@ import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
+import { formatOSFWarning, formatOSFStatus } from "@/lib/osf-registry";
 import { getPerGapBadgeConfig } from "@/lib/gap-badge";
 import { getCacheFreshnessStatus, formatResultAge } from "@/lib/cache-freshness";
 import { computePrimaryStudyPrismaData, type PrimaryStudyPrismaData, type ScreeningCriteria } from "@/lib/prisma-diagram";
@@ -33,7 +34,7 @@ import { shouldIgnoreKeyEvent } from "@/lib/keyboard-shortcuts";
 import { KeyboardShortcutsHelp, ShortcutsButton, ShortcutsDiscoveryTooltip } from "@/components/KeyboardShortcutsHelp";
 import { deriveProtocolFilename, hasStoredProtocol } from "@/lib/protocol-storage";
 import { downloadProsperoRegistration, type ProsperoRegistration } from "@/lib/prospero-export";
-import { InsufficientEvidencePanel } from "@/components/InsufficientEvidencePanel";
+import { InsufficientEvidencePanel, AlternativesSection } from "@/components/InsufficientEvidencePanel";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
   High: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 font-medium",
@@ -342,6 +343,12 @@ interface Props {
    * pre-migration result). In that case the metric is hidden.
    */
   prosperoRegistrationsCount?: number | null;
+  /**
+   * ACC-6: Number of systematic review protocols registered on OSF Registries
+   * for this query. Null when the OSF API was unavailable or the result predates
+   * migration 015. Hidden when null.
+   */
+  osfRegistrationsCount?: number | null;
   feasibilityScore: FeasibilityScore | null;
   feasibilityExplanation: string | null;
   gapAnalysis: GapAnalysis | null;
@@ -444,6 +451,7 @@ export function ResultsDashboard({
   primaryStudyCount,
   clinicalTrialsCount = null,
   prosperoRegistrationsCount = null,
+  osfRegistrationsCount = null,
   deduplicationCount = null,
   studyTrend = null,
   pubmedCount = null,
@@ -612,6 +620,12 @@ export function ResultsDashboard({
   const prosperoStatus =
     prosperoRegistrationsCount !== null && prosperoRegistrationsCount !== undefined
       ? formatProsperoStatus(prosperoRegistrationsCount)
+      : null;
+
+  // ACC-6: Compute OSF registry badge status once, outside JSX
+  const osfStatus =
+    osfRegistrationsCount !== null && osfRegistrationsCount !== undefined
+      ? formatOSFStatus(osfRegistrationsCount)
       : null;
 
   // UI-3: Compute cache freshness when a createdAt timestamp is available.
@@ -789,6 +803,33 @@ export function ResultsDashboard({
               <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>registry check</p>
             </div>
           )}
+
+          {/* ACC-6: OSF Registries indicator — third-largest SR registry (social sciences, psychology, public health) */}
+          {osfStatus !== null && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>OSF</p>
+              <a
+                href={`https://osf.io/registries/discover?q=${encodeURIComponent(query)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-opacity hover:opacity-80 ${
+                  osfStatus.hasMatch
+                    ? "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700"
+                    : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700"
+                }`}
+                title={
+                  osfStatus.hasMatch
+                    ? "Possible conflicts in OSF Registries — click to check"
+                    : "No registered protocols found in OSF Registries for this topic"
+                }
+                aria-label={`OSF Registries check: ${osfStatus.label}`}
+              >
+                <span aria-hidden="true">{osfStatus.hasMatch ? "⚠" : "✓"}</span>
+                {osfStatus.label}
+              </a>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>registry check</p>
+            </div>
+          )}
           {localFeasibilityScore && (
             <div>
               {/* UI-2: Label row with "Why This Score?" explainer */}
@@ -834,7 +875,38 @@ export function ResultsDashboard({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                  d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                />
+              </svg>
+            </a>
+          </div>
+        )}
+
+        {/* ACC-6: OSF detail banner — shown only when OSF matches > 0 */}
+        {osfRegistrationsCount !== null && osfRegistrationsCount !== undefined && osfRegistrationsCount > 0 && (
+          <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md">
+            <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
+              {formatOSFWarning(osfRegistrationsCount)}
+            </p>
+            <a
+              href={`https://osf.io/registries/discover?q=${encodeURIComponent(query)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-yellow-700 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-200 underline mt-1.5 inline-flex items-center gap-1"
+            >
+              Check OSF Registries
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
                 />
               </svg>
             </a>
@@ -1005,6 +1077,7 @@ export function ResultsDashboard({
               primaryStudyCount={primaryStudyCount}
               clinicalTrialsCount={clinicalTrialsCount}
               prosperoRegistrationsCount={prosperoRegistrationsCount}
+              osfRegistrationsCount={osfRegistrationsCount}
               deduplicationCount={deduplicationCount}
               pubmedCount={pubmedCount}
               openalexCount={openalexCount}
@@ -1044,6 +1117,7 @@ export function ResultsDashboard({
           primaryStudyCount={primaryStudyCount}
           clinicalTrialsCount={clinicalTrialsCount}
           prosperoRegistrationsCount={prosperoRegistrationsCount}
+          osfRegistrationsCount={osfRegistrationsCount}
           deduplicationCount={deduplicationCount}
           feasibilityScore={localFeasibilityScore}
           feasibilityExplanation={localFeasibilityExplanation}
@@ -1524,31 +1598,47 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
           The hard gate (ACC-1) already blocks AI for Insufficient (<3). For Low (3–5), AI runs but
           the evidence base is sparse. Researchers need a clear caution before interpreting gaps. */}
       {feasibilityScore === "Low" && (
-        <div
-          className="flex items-start gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/25 px-4 py-3"
-          role="alert"
-          aria-label="Limited evidence warning"
-        >
-          <svg
-            className="w-4 h-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            aria-hidden="true"
+        <div className="space-y-4">
+          <div
+            className="flex items-start gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/25 px-4 py-3"
+            role="alert"
+            aria-label="Limited evidence warning"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-          </svg>
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              Limited evidence base ({primaryStudyCount} primary {primaryStudyCount === 1 ? "study" : "studies"})
-            </p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
-              Gap analysis results should be interpreted with caution. With fewer than 6 primary studies,
-              AI-identified gaps may not reflect the full research landscape. Supplement with a hand search
-              of grey literature and conference proceedings.
-            </p>
+            <svg
+              className="w-4 h-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Limited evidence base ({primaryStudyCount} primary {primaryStudyCount === 1 ? "study" : "studies"})
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+                Gap analysis results should be interpreted with caution. With fewer than 6 primary studies,
+                AI-identified gaps may not reflect the full research landscape. Supplement with a hand search
+                of grey literature and conference proceedings.
+              </p>
+            </div>
           </div>
+
+          {/* ACC-2 completion: show verified alternative topics for Low feasibility.
+              Researchers with 3–5 studies see caveated AI output but previously had no
+              concrete suggestions for better adjacent topics — this closes that gap.
+              AlternativesSection fetches from /api/alternatives and shows a skeleton loader
+              while loading, so it does not block page render. */}
+          {query && (
+            <AlternativesSection
+              query={query}
+              primaryStudyCount={primaryStudyCount}
+              headingText="Related topics with stronger evidence"
+              subheadingText="Your topic has limited primary studies. These adjacent topics in the same research area have been verified against PubMed and may support a more feasible review."
+            />
+          )}
         </div>
       )}
 
@@ -2019,6 +2109,7 @@ function PrismaFlowTab({
   primaryStudyCount,
   clinicalTrialsCount = null,
   prosperoRegistrationsCount = null,
+  osfRegistrationsCount = null,
   pubmedCount = null,
   openalexCount = null,
   europepmcCount = null,
@@ -2030,6 +2121,7 @@ function PrismaFlowTab({
   primaryStudyCount: number;
   clinicalTrialsCount?: number | null;
   prosperoRegistrationsCount?: number | null;
+  osfRegistrationsCount?: number | null;
   deduplicationCount?: number | null;
   pubmedCount?: number | null;
   openalexCount?: number | null;
@@ -2413,6 +2505,11 @@ function PrismaFlowTab({
             {prosperoRegistrationsCount !== null && prosperoRegistrationsCount > 0 && (
               <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>
                 Additionally, <a href={prosperoUrl} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>{prosperoRegistrationsCount} review{prosperoRegistrationsCount > 1 ? "s" : ""} registered on PROSPERO</a> may be in progress on this topic.
+              </p>
+            )}
+            {osfRegistrationsCount !== null && osfRegistrationsCount > 0 && (
+              <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+                Additionally, <a href={`https://osf.io/registries/discover?q=${encodeURIComponent(query)}`} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>{osfRegistrationsCount} protocol{osfRegistrationsCount > 1 ? "s" : ""} registered on OSF Registries</a> may be in progress on this topic.
               </p>
             )}
           </div>

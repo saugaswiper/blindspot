@@ -73,7 +73,14 @@ function AlternativeTopicCard({ topic }: { topic: AlternativeTopic }) {
   );
 }
 
-function AlternativesSection({ query, primaryStudyCount }: { query: string; primaryStudyCount: number }) {
+export function AlternativesSection({ query, primaryStudyCount, headingText, subheadingText }: {
+  query: string;
+  primaryStudyCount: number;
+  /** Override the default heading. Defaults to "Explore related topics with sufficient evidence" */
+  headingText?: string;
+  /** Override the default sub-heading paragraph. */
+  subheadingText?: string;
+}) {
   // null = loading; [] = loaded but empty; [...] = loaded with results
   const [alternatives, setAlternatives] = useState<AlternativeTopic[] | null>(null);
 
@@ -103,11 +110,15 @@ function AlternativesSection({ query, primaryStudyCount }: { query: string; prim
       style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
     >
       <p className="text-sm font-semibold mb-1" style={{ color: "var(--foreground)" }}>
-        Explore related topics with sufficient evidence
+        {headingText ?? "Explore related topics with sufficient evidence"}
       </p>
       <p className="text-xs leading-relaxed mb-3" style={{ color: "var(--muted)" }}>
-        These adjacent topics are in the same research area and have been verified
-        to have enough primary studies for a systematic review.
+        {subheadingText ?? (
+          <>
+            These adjacent topics are in the same research area and have been verified
+            to have enough primary studies for a systematic review.
+          </>
+        )}
       </p>
 
       {loading && (

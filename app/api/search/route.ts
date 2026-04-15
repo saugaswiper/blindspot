@@ -8,8 +8,10 @@ import * as EuropePMC from "@/lib/europepmc";
 import * as ClinicalTrials from "@/lib/clinicaltrials";
 import * as SemanticScholar from "@/lib/semanticscholar";
 import { searchProspero, isQuerySubstantialEnough } from "@/lib/prospero";
+import { searchOSFRegistrations } from "@/lib/osf-registry";
 import { getCachedResult, saveSearchResult, saveGuestSearchResult } from "@/lib/cache";
 import { validateSearchInput } from "@/lib/validators";
+import { insertSearchTelemetry } from "@/lib/search-telemetry";
 import { toApiError } from "@/lib/errors";
 import { expandConcept } from "@/lib/synonyms";
 import { isUserBooleanQuery } from "@/lib/boolean-search";
@@ -285,6 +287,7 @@ export async function POST(request: Request) {
       clinicalTrialsCount,
       prosperoCount,
       pubmedRecentCount,
+      osfCount,
     ] = await Promise.allSettled([
       // Review searches use the targeted boolean query for higher precision
       PubMed.searchExistingReviews(reviewQuery),
@@ -299,6 +302,8 @@ export async function POST(request: Request) {
       isQuerySubstantialEnough(query) ? searchProspero(reviewQuery) : Promise.resolve(0),
       // NEW-2: Count primary studies published in the last 3 years (PubMed only)
       PubMed.countPrimaryStudiesRecent(query, 3),
+      // ACC-6: OSF Registries — third-largest SR registry (2,960+ protocols, 2026)
+      isQuerySubstantialEnough(query) ? searchOSFRegistrations(reviewQuery) : Promise.resolve(0),
     ]);
 
     if (pubmedResult.status === "fulfilled") {
@@ -351,6 +356,9 @@ export async function POST(request: Request) {
     // NEW-2: Recent count is from PubMed only; null means unavailable (API failure)
     const recentPrimaryStudyCountVal =
       pubmedRecentCount.status === "fulfilled" ? pubmedRecentCount.value : null;
+    // ACC-6: OSF Registries count — null means API was unavailable
+    const osfCountVal =
+      osfCount.status === "fulfilled" ? osfCount.value : null;
 
     const clinicalCounts = [pubmedCountVal, europepmcCountVal].filter(
       (c): c is number => c !== null
@@ -417,6 +425,7 @@ export async function POST(request: Request) {
       primary_study_count: primaryStudyCount,
       clinical_trials_count: clinicalTrialsCountVal,
       prospero_registrations_count: prosperoCountVal,
+      osf_registrations_count: osfCountVal,
       deduplication_count: deduplicationCount,
       recent_primary_study_count: recentPrimaryStudyCountVal,
       // UI-1: Per-source primary study counts — stored for breakdown display
@@ -428,6 +437,12 @@ export async function POST(request: Request) {
     const resultId = isGuest
       ? await saveGuestSearchResult(query, searchData, hashIp(getClientIp(request)))
       : await saveSearchResult(user!.id, query, searchData);
+
+    // Best-effort telemetry insert (migration 014).
+    // Records after_dedup, tier, and PRISMA included estimate for retrospective
+    // calibration of the screening funnel rates against published SRs.
+    // Never awaited at top level — a telemetry failure must not affect the response.
+    void insertSearchTelemetry(resultId, primaryStudyCount, isGuest);
 
     // Set guest cookie after a successful guest search so subsequent
     // unauthenticated requests are redirected to sign-up.

@@ -26,6 +26,8 @@ interface Props {
   clinicalTrialsCount?: number | null;
   /** Null means the PROSPERO count was unavailable; omit the stat. */
   prosperoRegistrationsCount?: number | null;
+  /** ACC-6: Null means the OSF Registries count was unavailable; omit the stat. */
+  osfRegistrationsCount?: number | null;
   /**
    * Number of cross-database duplicate records removed during deduplication.
    * Null for results stored before migration 007 — diagram falls back to
@@ -45,6 +47,7 @@ export function PrintableReport({
   primaryStudyCount,
   clinicalTrialsCount = null,
   prosperoRegistrationsCount = null,
+  osfRegistrationsCount = null,
   deduplicationCount = null,
   feasibilityScore,
   feasibilityExplanation,
@@ -89,6 +92,12 @@ export function PrintableReport({
               <span className="stat-value">{prosperoRegistrationsCount.toLocaleString("en-US")}</span>
             </div>
           )}
+          {osfRegistrationsCount !== null && osfRegistrationsCount !== undefined && (
+            <div>
+              <span className="stat-label">OSF Registries protocols</span>
+              <span className="stat-value">{osfRegistrationsCount.toLocaleString("en-US")}</span>
+            </div>
+          )}
           {feasibilityScore && (
             <div>
               <span className="stat-label">Feasibility</span>
@@ -102,6 +111,14 @@ export function PrintableReport({
             <p style={{ marginBottom: "4pt" }}>
               <strong>PROSPERO Alert:</strong> {prosperoRegistrationsCount} systematic review{prosperoRegistrationsCount !== 1 ? "s" : ""} may already be registered on PROSPERO for this topic. Check the{" "}
               <a href="https://www.crd.york.ac.uk/prospero/">PROSPERO registry</a> before proceeding.
+            </p>
+          </div>
+        )}
+        {osfRegistrationsCount !== null && osfRegistrationsCount !== undefined && osfRegistrationsCount > 0 && (
+          <div className="report-prospero-warning">
+            <p style={{ marginBottom: "4pt" }}>
+              <strong>OSF Registries Alert:</strong> {osfRegistrationsCount} systematic review protocol{osfRegistrationsCount !== 1 ? "s" : ""} may already be registered on OSF Registries for this topic. Check{" "}
+              <a href="https://osf.io/registries/">OSF Registries</a> before proceeding.
             </p>
           </div>
         )}

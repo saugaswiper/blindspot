@@ -20,6 +20,7 @@ async function getResult(id: string) {
       recent_primary_study_count,
       clinical_trials_count,
       prospero_registrations_count,
+      osf_registrations_count,
       deduplication_count,
       pubmed_count,
       openalex_count,
@@ -100,6 +101,9 @@ export default async function ResultsPage({
         }
         prosperoRegistrationsCount={
           (result.prospero_registrations_count as number | null | undefined) ?? null
+        }
+        osfRegistrationsCount={
+          (result.osf_registrations_count as number | null | undefined) ?? null
         }
         deduplicationCount={
           (result.deduplication_count as number | null | undefined) ?? null

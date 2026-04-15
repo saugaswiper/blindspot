@@ -191,6 +191,12 @@ export interface SearchResult {
    * PROSPERO API was down, or the result predates PROSPERO integration).
    */
   prospero_registrations_count: number | null;
+  /**
+   * Number of systematic review protocols registered on OSF Registries for this query.
+   * Null if the count was not available when the search was run (e.g. the
+   * OSF API was down, or the result predates migration 015).
+   */
+  osf_registrations_count: number | null;
   feasibility_score: FeasibilityScore;
   feasibility_explanation: string;
   gap_analysis: GapAnalysis | null;
