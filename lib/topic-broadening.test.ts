@@ -1,13 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { extractSubfieldId, filterCandidates } from "@/lib/topic-broadening";
+import {
+  extractSubfieldId,
+  filterCandidates,
+  extractTopicNamesFromWorks,
+  mergeAlternatives,
+} from "@/lib/topic-broadening";
+import type { AlternativeTopic } from "@/lib/topic-broadening";
 
 /**
- * Unit tests for ACC-2: Data-Grounded Alternative Topic Suggestions
+ * Unit tests for ACC-2 and ACC-7: Data-Grounded Alternative Topic Suggestions
+ * and OpenAlex Semantic Search Fallback.
  *
- * Tests cover the two pure helper functions in lib/topic-broadening.ts.
+ * Tests cover the four pure helper functions in lib/topic-broadening.ts.
  * The I/O-bound functions (searchTopics, fetchSiblingTopics,
- * findFeasibleAlternativeTopics) are tested via integration tests or
- * manually, as they require live OpenAlex and PubMed APIs.
+ * findFeasibleAlternativeTopics, findSemanticAlternativeTopics) are tested
+ * via integration tests or manually, as they require live OpenAlex and PubMed APIs.
  *
  * Note: full `npm test` may be blocked by a pre-existing rollup binary issue
  * (documented since handoff 026). The test logic is correct and covers all
@@ -146,5 +153,114 @@ describe("ACC-2: filterCandidates", () => {
     const result = filterCandidates(MOCK_TOPICS as never, "https://openalex.org/T999");
     // T100 (5000), T200 (8000), T300 (200) pass the default 50 minWorksCount
     expect(result.length).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ACC-7: extractTopicNamesFromWorks
+// ---------------------------------------------------------------------------
+
+type MockWork = { id: string; primary_topic?: { id: string; display_name: string } | null };
+
+const MOCK_WORKS: MockWork[] = [
+  { id: "W1", primary_topic: { id: "T1", display_name: "Cognitive Behavioral Therapy" } },
+  { id: "W2", primary_topic: { id: "T2", display_name: "Mindfulness-Based Stress Reduction" } },
+  { id: "W3", primary_topic: { id: "T1", display_name: "Cognitive Behavioral Therapy" } }, // duplicate
+  { id: "W4", primary_topic: null },
+  { id: "W5", primary_topic: { id: "T3", display_name: "cognitive behavioral therapy" } }, // same, different case
+  { id: "W6" }, // no primary_topic field at all
+  { id: "W7", primary_topic: { id: "T4", display_name: "Sleep Disorders" } },
+];
+
+describe("ACC-7: extractTopicNamesFromWorks", () => {
+  it("returns unique topic names (first occurrence wins)", () => {
+    const result = extractTopicNamesFromWorks(MOCK_WORKS as never);
+    expect(result).toContain("Cognitive Behavioral Therapy");
+    expect(result).toContain("Mindfulness-Based Stress Reduction");
+    expect(result).toContain("Sleep Disorders");
+  });
+
+  it("deduplicates case-insensitively", () => {
+    const result = extractTopicNamesFromWorks(MOCK_WORKS as never);
+    // "Cognitive Behavioral Therapy" and "cognitive behavioral therapy" → one entry
+    expect(result.filter((n) => n.toLowerCase() === "cognitive behavioral therapy")).toHaveLength(1);
+  });
+
+  it("skips works with null primary_topic", () => {
+    const result = extractTopicNamesFromWorks(MOCK_WORKS as never);
+    // W4 has null primary_topic — no extra undefined/null entries
+    expect(result.every((n) => typeof n === "string" && n.length > 0)).toBe(true);
+  });
+
+  it("skips works with no primary_topic field", () => {
+    const result = extractTopicNamesFromWorks(MOCK_WORKS as never);
+    // W6 has no primary_topic field — result count should be 3
+    expect(result).toHaveLength(3);
+  });
+
+  it("returns empty array for empty works list", () => {
+    expect(extractTopicNamesFromWorks([])).toHaveLength(0);
+  });
+
+  it("preserves the casing of the first occurrence", () => {
+    const result = extractTopicNamesFromWorks(MOCK_WORKS as never);
+    // W1 "Cognitive Behavioral Therapy" (title case) appears before W5 (lowercase)
+    expect(result.find((n) => n.toLowerCase() === "cognitive behavioral therapy")).toBe(
+      "Cognitive Behavioral Therapy"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ACC-7: mergeAlternatives
+// ---------------------------------------------------------------------------
+
+function makeAlt(name: string, count = 10): AlternativeTopic {
+  return {
+    displayName: name,
+    pubmedCount: count,
+    feasibility: "Moderate",
+    searchUrl: `/?q=${encodeURIComponent(name)}`,
+    openalexWorksCount: 0,
+  };
+}
+
+describe("ACC-7: mergeAlternatives", () => {
+  it("returns all primary items when secondary is empty", () => {
+    const primary = [makeAlt("Topic A"), makeAlt("Topic B")];
+    const result = mergeAlternatives(primary, [], 5);
+    expect(result).toEqual(primary);
+  });
+
+  it("appends secondary items not in primary", () => {
+    const primary = [makeAlt("Topic A")];
+    const secondary = [makeAlt("Topic B")];
+    const result = mergeAlternatives(primary, secondary, 5);
+    expect(result.map((r) => r.displayName)).toEqual(["Topic A", "Topic B"]);
+  });
+
+  it("deduplicates secondary items already present in primary (case-insensitive)", () => {
+    const primary = [makeAlt("CBT for Insomnia")];
+    const secondary = [makeAlt("cbt for insomnia"), makeAlt("Sleep Hygiene")];
+    const result = mergeAlternatives(primary, secondary, 5);
+    expect(result.map((r) => r.displayName)).toEqual(["CBT for Insomnia", "Sleep Hygiene"]);
+  });
+
+  it("respects maxResults cap", () => {
+    const primary = [makeAlt("A"), makeAlt("B")];
+    const secondary = [makeAlt("C"), makeAlt("D"), makeAlt("E")];
+    const result = mergeAlternatives(primary, secondary, 3);
+    expect(result).toHaveLength(3);
+  });
+
+  it("returns only primary items when cap is already reached by primary", () => {
+    const primary = [makeAlt("A"), makeAlt("B"), makeAlt("C")];
+    const secondary = [makeAlt("D"), makeAlt("E")];
+    const result = mergeAlternatives(primary, secondary, 3);
+    expect(result.map((r) => r.displayName)).toEqual(["A", "B", "C"]);
+  });
+
+  it("returns empty array when both inputs are empty", () => {
+    expect(mergeAlternatives([], [], 5)).toHaveLength(0);
   });
 });

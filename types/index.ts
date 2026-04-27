@@ -15,6 +15,14 @@ export interface SearchInput {
   mode: SearchMode;
   queryText?: string; // simple mode
   pico?: PICOInput;  // pico mode
+  /**
+   * ACC-8: Optional minimum publication year filter for primary study counts.
+   * When set, only studies published on or after this year are counted toward
+   * feasibility scoring. Prevents inflated High scores on topics where most
+   * evidence is old (e.g., "telemedicine for chronic disease" → mostly pre-2015).
+   * Valid range: 1990–current year.
+   */
+  minYear?: number;
 }
 
 // ---------------------------------------------------------------------------

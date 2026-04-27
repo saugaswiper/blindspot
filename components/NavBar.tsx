@@ -28,6 +28,14 @@ export async function NavBar() {
         <div className="flex items-center gap-1 sm:gap-3">
           <NavHelpButton />
           <ThemeToggle />
+          <Link
+            href="/about"
+            className="text-sm transition-opacity hover:opacity-100 hidden md:block px-2 py-1"
+            style={{ color: "var(--muted)", opacity: 0.7 }}
+            title="About & Methodology — how Blindspot works, RAISE 3 compliance"
+          >
+            Methodology
+          </Link>
 
           {user ? (
             <>

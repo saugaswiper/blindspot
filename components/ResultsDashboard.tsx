@@ -316,6 +316,13 @@ function FeasibilityExplainer() {
           <p className="mt-2" style={{ color: "var(--muted)", fontSize: "10px" }}>
             Thresholds are aligned with Cochrane Handbook recommendations for systematic review methodology.
           </p>
+          <a
+            href="/about"
+            className="inline-block mt-3 text-xs hover:opacity-100 transition-opacity"
+            style={{ color: "var(--accent)", opacity: 0.8 }}
+          >
+            Full methodology &rarr;
+          </a>
         </div>
       )}
     </div>

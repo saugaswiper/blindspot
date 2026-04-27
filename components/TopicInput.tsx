@@ -14,6 +14,19 @@ const EMPTY_PICO: PICOInput = {
   outcome: "",
 };
 
+/**
+ * ACC-8: Publication year filter options shown in the search form.
+ * "All time" (undefined) is the default — matches existing behaviour.
+ */
+const YEAR_OPTIONS: { label: string; value: number | undefined }[] = [
+  { label: "All time", value: undefined },
+  { label: "Since 2010", value: 2010 },
+  { label: "Since 2015", value: 2015 },
+  { label: "Since 2018", value: 2018 },
+  { label: "Since 2020", value: 2020 },
+  { label: "Since 2022", value: 2022 },
+];
+
 export function TopicInput() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +36,8 @@ export function TopicInput() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showBooleanHints, setShowBooleanHints] = useState(false);
+  /** ACC-8: Selected minimum publication year (undefined = all time) */
+  const [minYear, setMinYear] = useState<number | undefined>(undefined);
 
   function handleModeToggle(next: SearchMode) {
     setMode(next);
@@ -47,8 +62,8 @@ export function TopicInput() {
     setLoading(true);
 
     const body = mode === "simple"
-      ? { mode: "simple", queryText }
-      : { mode: "pico", pico };
+      ? { mode: "simple", queryText, ...(minYear !== undefined && { minYear }) }
+      : { mode: "pico", pico, ...(minYear !== undefined && { minYear }) };
 
     const res = await fetch("/api/search", {
       method: "POST",
@@ -73,8 +88,8 @@ export function TopicInput() {
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      {/* Mode toggle — underline style */}
-      <div className="flex items-center gap-1 mb-5">
+      {/* Top control bar — mode toggle + year filter */}
+      <div className="flex items-center gap-1 mb-5 flex-wrap">
         <span className="text-xs mr-2" style={{ color: "var(--muted)" }}>
           Search mode:
         </span>
@@ -93,6 +108,38 @@ export function TopicInput() {
             {m === "simple" ? "Simple" : "PICO"}
           </button>
         ))}
+
+        {/* ACC-8: Publication year filter */}
+        <div className="ml-auto flex items-center gap-1.5">
+          <label
+            htmlFor="year-filter"
+            className="text-xs"
+            style={{ color: "var(--muted)" }}
+          >
+            Period:
+          </label>
+          <select
+            id="year-filter"
+            value={minYear ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              setMinYear(v === "" ? undefined : parseInt(v, 10));
+            }}
+            className="text-xs rounded px-2 py-1 transition-colors cursor-pointer"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+              color: minYear ? "var(--foreground)" : "var(--muted)",
+            }}
+            aria-label="Filter studies by publication period"
+          >
+            {YEAR_OPTIONS.map((opt) => (
+              <option key={opt.label} value={opt.value ?? ""}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Input area */}

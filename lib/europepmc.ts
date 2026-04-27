@@ -56,11 +56,17 @@ export async function searchExistingReviews(query: string): Promise<ExistingRevi
     });
 }
 
-export async function countPrimaryStudies(query: string): Promise<number> {
+export async function countPrimaryStudies(query: string, minYear?: number): Promise<number> {
   // Exclude systematic reviews and meta-analyses from the primary study count.
   // Europe PMC's PUB_TYPE filter matches publication types from MEDLINE.
   // We wrap the user query in parens to safely append the NOT clauses.
-  const primaryQuery = `(${query}) NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"`;
+  //
+  // ACC-8: When minYear is provided, restrict to studies published on or after
+  // that year using Europe PMC's FIRST_PDATE range syntax.
+  const datePart = minYear
+    ? ` AND FIRST_PDATE:[${minYear}-01-01 TO 3000-01-01]`
+    : "";
+  const primaryQuery = `(${query}) NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
   const data = await search(primaryQuery, false, 1);
   return data.hitCount ?? 0;
 }

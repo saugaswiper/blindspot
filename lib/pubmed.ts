@@ -90,13 +90,18 @@ export async function searchExistingReviews(query: string): Promise<ExistingRevi
   return efetch(ids);
 }
 
-export async function countPrimaryStudies(query: string): Promise<number> {
+export async function countPrimaryStudies(query: string, minYear?: number): Promise<number> {
   // Exclude systematic reviews from the primary study count.
   // We want to assess how much raw primary evidence exists — not whether
   // there are existing reviews of that evidence.
   // PubMed's systematic[sb] filter matches all systematic reviews, Cochrane
   // reviews, and related secondary study types.
-  const { count } = await esearch(`(${query}) AND NOT systematic[sb]`, 1);
+  //
+  // ACC-8: When minYear is provided, restrict counts to studies published
+  // on or after that year using PubMed's [dp] (date published) field tag.
+  // Current year is used as the upper bound to capture in-press records.
+  const datePart = minYear ? ` AND ${minYear}:${new Date().getFullYear()}[dp]` : "";
+  const { count } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, 1);
   return count;
 }
 

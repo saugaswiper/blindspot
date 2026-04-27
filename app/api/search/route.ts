@@ -40,19 +40,30 @@ function getClientIp(request: Request): string {
 const GUEST_COOKIE = "blindspot_guest_search";
 const GUEST_COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days — matches search result TTL
 
-type SearchBody = { queryText?: string; pico?: { population: string; intervention: string; comparison?: string; outcome: string } };
+type SearchBody = {
+  queryText?: string;
+  pico?: { population: string; intervention: string; comparison?: string; outcome: string };
+  /** ACC-8: optional minimum publication year for primary-study count filtering */
+  minYear?: number;
+};
 
 /**
  * Builds the user-facing query string used as the cache key and stored label.
  * Kept simple: PICO components are joined with spaces.
+ *
+ * ACC-8: When minYear is present, appends " (after YYYY)" to the query so that:
+ *   1. The Supabase cache key is unique per year filter (avoids stale hits)
+ *   2. The stored query_text shown on the results page reflects the filter
  */
 function buildQueryString(body: SearchBody): string {
-  if (body.queryText) return body.queryText;
-  if (body.pico) {
+  let base = "";
+  if (body.queryText) {
+    base = body.queryText;
+  } else if (body.pico) {
     const { population, intervention, comparison, outcome } = body.pico;
-    return [population, intervention, comparison, outcome].filter(Boolean).join(" ");
+    base = [population, intervention, comparison, outcome].filter(Boolean).join(" ");
   }
-  return "";
+  return body.minYear ? `${base} (after ${body.minYear})` : base;
 }
 
 /**
@@ -253,10 +264,19 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid input", details: validation.errors }, { status: 400 });
     }
 
-    const query = buildQueryString(body as SearchBody);
+    const typedBody = body as SearchBody;
+    const query = buildQueryString(typedBody);
+    // ACC-8: Extract the base query (without the year suffix) for count functions
+    // that accept minYear directly — avoids double-filtering.
+    const baseQuery = typedBody.queryText
+      ? typedBody.queryText
+      : typedBody.pico
+      ? [typedBody.pico.population, typedBody.pico.intervention, typedBody.pico.comparison, typedBody.pico.outcome].filter(Boolean).join(" ")
+      : query;
+    const minYear: number | undefined = typedBody.minYear;
     // Targeted boolean query used for review searches — narrows results to the
     // exact combination of concepts rather than any individual keyword match.
-    const reviewQuery = buildReviewQuery(body as SearchBody);
+    const reviewQuery = buildReviewQuery(typedBody);
 
     // Check cache for authenticated users only (guests always run fresh)
     if (!isGuest) {
@@ -294,16 +314,18 @@ export async function POST(request: Request) {
       OpenAlex.searchExistingReviews(reviewQuery),
       EuropePMC.searchExistingReviews(reviewQuery),
       SemanticScholar.searchExistingReviews(reviewQuery),
-      // Primary study counts stay broad (original query) for accurate feasibility scoring
-      PubMed.countPrimaryStudies(query),
-      OpenAlex.countPrimaryStudies(query),
-      EuropePMC.countPrimaryStudies(query),
-      ClinicalTrials.countPrimaryStudies(query),
-      isQuerySubstantialEnough(query) ? searchProspero(reviewQuery) : Promise.resolve(0),
-      // NEW-2: Count primary studies published in the last 3 years (PubMed only)
-      PubMed.countPrimaryStudiesRecent(query, 3),
+      // Primary study counts use baseQuery (without year suffix) + optional minYear filter.
+      // ACC-8: minYear restricts counts to studies published on/after that year.
+      PubMed.countPrimaryStudies(baseQuery, minYear),
+      OpenAlex.countPrimaryStudies(baseQuery, minYear),
+      EuropePMC.countPrimaryStudies(baseQuery, minYear),
+      ClinicalTrials.countPrimaryStudies(baseQuery),
+      isQuerySubstantialEnough(baseQuery) ? searchProspero(reviewQuery) : Promise.resolve(0),
+      // NEW-2: Count primary studies published in the last 3 years (PubMed only).
+      // Note: trend analysis always uses the 3-year window regardless of minYear.
+      PubMed.countPrimaryStudiesRecent(baseQuery, 3),
       // ACC-6: OSF Registries — third-largest SR registry (2,960+ protocols, 2026)
-      isQuerySubstantialEnough(query) ? searchOSFRegistrations(reviewQuery) : Promise.resolve(0),
+      isQuerySubstantialEnough(baseQuery) ? searchOSFRegistrations(reviewQuery) : Promise.resolve(0),
     ]);
 
     if (pubmedResult.status === "fulfilled") {

@@ -61,3 +61,51 @@ describe("validateSearchInput — PICO mode", () => {
     expect(result.success).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ACC-8: minYear validation
+// ---------------------------------------------------------------------------
+
+describe("validateSearchInput — minYear (ACC-8)", () => {
+  it("passes when minYear is absent (all time — default)", () => {
+    const result = validateSearchInput({ mode: "simple", queryText: "CBT for insomnia" });
+    expect(result.success).toBe(true);
+  });
+
+  it("passes when minYear is a valid year (e.g. 2020)", () => {
+    const result = validateSearchInput({ mode: "simple", queryText: "CBT for insomnia", minYear: 2020 });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.minYear).toBe(2020);
+  });
+
+  it("passes when minYear is the boundary year 1990", () => {
+    const result = validateSearchInput({ mode: "simple", queryText: "CBT for insomnia", minYear: 1990 });
+    expect(result.success).toBe(true);
+  });
+
+  it("fails when minYear is before 1990", () => {
+    const result = validateSearchInput({ mode: "simple", queryText: "CBT for insomnia", minYear: 1985 });
+    expect(result.success).toBe(false);
+  });
+
+  it("fails when minYear is in the future", () => {
+    const futureYear = new Date().getFullYear() + 1;
+    const result = validateSearchInput({ mode: "simple", queryText: "CBT for insomnia", minYear: futureYear });
+    expect(result.success).toBe(false);
+  });
+
+  it("fails when minYear is a float", () => {
+    const result = validateSearchInput({ mode: "simple", queryText: "CBT for insomnia", minYear: 2020.5 });
+    expect(result.success).toBe(false);
+  });
+
+  it("passes with PICO mode and a valid minYear", () => {
+    const result = validateSearchInput({
+      mode: "pico",
+      pico: { population: "adults", intervention: "CBT", outcome: "sleep" },
+      minYear: 2018,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.minYear).toBe(2018);
+  });
+});

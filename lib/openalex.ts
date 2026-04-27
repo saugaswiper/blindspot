@@ -33,14 +33,26 @@ function invertedIndexToAbstract(index: Record<string, number[]> | null | undefi
   return words.filter(Boolean).join(" ");
 }
 
-async function searchOpenAlex(query: string, filterType: "review" | "all" | "primary", perPage = 25): Promise<OpenAlexResponse> {
+async function searchOpenAlex(
+  query: string,
+  filterType: "review" | "all" | "primary",
+  perPage = 25,
+  minYear?: number,
+): Promise<OpenAlexResponse> {
   const url = new URL(`${BASE}/works`);
   url.searchParams.set("search", query);
-  if (filterType === "review") url.searchParams.set("filter", "type:review");
+
+  // Build filter string — multiple criteria joined with comma
+  const filters: string[] = [];
+  if (filterType === "review") filters.push("type:review");
   // "primary" targets original research articles only — excludes OpenAlex's
   // review-type works (systematic reviews, narrative reviews) so the count
   // reflects actual primary research the field can support.
-  if (filterType === "primary") url.searchParams.set("filter", "type:article");
+  if (filterType === "primary") filters.push("type:article");
+  // ACC-8: restrict by publication year when caller provides a minYear
+  if (minYear) filters.push(`from_publication_date:${minYear}-01-01`);
+
+  if (filters.length > 0) url.searchParams.set("filter", filters.join(","));
   url.searchParams.set("per-page", String(perPage));
   url.searchParams.set("select", "title,publication_year,primary_location,abstract_inverted_index,doi");
   if (EMAIL) url.searchParams.set("mailto", EMAIL);
@@ -69,10 +81,12 @@ export async function searchExistingReviews(query: string): Promise<ExistingRevi
     });
 }
 
-export async function countPrimaryStudies(query: string): Promise<number> {
+export async function countPrimaryStudies(query: string, minYear?: number): Promise<number> {
   // Use "primary" filter (type:article) to count original research papers only.
   // Previously used "all" which included systematic reviews, editorials, and
   // letters — inflating counts for broad topics significantly.
-  const data = await searchOpenAlex(query, "primary", 1);
+  //
+  // ACC-8: Pass minYear through so OpenAlex filters by from_publication_date.
+  const data = await searchOpenAlex(query, "primary", 1, minYear);
   return data.meta.count;
 }

@@ -33,9 +33,24 @@ const sanitizedString = (min: number, max: number, label: string) =>
 // Schemas
 // ---------------------------------------------------------------------------
 
+const CURRENT_YEAR = new Date().getFullYear();
+
+/**
+ * ACC-8: Optional publication year filter.
+ * Must be an integer in the range [1990, currentYear].
+ * Absent = no date restriction (all years).
+ */
+const minYearSchema = z
+  .number()
+  .int("Publication year must be a whole number")
+  .min(1990, "Publication year must be 1990 or later")
+  .max(CURRENT_YEAR, `Publication year cannot be in the future`)
+  .optional();
+
 const simpleSearchSchema = z.object({
   mode: z.literal("simple"),
   queryText: sanitizedString(3, 500, "Query"),
+  minYear: minYearSchema,
 });
 
 const picoSearchSchema = z.object({
@@ -50,6 +65,7 @@ const picoSearchSchema = z.object({
                     .optional(),
     outcome:      sanitizedString(2, 300, "Outcome"),
   }),
+  minYear: minYearSchema,
 });
 
 const searchSchema = z.discriminatedUnion("mode", [
