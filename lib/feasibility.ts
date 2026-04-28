@@ -36,12 +36,17 @@ function buildExplanation(
   score: FeasibilityScore,
   primaryStudyCount: number,
   reviewStatus: ExistingReviewStatus,
-  reviews: ExistingReview[]
+  reviews: ExistingReview[],
+  minYear?: number
 ): string {
   const studyPhrase =
     primaryStudyCount === 0
       ? "No primary studies found"
       : `${primaryStudyCount} primary ${primaryStudyCount === 1 ? "study" : "studies"} found`;
+
+  // ACC-9: When a year filter was applied, append scope to the study count phrase
+  // so researchers understand the filtered window without reading the raw query text.
+  const scopeSuffix = minYear ? ` from ${minYear} onward` : "";
 
   const reviewPhrase =
     reviewStatus === "novel"
@@ -57,7 +62,7 @@ function buildExplanation(
     Insufficient: "Not enough evidence for a review — primary research may be needed.",
   };
 
-  return `${studyPhrase}. ${reviewPhrase}. ${feasibilityPhrase[score]}`;
+  return `${studyPhrase}${scopeSuffix}. ${reviewPhrase}. ${feasibilityPhrase[score]}`;
 }
 
 function buildFlags(
@@ -94,13 +99,23 @@ function buildFlags(
   return flags;
 }
 
+/**
+ * Score the feasibility of a systematic review topic.
+ *
+ * @param primaryStudyCount - Number of primary studies found (already filtered by minYear if applicable).
+ * @param existingReviews   - Existing systematic reviews found on the topic.
+ * @param minYear           - ACC-9: Optional earliest publication year filter that was applied to
+ *                            the primary study count. When present, the explanation includes
+ *                            "from YYYY onward" so users understand the filtered scope.
+ */
 export function scoreFeasibility(
   primaryStudyCount: number,
-  existingReviews: ExistingReview[]
+  existingReviews: ExistingReview[],
+  minYear?: number
 ): FeasibilityResult {
   const score = getScore(primaryStudyCount);
   const existingReviewStatus = getExistingReviewStatus(existingReviews);
-  const explanation = buildExplanation(score, primaryStudyCount, existingReviewStatus, existingReviews);
+  const explanation = buildExplanation(score, primaryStudyCount, existingReviewStatus, existingReviews, minYear);
   const flags = buildFlags(score, existingReviewStatus, existingReviews, primaryStudyCount);
 
   return {

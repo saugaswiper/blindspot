@@ -150,3 +150,39 @@ describe("scoreFeasibility — broad-query flag for very large corpora", () => {
     expect(hasRecentFlag).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ACC-9: scoreFeasibility — minYear scope suffix in explanation
+// ---------------------------------------------------------------------------
+
+describe("scoreFeasibility — ACC-9 minYear scope in explanation", () => {
+  it("explanation has no scope suffix when minYear is absent", () => {
+    const result = scoreFeasibility(15, NO_REVIEWS);
+    expect(result.explanation).not.toContain("from");
+    expect(result.explanation).toMatch(/^15 primary studies found\./);
+  });
+
+  it("explanation includes 'from YYYY onward' when minYear is provided", () => {
+    const result = scoreFeasibility(15, NO_REVIEWS, 2015);
+    expect(result.explanation).toContain("from 2015 onward");
+    expect(result.explanation).toMatch(/^15 primary studies found from 2015 onward\./);
+  });
+
+  it("explanation 'from YYYY onward' appears correctly with singular study", () => {
+    const result = scoreFeasibility(1, NO_REVIEWS, 2020);
+    expect(result.explanation).toMatch(/^1 primary study found from 2020 onward\./);
+  });
+
+  it("explanation uses correct year value", () => {
+    expect(scoreFeasibility(10, NO_REVIEWS, 2000).explanation).toContain("from 2000 onward");
+    expect(scoreFeasibility(10, NO_REVIEWS, 2023).explanation).toContain("from 2023 onward");
+  });
+
+  it("score and flags are unchanged when minYear is provided", () => {
+    const withYear = scoreFeasibility(15, NO_REVIEWS, 2015);
+    const withoutYear = scoreFeasibility(15, NO_REVIEWS);
+    expect(withYear.score).toBe(withoutYear.score);
+    expect(withYear.flags).toEqual(withoutYear.flags);
+    expect(withYear.primary_study_count).toBe(withoutYear.primary_study_count);
+  });
+});

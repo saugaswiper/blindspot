@@ -68,10 +68,16 @@ export async function POST(request: Request) {
     const primaryStudyCount = result.primary_study_count as number;
     const query = (result.searches as unknown as { query_text: string } | null)?.query_text ?? "";
 
-    console.log("[analyze] query:", query, "| reviews:", existingReviews.length, "| studies:", primaryStudyCount);
+    // ACC-9: Extract minYear from the query text suffix appended by ACC-8.
+    // The search route appends " (after YYYY)" when a year filter is applied,
+    // so the stored query_text may be e.g. "CBT for insomnia (after 2015)".
+    const minYearMatch = query.match(/\(after (\d{4})\)/);
+    const minYear = minYearMatch ? parseInt(minYearMatch[1], 10) : undefined;
+
+    console.log("[analyze] query:", query, "| reviews:", existingReviews.length, "| studies:", primaryStudyCount, "| minYear:", minYear);
 
     // Step 1: Feasibility scoring (pure logic — no AI)
-    const feasibility = scoreFeasibility(primaryStudyCount, existingReviews);
+    const feasibility = scoreFeasibility(primaryStudyCount, existingReviews, minYear);
 
     // ACC-1: Hard gate — block AI analysis when evidence is insufficient
     if (primaryStudyCount < 3) {

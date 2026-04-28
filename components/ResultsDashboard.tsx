@@ -17,7 +17,7 @@ import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
 import { formatOSFWarning, formatOSFStatus } from "@/lib/osf-registry";
 import { getPerGapBadgeConfig } from "@/lib/gap-badge";
 import { getCacheFreshnessStatus, formatResultAge } from "@/lib/cache-freshness";
-import { computePrimaryStudyPrismaData, type PrimaryStudyPrismaData, type ScreeningCriteria } from "@/lib/prisma-diagram";
+import { computePrimaryStudyPrismaData, type PrimaryStudyPrismaData } from "@/lib/prisma-diagram";
 import {
   ALL_DIMENSIONS,
   DIMENSION_LABELS,
@@ -1289,6 +1289,19 @@ function SourceBadge({ source }: { source?: string }) {
 /* Reviews tab                                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * NEW-5: Encode a UTF-8 string as base64 safely in all browsers.
+ * `btoa` only handles latin-1; we percent-encode first then decode back
+ * to latin-1 bytes before encoding.
+ */
+function utf8ToBase64(str: string): string {
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/gi, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    )
+  );
+}
+
 function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -1301,6 +1314,20 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
   function handleExportBibtex() {
     const content = toBibtex(reviews);
     downloadTextFile(content, "blindspot-reviews.bib", "application/x-bibtex");
+    setExportOpen(false);
+  }
+
+  /**
+   * NEW-5: Open Zotero Desktop directly via the zotero:// URI protocol.
+   * Zotero registers this protocol handler on install; it imports the
+   * base64-encoded RIS data without any OAuth or API key.
+   * Users without Zotero installed see a "No application can open" OS dialog.
+   */
+  function handleZoteroExport() {
+    const content = toRis(reviews);
+    if (!content) return;
+    const encoded = utf8ToBase64(content);
+    window.location.href = `zotero://import?format=ris&data=${encoded}`;
     setExportOpen(false);
   }
 
@@ -1325,17 +1352,31 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
   return (
     <div>
       {/* Export toolbar */}
-      <div className="flex items-center justify-end mb-3 relative">
+      <div className="flex items-center justify-end gap-2 mb-3 relative">
+        {/* NEW-5: Zotero Direct Import button */}
+        <button
+          onClick={handleZoteroExport}
+          title="Import all references directly into Zotero Desktop (requires Zotero to be installed)"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-red-300 dark:border-red-700 text-red-700 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          aria-label="Save references to Zotero"
+        >
+          {/* Zotero "Z" icon rendered as SVG text */}
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M3 4h18v2.5L7.5 18H21v2H3v-2.5L16.5 6H3V4z" />
+          </svg>
+          Save to Zotero
+        </button>
+
         <div className="relative">
           <button
             onClick={() => setExportOpen((v) => !v)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-md hover:border-[#4a90d9] dark:hover:border-blue-400 hover:text-[#4a90d9] dark:hover:text-blue-400 transition-colors"
-            aria-label="Export references"
+            aria-label="Export references as file"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
             </svg>
-            Export references
+            Export file
           </button>
           {exportOpen && (
             <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 py-1">
