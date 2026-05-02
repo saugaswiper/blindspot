@@ -43,16 +43,22 @@ function FeasibilityDot({ score }: { score: string }) {
 function SubtopicCard({
   subtopic,
   onSearch,
+  isSearching,
+  anySearching,
 }: {
   subtopic: ExploreSubtopic;
   onSearch: (query: string) => void;
+  isSearching: boolean;
+  anySearching: boolean;
 }) {
   return (
     <div
       className="flex flex-col gap-3 rounded-xl p-5 transition-shadow hover:shadow-md"
       style={{
         background: "var(--surface)",
-        border: "1px solid var(--border)",
+        border: isSearching ? "1px solid var(--accent)" : "1px solid var(--border)",
+        opacity: anySearching && !isSearching ? 0.6 : 1,
+        transition: "opacity 0.2s, border-color 0.2s",
       }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -72,13 +78,25 @@ function SubtopicCard({
         </span>
         <button
           onClick={() => onSearch(subtopic.title)}
-          className="text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+          disabled={anySearching}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:cursor-not-allowed"
           style={{
             background: "var(--brand)",
             color: "#fff",
+            opacity: anySearching && !isSearching ? 0.5 : 1,
           }}
         >
-          Search this topic →
+          {isSearching ? (
+            <span className="flex items-center gap-1.5">
+              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Searching…
+            </span>
+          ) : (
+            "Search this topic →"
+          )}
         </button>
       </div>
     </div>
@@ -121,6 +139,7 @@ export function FieldExplorer() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExploreResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchingQuery, setSearchingQuery] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -149,8 +168,35 @@ export function FieldExplorer() {
     }
   }
 
-  function handleSearch(query: string) {
-    router.push(`/?q=${encodeURIComponent(query)}&autosubmit=1`);
+  /**
+   * Calls /api/search directly so the full feasibility search runs immediately
+   * without routing through TopicInput (which may already be mounted on this page).
+   */
+  async function handleSearch(query: string) {
+    setSearchingQuery(query);
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "simple", queryText: query }),
+      });
+      const data = (await res.json()) as { resultId?: string; guestLimitReached?: boolean; error?: string };
+
+      if (data.guestLimitReached) {
+        router.push("/signup");
+        return;
+      }
+      if (data.resultId) {
+        router.push(`/results/${data.resultId}`);
+        return;
+      }
+      // Surface API error briefly then reset
+      setError(data.error ?? "Search failed. Please try again.");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSearchingQuery(null);
+    }
   }
 
   return (
@@ -220,7 +266,13 @@ export function FieldExplorer() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {result.subtopics.map((sub, i) => (
-                <SubtopicCard key={i} subtopic={sub} onSearch={handleSearch} />
+                <SubtopicCard
+                  key={i}
+                  subtopic={sub}
+                  onSearch={handleSearch}
+                  isSearching={searchingQuery === sub.title}
+                  anySearching={searchingQuery !== null}
+                />
               ))}
             </div>
           )}
