@@ -191,9 +191,24 @@ function ComparisonModal({
     return () => document.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
+  // PRINT-1: Mark <body> while the modal is open so print CSS targets only
+  // the comparison table (everything else carries [data-screen-only]).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.add("comparison-modal-open");
+    return () => document.body.classList.remove("comparison-modal-open");
+  }, []);
+
+  // PRINT-1: Generated-on label shown only in the printed output.
+  const generatedAt = new Date().toLocaleString("en-US", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+
   return (
     /* Backdrop */
     <div
+      id="comparison-modal-print-root"
       className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-24"
       style={{ background: "rgba(0,0,0,0.5)" }}
       onClick={(e) => {
@@ -204,7 +219,7 @@ function ComparisonModal({
       aria-label="Topic comparison"
     >
       <div
-        className="w-full max-w-5xl rounded-xl shadow-2xl overflow-hidden"
+        className="w-full max-w-5xl rounded-xl shadow-2xl overflow-hidden comparison-modal-card"
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",
@@ -225,27 +240,62 @@ function ComparisonModal({
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
               {rows.length} topic{rows.length !== 1 ? "s" : ""} selected
             </p>
+            {/* Print-only generated-on line. Hidden on screen via .print-only. */}
+            <p className="print-only text-xs mt-0.5" style={{ color: "#444" }}>
+              Generated {generatedAt} · blindspot.app
+            </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:opacity-70 transition-opacity"
-            style={{ color: "var(--muted)" }}
-            aria-label="Close comparison"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
+          <div className="flex items-center gap-1" data-screen-only>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md transition-opacity hover:opacity-80"
+              style={{
+                background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                color: "var(--accent)",
+                border:
+                  "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+                fontWeight: 500,
+              }}
+              aria-label="Print comparison"
+              title="Print or save as PDF"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18 18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.8}
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z"
+                />
+              </svg>
+              Print
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-md hover:opacity-70 transition-opacity"
+              style={{ color: "var(--muted)" }}
+              aria-label="Close comparison"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18 18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Table — scrollable horizontally on mobile */}
@@ -568,6 +618,10 @@ export function DashboardContent({
 
   return (
     <>
+      {/* PRINT-1: Wrapper marks the dashboard as screen-only so window.print()
+          from the ComparisonModal renders only the comparison table, not the
+          full dashboard underneath. */}
+      <div data-screen-only>
       {/* Header row */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -857,8 +911,10 @@ export function DashboardContent({
           onClear={clearSelection}
         />
       )}
+      </div>{/* /data-screen-only wrapper */}
 
-      {/* Comparison modal */}
+      {/* Comparison modal — kept OUTSIDE the data-screen-only wrapper so
+          window.print() from inside the modal renders the comparison table. */}
       {showComparison && comparisonRows.length >= 2 && (
         <ComparisonModal
           rows={comparisonRows}

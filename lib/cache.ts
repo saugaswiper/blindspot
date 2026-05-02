@@ -2,6 +2,46 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import type { ExistingReview } from "@/types";
 
+// ---------------------------------------------------------------------------
+// PICO-1: Pure helper — build the `searches` row insert payload
+// ---------------------------------------------------------------------------
+
+/**
+ * Structured PICO elements from a search form submission.
+ * All fields are optional/nullable — callers may provide any subset.
+ */
+export interface PicoFields {
+  population?: string | null;
+  intervention?: string | null;
+  comparison?: string | null;
+  outcome?: string | null;
+}
+
+/**
+ * Build the payload object for a `searches` table INSERT.
+ *
+ * When `pico` is provided, the four PICO columns are included in the returned
+ * object (only non-empty string values are written — nulls and empty strings
+ * are omitted so the DB retains its column default of NULL).
+ *
+ * Extracted as a pure function so it can be unit-tested without a Supabase
+ * connection. Used by both `saveSearchResult` and `saveGuestSearchResult`.
+ *
+ * @param base    - Required fields that are always present (user_id or null, query_text, etc.)
+ * @param pico    - Optional PICO elements; omit entirely for simple-text searches
+ */
+export function buildSearchInsertPayload(
+  base: Record<string, unknown>,
+  pico?: PicoFields
+): Record<string, unknown> {
+  const payload = { ...base };
+  if (pico?.population)   payload.pico_population   = pico.population;
+  if (pico?.intervention) payload.pico_intervention = pico.intervention;
+  if (pico?.comparison)   payload.pico_comparison   = pico.comparison;
+  if (pico?.outcome)      payload.pico_outcome      = pico.outcome;
+  return payload;
+}
+
 export interface CachedSearchResult {
   id: string;
   existing_reviews: ExistingReview[];
@@ -97,14 +137,32 @@ export async function saveSearchResult(
     pubmed_count: number | null;
     openalex_count: number | null;
     europepmc_count: number | null;
+  },
+  /**
+   * PICO-1: Structured PICO elements from the search form.
+   * When provided, stored in the searches row so PROSPERO export and protocol
+   * generation can produce pre-filled, field-specific output instead of
+   * falling back to generic query-derived text.
+   */
+  pico?: {
+    population?: string | null;
+    intervention?: string | null;
+    comparison?: string | null;
+    outcome?: string | null;
   }
 ): Promise<string> {
   const supabase = await createClient();
 
+  // PICO-1: Build the search row payload, including PICO fields when present.
+  const searchInsert = buildSearchInsertPayload(
+    { user_id: userId, query_text: query },
+    pico
+  );
+
   // Create the search row
   const { data: search, error: searchError } = await supabase
     .from("searches")
-    .insert({ user_id: userId, query_text: query })
+    .insert(searchInsert)
     .select("id")
     .single();
 
@@ -256,13 +314,30 @@ export async function saveGuestSearchResult(
    * Stored for server-side guest rate limiting (migration 013).
    * Pass undefined to omit — the column is nullable so older callers continue to work.
    */
-  guestIpHash?: string
+  guestIpHash?: string,
+  /**
+   * PICO-1: Structured PICO elements from the search form.
+   * Stored so that if the guest later signs up and runs analysis, PROSPERO export
+   * and protocol generation receive properly typed fields.
+   */
+  pico?: {
+    population?: string | null;
+    intervention?: string | null;
+    comparison?: string | null;
+    outcome?: string | null;
+  }
 ): Promise<string> {
   const supabase = createServiceRoleClient();
 
+  // PICO-1: Build the search row payload, including PICO fields when present.
+  const searchInsert = buildSearchInsertPayload(
+    { user_id: null, query_text: query, guest_ip_hash: guestIpHash ?? null },
+    pico
+  );
+
   const { data: search, error: searchError } = await supabase
     .from("searches")
-    .insert({ user_id: null, query_text: query, guest_ip_hash: guestIpHash ?? null })
+    .insert(searchInsert)
     .select("id")
     .single();
 

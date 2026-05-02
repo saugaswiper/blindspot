@@ -456,9 +456,21 @@ export async function POST(request: Request) {
       europepmc_count: europepmcCountVal,
     };
 
+    // PICO-1: Pass structured PICO elements so they are stored in the searches row.
+    // Used by PROSPERO export and protocol generator to pre-fill typed fields
+    // (population, intervention, comparator, outcome) instead of generic query text.
+    const picoFields = typedBody.pico
+      ? {
+          population: typedBody.pico.population ?? null,
+          intervention: typedBody.pico.intervention ?? null,
+          comparison: typedBody.pico.comparison ?? null,
+          outcome: typedBody.pico.outcome ?? null,
+        }
+      : undefined;
+
     const resultId = isGuest
-      ? await saveGuestSearchResult(query, searchData, hashIp(getClientIp(request)))
-      : await saveSearchResult(user!.id, query, searchData);
+      ? await saveGuestSearchResult(query, searchData, hashIp(getClientIp(request)), picoFields)
+      : await saveSearchResult(user!.id, query, searchData, picoFields);
 
     // Best-effort telemetry insert (migration 014).
     // Records after_dedup, tier, and PRISMA included estimate for retrospective

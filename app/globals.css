@@ -241,11 +241,22 @@ body {
   color: var(--muted);
 }
 
+/* Hide print-only annotations on screen — they appear only in @media print. */
+.print-only {
+  display: none !important;
+}
+
 /* ── Print styles ─────────────────────────────────────────────────────────── */
 @media print {
   nav,
-  [data-screen-content] {
+  [data-screen-content],
+  [data-screen-only] {
     display: none !important;
+  }
+
+  /* Reveal print-only annotations (PRINT-1: comparison "Generated …" label). */
+  .print-only {
+    display: block !important;
   }
 
   #printable-report {
@@ -599,5 +610,69 @@ body {
     color: #666;
     margin-top: 8pt;
     font-style: italic;
+  }
+
+  /* ── PRINT-1: Comparison modal print layout ─────────────────────────── */
+  /* When the user prints from inside the topic-comparison modal, render the
+     modal as a normal block document instead of a centered overlay. The
+     [data-screen-only] rule above hides the rest of the dashboard. */
+  body.comparison-modal-open #comparison-modal-print-root {
+    position: static !important;
+    inset: auto !important;
+    background: none !important;
+    padding: 0 !important;
+    display: block !important;
+    z-index: auto !important;
+    color: #000;
+    font-family: Georgia, serif;
+  }
+
+  body.comparison-modal-open #comparison-modal-print-root .comparison-modal-card {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body.comparison-modal-open #comparison-modal-print-root h2 {
+    color: #1c2b3a !important;
+    font-size: 18pt;
+    margin: 0 0 4pt;
+  }
+
+  body.comparison-modal-open #comparison-modal-print-root table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    font-size: 10pt;
+  }
+
+  body.comparison-modal-open #comparison-modal-print-root thead th {
+    color: #1c2b3a !important;
+    border-bottom: 1pt solid #1c2b3a;
+    padding: 6pt 4pt !important;
+  }
+
+  body.comparison-modal-open #comparison-modal-print-root tbody tr {
+    background: transparent !important;
+    page-break-inside: avoid;
+  }
+
+  body.comparison-modal-open #comparison-modal-print-root tbody td {
+    padding: 6pt 4pt !important;
+    border-bottom: 0.5pt solid #ccc;
+    color: #000 !important;
+    background: transparent !important;
+  }
+
+  /* Strip pill backgrounds — keep just the text — they're noisy in print. */
+  body.comparison-modal-open #comparison-modal-print-root tbody td span {
+    background: transparent !important;
+    color: #000 !important;
+    border: none !important;
+    padding: 0 !important;
   }
 }
