@@ -129,6 +129,10 @@ export async function saveSearchResult(
     clinical_trials_count: number | null;
     /** Pass null when the PROSPERO API was unavailable. */
     prospero_registrations_count: number | null;
+    /** ACC-6: OSF Registries count. Pass null when the OSF API was unavailable. */
+    osf_registrations_count: number | null;
+    /** Scopus primary study count. Pass null when the Elsevier API was unavailable. */
+    scopus_count: number | null;
     /** Number of cross-database duplicate records removed during deduplication. */
     deduplication_count: number;
     /** Pass null when the PubMed recent-count API was unavailable. */
@@ -171,8 +175,9 @@ export async function saveSearchResult(
     throw new Error(`Failed to save search: ${searchError?.message}`);
   }
 
-  // Try inserting with all columns (including per-source counts from migration 012).
-  // Fall back without newer columns if older migrations haven't been applied yet.
+  // Try inserting with all columns (migrations 012 + 015 + 016).
+  // Falls back progressively if a column introduced by a newer migration is missing
+  // (Postgres error code 42703 = undefined_column).
   let { data: result, error: resultError } = await supabase
     .from("search_results")
     .insert({
@@ -181,6 +186,8 @@ export async function saveSearchResult(
       primary_study_count: data.primary_study_count,
       clinical_trials_count: data.clinical_trials_count,
       prospero_registrations_count: data.prospero_registrations_count,
+      osf_registrations_count: data.osf_registrations_count,
+      scopus_count: data.scopus_count,
       deduplication_count: data.deduplication_count,
       recent_primary_study_count: data.recent_primary_study_count,
       pubmed_count: data.pubmed_count,
@@ -191,6 +198,28 @@ export async function saveSearchResult(
     .single();
 
   // If insertion fails due to missing columns, try older schemas in order
+  if (resultError?.code === "42703") {
+    // scopus_count or osf_registrations_count columns don't exist yet — try without them
+    const fallbackScopus = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        deduplication_count: data.deduplication_count,
+        recent_primary_study_count: data.recent_primary_study_count,
+        pubmed_count: data.pubmed_count,
+        openalex_count: data.openalex_count,
+        europepmc_count: data.europepmc_count,
+      })
+      .select("id")
+      .single();
+    result = fallbackScopus.data;
+    resultError = fallbackScopus.error;
+  }
+
   if (resultError?.code === "42703") {
     // per-source count columns don't exist yet (migration 012 not applied) — try without them
     const fallbackPerSource = await supabase
@@ -302,6 +331,10 @@ export async function saveGuestSearchResult(
     primary_study_count: number;
     clinical_trials_count: number | null;
     prospero_registrations_count: number | null;
+    /** ACC-6: OSF Registries count. Pass null when the OSF API was unavailable. */
+    osf_registrations_count: number | null;
+    /** Scopus primary study count. Pass null when the Elsevier API was unavailable. */
+    scopus_count: number | null;
     deduplication_count: number;
     recent_primary_study_count: number | null;
     /** UI-1: Per-source primary study counts. Pass null when a source API was unavailable. */
@@ -346,7 +379,7 @@ export async function saveGuestSearchResult(
     throw new Error(`Failed to save guest search: ${searchError?.message}`);
   }
 
-  // Try with all columns including per-source counts (migration 012); fall back if columns don't exist
+  // Try with all columns (migrations 012 + 015 + 016); fall back if columns don't exist
   let { data: result, error: resultError } = await supabase
     .from("search_results")
     .insert({
@@ -355,6 +388,8 @@ export async function saveGuestSearchResult(
       primary_study_count: data.primary_study_count,
       clinical_trials_count: data.clinical_trials_count,
       prospero_registrations_count: data.prospero_registrations_count,
+      osf_registrations_count: data.osf_registrations_count,
+      scopus_count: data.scopus_count,
       deduplication_count: data.deduplication_count,
       recent_primary_study_count: data.recent_primary_study_count,
       pubmed_count: data.pubmed_count,
@@ -364,6 +399,29 @@ export async function saveGuestSearchResult(
     })
     .select("id")
     .single();
+
+  if (resultError?.code === "42703") {
+    // scopus_count or osf_registrations_count not yet added — try without them
+    const fallbackScopus = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        deduplication_count: data.deduplication_count,
+        recent_primary_study_count: data.recent_primary_study_count,
+        pubmed_count: data.pubmed_count,
+        openalex_count: data.openalex_count,
+        europepmc_count: data.europepmc_count,
+        is_public: true,
+      })
+      .select("id")
+      .single();
+    result = fallbackScopus.data;
+    resultError = fallbackScopus.error;
+  }
 
   if (resultError?.code === "42703") {
     // per-source count columns don't exist yet (migration 012 not applied) — try without them

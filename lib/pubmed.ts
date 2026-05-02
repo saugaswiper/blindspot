@@ -111,6 +111,27 @@ export async function countSystematicReviews(query: string): Promise<number> {
 }
 
 /**
+ * Fetch PMIDs for a sample of primary studies from PubMed.
+ * Used for cross-source deduplication: the route collects IDs from all sources,
+ * deduplicates them by PMID/DOI, and uses the overlap fraction to estimate
+ * the true unique primary study count.
+ *
+ * @param query    Review-mode boolean query string
+ * @param minYear  Optional publication year floor (ACC-8)
+ * @param limit    Maximum PMIDs to fetch (PubMed ESearch max is 10 000)
+ */
+export async function fetchPrimaryStudyIds(
+  query: string,
+  minYear?: number,
+  limit = 200,
+): Promise<Array<{ pmid?: string; doi?: string }>> {
+  const datePart = minYear ? ` AND ${minYear}:${new Date().getFullYear()}[dp]` : "";
+  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, limit);
+  // PubMed ESearch returns bare PMIDs; no DOI available without an EFetch round-trip
+  return ids.map((pmid) => ({ pmid }));
+}
+
+/**
  * Counts primary studies published within the last `years` years.
  * Uses PubMed's `datetype=pdat` filter with `mindate` set to (currentYear - years).
  * Excludes systematic reviews for the same reason as `countPrimaryStudies`.

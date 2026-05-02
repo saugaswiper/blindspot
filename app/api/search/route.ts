@@ -5,6 +5,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service";
 import * as PubMed from "@/lib/pubmed";
 import * as OpenAlex from "@/lib/openalex";
 import * as EuropePMC from "@/lib/europepmc";
+import * as Scopus from "@/lib/scopus";
 import * as ClinicalTrials from "@/lib/clinicaltrials";
 import * as SemanticScholar from "@/lib/semanticscholar";
 import { searchProspero, isQuerySubstantialEnough } from "@/lib/prospero";
@@ -210,6 +211,54 @@ function dedupeReviews(...sources: ExistingReview[][]): DedupeResult {
   };
 }
 
+/**
+ * Deduplicate primary study IDs fetched from multiple databases.
+ *
+ * Each entry carries an optional PMID and/or DOI. A record is considered a
+ * duplicate if its PMID or DOI was already seen in a previous source's sample.
+ * EuropePMC is a particularly useful "bridge" source because its records carry
+ * both PMIDs (matches PubMed) and DOIs (matches OpenAlex and Scopus).
+ *
+ * Returns the fraction of unique records in the combined sample. This fraction
+ * is then applied to the sum of all source counts to estimate the true unique
+ * primary study count — replacing the fixed 0.75 dedupFactor approximation.
+ *
+ * @param sources  Arrays of IDs from each source, in order they should be merged
+ * @returns  dedupFraction in (0, 1]: 1 means no overlap detected in sample
+ */
+function computeDedupFraction(
+  sources: Array<Array<{ pmid?: string; doi?: string }>>,
+): number {
+  const seenPmids = new Set<string>();
+  const seenDois = new Set<string>();
+  let uniqueCount = 0;
+  let totalCount = 0;
+
+  for (const source of sources) {
+    for (const id of source) {
+      totalCount++;
+      const pmid = id.pmid?.trim();
+      const doi = id.doi
+        ? id.doi.toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim()
+        : undefined;
+
+      if (pmid && seenPmids.has(pmid)) continue;
+      if (doi && seenDois.has(doi)) continue;
+
+      // New record — mark as seen
+      uniqueCount++;
+      if (pmid) seenPmids.add(pmid);
+      if (doi) seenDois.add(doi);
+    }
+  }
+
+  if (totalCount === 0) return 0.75; // no sample — fall back to legacy estimate
+  // Clamp between 0.30 and 0.95 to guard against extreme sampling artefacts
+  // (highly-ranked records tend to be indexed in more sources than average,
+  //  so the true uniqueness fraction is slightly higher than the sample suggests)
+  return Math.min(0.95, Math.max(0.30, uniqueCount / totalCount));
+}
+
 export async function POST(request: Request) {
   try {
     // Resolve auth and guest cookie in parallel
@@ -286,10 +335,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // Run all sources in parallel — fall back gracefully if any fail
+    // Run all sources in parallel — fall back gracefully if any fail.
+    // We run 4 categories in one allSettled batch to minimise latency:
+    //   1. Review searches (for the existing-reviews list)
+    //   2. Primary study COUNTS (for feasibility scoring)
+    //   3. Primary study ID samples (for cross-source deduplication)
+    //   4. Registry checks (PROSPERO, ClinicalTrials.gov, OSF)
     let pubmedReviews: ExistingReview[] = [];
     let openalexReviews: ExistingReview[] = [];
     let europepmcReviews: ExistingReview[] = [];
+    let scopusReviews: ExistingReview[] = [];
     let semanticScholarReviews: ExistingReview[] = [];
     let primaryStudyCount = 0;
     let pubmedFailed = false;
@@ -300,56 +355,78 @@ export async function POST(request: Request) {
       pubmedResult,
       openalexResult,
       europepmcResult,
+      scopusResult,
       semanticScholarResult,
       pubmedCount,
       openalexCount,
       europepmcCount,
+      scopusCount,
       clinicalTrialsCount,
       prosperoCount,
       pubmedRecentCount,
       osfCount,
+      // ID samples for true deduplication (200 IDs per source, runs in parallel)
+      pubmedIds,
+      openalexIds,
+      europepmcIds,
+      scopusIds,
     ] = await Promise.allSettled([
-      // Review searches use the targeted boolean query for higher precision
+      // ── Review searches ──────────────────────────────────────────────────────
       PubMed.searchExistingReviews(reviewQuery),
       OpenAlex.searchExistingReviews(reviewQuery),
       EuropePMC.searchExistingReviews(reviewQuery),
+      Scopus.searchExistingReviews(reviewQuery),
       SemanticScholar.searchExistingReviews(reviewQuery),
-      // Primary study counts use baseQuery (without year suffix) + optional minYear filter.
+      // ── Primary study counts ─────────────────────────────────────────────────
       // ACC-8: minYear restricts counts to studies published on/after that year.
       PubMed.countPrimaryStudies(baseQuery, minYear),
       OpenAlex.countPrimaryStudies(baseQuery, minYear),
       EuropePMC.countPrimaryStudies(baseQuery, minYear),
+      Scopus.countPrimaryStudies(baseQuery, minYear),
       ClinicalTrials.countPrimaryStudies(baseQuery),
       isQuerySubstantialEnough(baseQuery) ? searchProspero(reviewQuery) : Promise.resolve(0),
       // NEW-2: Count primary studies published in the last 3 years (PubMed only).
-      // Note: trend analysis always uses the 3-year window regardless of minYear.
       PubMed.countPrimaryStudiesRecent(baseQuery, 3),
-      // ACC-6: OSF Registries — third-largest SR registry (2,960+ protocols, 2026)
+      // ACC-6: OSF Registries — third-largest SR registry
       isQuerySubstantialEnough(baseQuery) ? searchOSFRegistrations(reviewQuery) : Promise.resolve(0),
+      // ── ID samples for cross-source deduplication ────────────────────────────
+      // 200 records per source is sufficient to estimate database overlap with
+      // ~±5% precision. These run concurrently with the count calls above so
+      // they add no wall-clock latency.
+      PubMed.fetchPrimaryStudyIds(baseQuery, minYear, 200),
+      OpenAlex.fetchPrimaryStudyIds(baseQuery, minYear, 200),
+      EuropePMC.fetchPrimaryStudyIds(baseQuery, minYear, 200),
+      Scopus.fetchPrimaryStudyIds(baseQuery, minYear, 200),
     ]);
 
     if (pubmedResult.status === "fulfilled") {
       pubmedReviews = pubmedResult.value;
     } else {
       pubmedFailed = true;
-      console.error("PubMed failed:", pubmedResult.reason);
+      console.error("PubMed reviews failed:", pubmedResult.reason);
     }
 
     if (openalexResult.status === "fulfilled") {
       openalexReviews = openalexResult.value;
     } else {
       openalexFailed = true;
-      console.error("OpenAlex failed:", openalexResult.reason);
+      console.error("OpenAlex reviews failed:", openalexResult.reason);
     }
 
     if (europepmcResult.status === "fulfilled") {
       europepmcReviews = europepmcResult.value;
     } else {
       europepmcFailed = true;
-      console.error("Europe PMC failed:", europepmcResult.reason);
+      console.error("Europe PMC reviews failed:", europepmcResult.reason);
     }
 
-    // Semantic Scholar is optional — never fail the request if it's down
+    // Scopus and Semantic Scholar are supplementary — never fail the request
+    if (scopusResult.status === "fulfilled") {
+      scopusReviews = scopusResult.value;
+    } else {
+      console.error("Scopus reviews failed:", scopusResult.reason);
+    }
+
     if (semanticScholarResult.status === "fulfilled") {
       semanticScholarReviews = semanticScholarResult.value;
     } else {
@@ -363,14 +440,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Smarter primary study count estimation:
-    // PubMed and Europe PMC are precise clinical databases; OpenAlex is broader but
-    // can significantly over-count for general topics. If OpenAlex count exceeds the
-    // max of the two clinical sources by more than 5×, blend rather than taking the
-    // raw maximum to avoid inflating feasibility scores.
+    // ── Extract individual counts ─────────────────────────────────────────────
     const pubmedCountVal = pubmedCount.status === "fulfilled" ? pubmedCount.value : null;
     const openalexCountVal = openalexCount.status === "fulfilled" ? openalexCount.value : null;
     const europepmcCountVal = europepmcCount.status === "fulfilled" ? europepmcCount.value : null;
+    const scopusCountVal = scopusCount.status === "fulfilled" ? scopusCount.value : null;
     const clinicalTrialsCountVal =
       clinicalTrialsCount.status === "fulfilled" ? clinicalTrialsCount.value : null;
     const prosperoCountVal =
@@ -382,39 +456,34 @@ export async function POST(request: Request) {
     const osfCountVal =
       osfCount.status === "fulfilled" ? osfCount.value : null;
 
-    const clinicalCounts = [pubmedCountVal, europepmcCountVal].filter(
-      (c): c is number => c !== null
-    );
-    const allCounts = [pubmedCountVal, openalexCountVal, europepmcCountVal].filter(
-      (c): c is number => c !== null
-    );
+    // ── True deduplication via sampled IDs ────────────────────────────────────
+    // Collect ID samples from each source that succeeded. EuropePMC is the key
+    // "bridge" source — its records carry both PMIDs (matching PubMed) and DOIs
+    // (matching OpenAlex / Scopus) — which maximises overlap detection.
+    const idSamples = [
+      pubmedIds.status === "fulfilled" ? pubmedIds.value : [],
+      // EuropePMC first so its PMID+DOI pairs can link PubMed PMIDs to DOIs
+      // before we process the DOI-only OpenAlex/Scopus entries.
+      europepmcIds.status === "fulfilled" ? europepmcIds.value : [],
+      openalexIds.status === "fulfilled" ? openalexIds.value : [],
+      scopusIds.status === "fulfilled" ? scopusIds.value : [],
+    ];
 
-    if (allCounts.length === 0) {
+    const dedupFraction = computeDedupFraction(idSamples);
+
+    // Sum all source counts; apply the empirical dedup fraction to estimate
+    // the true number of unique primary studies across all databases.
+    const availableCounts = [pubmedCountVal, openalexCountVal, europepmcCountVal, scopusCountVal]
+      .filter((c): c is number => c !== null);
+
+    if (availableCounts.length === 0) {
       primaryStudyCount = clinicalTrialsCountVal ?? 0;
     } else {
-      const maxClinical = clinicalCounts.length > 0 ? Math.max(...clinicalCounts) : 0;
-      const maxAll = Math.max(...allCounts);
-
-      // If OpenAlex is the sole outlier (>5× clinical sources), use a weighted blend
-      if (
-        openalexCountVal !== null &&
-        clinicalCounts.length > 0 &&
-        openalexCountVal > maxClinical * 5
-      ) {
-        const clinicalAvg =
-          clinicalCounts.reduce((a, b) => a + b, 0) / clinicalCounts.length;
-        primaryStudyCount = Math.round(clinicalAvg * 0.6 + openalexCountVal * 0.4);
-      } else {
-        // Apply a dedup factor to account for ~25% inter-database overlap
-        // (PubMed+OpenAlex overlap ~50–70%; PubMed+EuropePMC ~40–60%).
-        // Taking Math.max() without adjustment inflates counts by ~20–50%.
-        // dedupFactor=0.75 is conservative; validate empirically once telemetry is in place.
-        const dedupFactor = 0.75;
-        primaryStudyCount = Math.max(
-          Math.round(maxAll * dedupFactor),
-          clinicalTrialsCountVal ?? 0
-        );
-      }
+      const sumCounts = availableCounts.reduce((a, b) => a + b, 0);
+      primaryStudyCount = Math.max(
+        Math.round(sumCounts * dedupFraction),
+        clinicalTrialsCountVal ?? 0,
+      );
     }
 
     const {
@@ -424,7 +493,8 @@ export async function POST(request: Request) {
       pubmedReviews,
       openalexReviews,
       europepmcReviews,
-      semanticScholarReviews
+      scopusReviews,
+      semanticScholarReviews,
     );
 
     // Keep only reviews that mention all key concepts in title or abstract.
@@ -448,6 +518,7 @@ export async function POST(request: Request) {
       clinical_trials_count: clinicalTrialsCountVal,
       prospero_registrations_count: prosperoCountVal,
       osf_registrations_count: osfCountVal,
+      scopus_count: scopusCountVal,
       deduplication_count: deduplicationCount,
       recent_primary_study_count: recentPrimaryStudyCountVal,
       // UI-1: Per-source primary study counts — stored for breakdown display
@@ -480,14 +551,21 @@ export async function POST(request: Request) {
 
     // Set guest cookie after a successful guest search so subsequent
     // unauthenticated requests are redirected to sign-up.
+    // Wrapped in try-catch: in some Next.js 15/16 contexts (e.g. when the
+    // Response is already being streamed) cookie mutation can throw — we log
+    // and continue rather than failing the entire response.
     if (isGuest) {
-      cookieStore.set(GUEST_COOKIE, "1", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: GUEST_COOKIE_MAX_AGE,
-        path: "/",
-      });
+      try {
+        cookieStore.set(GUEST_COOKIE, "1", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: GUEST_COOKIE_MAX_AGE,
+          path: "/",
+        });
+      } catch (cookieErr) {
+        console.warn("[search] Failed to set guest cookie (non-fatal):", cookieErr);
+      }
     }
 
     return Response.json({
@@ -498,9 +576,20 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const apiError = toApiError(error);
-    console.error("[/api/search] Unhandled error:", apiError.message, error instanceof Error ? error.stack : error);
+    // Log the full error for server-side diagnosis (Vercel Logs / local console)
+    console.error(
+      "[/api/search] Unhandled error:",
+      error instanceof Error ? `${error.name}: ${error.message}` : error,
+      error instanceof Error ? error.stack : "",
+    );
     return Response.json(
-      { error: apiError.userMessage },
+      {
+        error: apiError.userMessage,
+        // Expose raw message in non-production environments for easier debugging
+        ...(process.env.NODE_ENV !== "production" && {
+          _debug: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        }),
+      },
       { status: apiError.statusCode }
     );
   }

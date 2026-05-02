@@ -90,3 +90,46 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
   const data = await searchOpenAlex(query, "primary", 1, minYear);
   return data.meta.count;
 }
+
+/**
+ * Fetch DOIs (and PubMed IDs when available) for a sample of primary studies
+ * from OpenAlex. Used for cross-source deduplication in the search route.
+ *
+ * OpenAlex works have a `doi` field (URL-prefixed) and an `ids.pmid` field.
+ * We normalise DOIs to bare identifiers and include both where present so the
+ * route can match them against PubMed PMIDs and EuropePMC records.
+ *
+ * @param query    Review-mode boolean query string
+ * @param minYear  Optional publication year floor (ACC-8)
+ * @param limit    Maximum records to fetch (OpenAlex max per-page is 200)
+ */
+export async function fetchPrimaryStudyIds(
+  query: string,
+  minYear?: number,
+  limit = 200,
+): Promise<Array<{ pmid?: string; doi?: string }>> {
+  const url = new URL(`${BASE}/works`);
+  url.searchParams.set("search", query);
+
+  const filters: string[] = ["type:article"];
+  if (minYear) filters.push(`from_publication_date:${minYear}-01-01`);
+  url.searchParams.set("filter", filters.join(","));
+  url.searchParams.set("per-page", String(Math.min(limit, 200)));
+  // Request doi and ids (which includes pmid for indexed works)
+  url.searchParams.set("select", "doi,ids");
+  if (EMAIL) url.searchParams.set("mailto", EMAIL);
+
+  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+  if (!res.ok) throw new ApiError(`OpenAlex ID fetch failed: ${res.status}`, 502);
+
+  const data = (await res.json()) as {
+    results: Array<{ doi?: string | null; ids?: { pmid?: string | null } }>;
+  };
+
+  return (data.results ?? []).map((w) => ({
+    doi: w.doi
+      ? w.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").toLowerCase()
+      : undefined,
+    pmid: w.ids?.pmid?.replace(/^https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\//i, "") || undefined,
+  }));
+}

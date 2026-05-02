@@ -75,3 +75,40 @@ export async function countSystematicReviews(query: string): Promise<number> {
   const data = await search(query, true, 1);
   return data.hitCount ?? 0;
 }
+
+/**
+ * Fetch PMIDs and DOIs for a sample of primary studies from Europe PMC.
+ * Europe PMC is a superset of PubMed (all PubMed records + European literature),
+ * so its records bridge PubMed PMIDs and OpenAlex/Scopus DOIs — making it the
+ * ideal "linker" source for cross-database deduplication.
+ *
+ * @param query    Review-mode boolean query string
+ * @param minYear  Optional publication year floor (ACC-8)
+ * @param limit    Maximum records to fetch (Europe PMC supports up to 1 000 per page)
+ */
+export async function fetchPrimaryStudyIds(
+  query: string,
+  minYear?: number,
+  limit = 200,
+): Promise<Array<{ pmid?: string; doi?: string }>> {
+  const datePart = minYear
+    ? ` AND FIRST_PDATE:[${minYear}-01-01 TO 3000-01-01]`
+    : "";
+  const primaryQuery = `(${query}) NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
+
+  const url = new URL(`${BASE}/search`);
+  url.searchParams.set("query", primaryQuery);
+  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
+  url.searchParams.set("resultType", "lite");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+
+  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
+  return (data.resultList?.result ?? []).map((r) => ({
+    pmid: r.pmid || undefined,
+    doi: r.doi?.toLowerCase() || undefined,
+  }));
+}
