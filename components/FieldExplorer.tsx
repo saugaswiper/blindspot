@@ -150,7 +150,7 @@ export function FieldExplorer() {
   }
 
   function handleSearch(query: string) {
-    router.push(`/?q=${encodeURIComponent(query)}`);
+    router.push(`/?q=${encodeURIComponent(query)}&autosubmit=1`);
   }
 
   return (

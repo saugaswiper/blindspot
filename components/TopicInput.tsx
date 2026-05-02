@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PICOForm } from "@/components/PICOForm";
 import { validateSearchInput } from "@/lib/validators";
@@ -39,18 +39,25 @@ export function TopicInput() {
   /** ACC-8: Selected minimum publication year (undefined = all time) */
   const [minYear, setMinYear] = useState<number | undefined>(undefined);
 
+  // Ref to track whether an autosubmit has already fired (prevents double-fire in strict mode)
+  const autosubmitFired = useRef(false);
+
   function handleModeToggle(next: SearchMode) {
     setMode(next);
     setErrors({});
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  /**
+   * Core search logic — callable from form submit or programmatically (e.g. autosubmit).
+   * `overrideQuery` is used when the caller supplies the query directly (field explorer).
+   */
+  async function runSearch(overrideQuery?: string) {
     setErrors({});
+    const q = overrideQuery ?? queryText;
 
     const input =
       mode === "simple"
-        ? { mode: "simple" as const, queryText }
+        ? { mode: "simple" as const, queryText: q }
         : { mode: "pico" as const, pico };
 
     const validation = validateSearchInput(input);
@@ -62,7 +69,7 @@ export function TopicInput() {
     setLoading(true);
 
     const body = mode === "simple"
-      ? { mode: "simple", queryText, ...(minYear !== undefined && { minYear }) }
+      ? { mode: "simple", queryText: q, ...(minYear !== undefined && { minYear }) }
       : { mode: "pico", pico, ...(minYear !== undefined && { minYear }) };
 
     const res = await fetch("/api/search", {
@@ -85,6 +92,23 @@ export function TopicInput() {
 
     router.push(`/results/${data.resultId}`);
   }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await runSearch();
+  }
+
+  // Auto-submit when navigated here with ?autosubmit=1 (e.g. from Field Explorer)
+  useEffect(() => {
+    if (autosubmitFired.current) return;
+    const q = searchParams.get("q");
+    const auto = searchParams.get("autosubmit");
+    if (q && auto === "1") {
+      autosubmitFired.current = true;
+      runSearch(q);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
