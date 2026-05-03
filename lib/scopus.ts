@@ -56,6 +56,9 @@ async function scopusSearch(
   const url = new URL(BASE);
   url.searchParams.set("query", query);
   url.searchParams.set("count", String(Math.min(count, 200)));
+  // Pass the API key as a URL parameter in addition to the header — some
+  // reverse-proxy setups strip custom headers, and Elsevier accepts both.
+  url.searchParams.set("apiKey", API_KEY);
   if (fields) url.searchParams.set("field", fields);
 
   const res = await fetch(url.toString(), {
@@ -63,11 +66,13 @@ async function scopusSearch(
       "X-ELS-APIKey": API_KEY,
       Accept: "application/json",
     },
-    next: { revalidate: 0 },
+    // cache: "no-store" is the standard fetch equivalent of Next.js revalidate:0
+    cache: "no-store",
   });
 
   if (!res.ok) {
-    throw new ApiError(`Scopus API returned ${res.status}`, 502);
+    const body = await res.text().catch(() => "");
+    throw new ApiError(`Scopus API returned ${res.status}: ${body.slice(0, 200)}`, 502);
   }
 
   const data = (await res.json()) as ScopusResponse;

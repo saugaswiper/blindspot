@@ -445,11 +445,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // ── Extract individual counts ─────────────────────────────────────────────
+    // ── Extract individual counts — log failures so Vercel logs show the cause ──
     const pubmedCountVal = pubmedCount.status === "fulfilled" ? pubmedCount.value : null;
     const openalexCountVal = openalexCount.status === "fulfilled" ? openalexCount.value : null;
     const europepmcCountVal = europepmcCount.status === "fulfilled" ? europepmcCount.value : null;
     const scopusCountVal = scopusCount.status === "fulfilled" ? scopusCount.value : null;
+    if (scopusCount.status === "rejected") {
+      console.error("[search] Scopus count failed:", scopusCount.reason);
+    }
+    if (scopusIds.status === "rejected") {
+      console.error("[search] Scopus ID fetch failed:", scopusIds.reason);
+    }
     const clinicalTrialsCountVal =
       clinicalTrialsCount.status === "fulfilled" ? clinicalTrialsCount.value : null;
     const prosperoCountVal =
