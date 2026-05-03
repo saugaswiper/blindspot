@@ -1961,26 +1961,67 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
 
   const topTopic = gapAnalysis.suggested_topics[0] ?? null;
 
+  // Derive feasibility specific to the recommended sub-topic.
+  // Priority: verified PubMed data → rule-based threshold on AI estimate.
+  // This replaces the overall feasibilityScore in the recommendation card so
+  // that "High feasibility" is never shown when the sub-topic only has 1 study.
+  const topicFeasibility: FeasibilityScore | null = topTopic
+    ? (topTopic.verified_feasibility ??
+        (topTopic.estimated_studies >= 11 ? "High" :
+         topTopic.estimated_studies >= 6  ? "Moderate" :
+         topTopic.estimated_studies >= 3  ? "Low" :
+         "Insufficient"))
+    : null;
+
+  const isTopicInsufficient = topicFeasibility === "Insufficient";
+  const isTopicLow = topicFeasibility === "Low";
+
   return (
     <div className="space-y-6">
       {/* Recommended review idea */}
-      {topTopic && (
-        <div className="border border-[#1e3a5f] rounded-lg overflow-hidden">
-          <div className="bg-[#1e3a5f] text-white px-4 sm:px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-xs uppercase tracking-wide opacity-70">Recommended review</p>
+      {topTopic && topicFeasibility && (
+        <div
+          className="rounded-lg overflow-hidden"
+          style={{ border: `1px solid ${isTopicInsufficient ? "#fca5a5" : "#1e3a5f"}` }}
+        >
+          <div
+            className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3 flex-wrap"
+            style={{ background: isTopicInsufficient ? "#7f1d1d" : "#1e3a5f" }}
+          >
+            <p className="text-xs uppercase tracking-wide text-white opacity-70">
+              {isTopicInsufficient ? "Evidence gap identified" : "Recommended review"}
+            </p>
             <div className="flex items-center gap-2 flex-wrap">
-              {feasibilityScore && (
-                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${FEASIBILITY_STYLES[feasibilityScore]}`}>
-                  {feasibilityScore} feasibility
-                </span>
-              )}
-              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${FEASIBILITY_BADGE[topTopic.feasibility]}`}>
-                ~{topTopic.estimated_studies.toLocaleString("en-US")} primary studies
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full border font-medium ${FEASIBILITY_STYLES[topicFeasibility]}`}
+                title={topTopic.verified_feasibility ? "Feasibility verified against real PubMed data" : "Derived from AI-estimated study count for this specific sub-topic"}
+              >
+                {topicFeasibility} feasibility
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${FEASIBILITY_STYLES[topicFeasibility]}`}>
+                ~{topTopic.estimated_studies.toLocaleString("en-US")} primary {topTopic.estimated_studies === 1 ? "study" : "studies"}
               </span>
             </div>
           </div>
           <div className="p-4 sm:p-5 space-y-4 bg-white dark:bg-gray-900">
             <p className="text-base font-semibold text-[#1e3a5f] dark:text-blue-300 leading-snug break-words">{topTopic.title}</p>
+
+            {/* Warning banner when evidence is insufficient for a review */}
+            {isTopicInsufficient && (
+              <div className="rounded-md px-3 py-2.5 text-xs leading-relaxed border bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300">
+                <strong>Not yet review-ready:</strong> Only ~{topTopic.estimated_studies.toLocaleString("en-US")} primary{" "}
+                {topTopic.estimated_studies === 1 ? "study was" : "studies were"} estimated for this specific sub-topic.
+                A systematic review requires a minimum of 3 primary studies (Cochrane Handbook).
+                This gap is highlighted as an open research opportunity — consider broadening the scope
+                or conducting primary research on this topic first.
+              </div>
+            )}
+            {isTopicLow && !isTopicInsufficient && (
+              <div className="rounded-md px-3 py-2.5 text-xs leading-relaxed border bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
+                <strong>Limited evidence:</strong> Only ~{topTopic.estimated_studies.toLocaleString("en-US")} primary studies estimated.
+                A scoping review is more appropriate than a meta-analysis at this stage.
+              </div>
+            )}
 
             <div>
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Expected outcomes</p>
@@ -1997,11 +2038,24 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
 
       {/* Study design method */}
       <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-5 space-y-4">
+        {/* If the recommended topic has insufficient evidence, clarify that the
+            study design below applies to the BROADER evidence base, not the
+            specific sub-topic which needs primary research first. */}
+        {(isTopicInsufficient || isTopicLow) && (
+          <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 pb-3">
+            <span className="font-semibold">Note:</span> The design below is for the broader topic based on overall evidence found.
+            The specific recommended sub-topic above has insufficient evidence for this design —
+            see the warning in the recommendation card.
+          </p>
+        )}
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">Recommended study design</p>
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-lg font-bold text-gray-800 dark:text-gray-100">{studyDesign.primary}</p>
-            {studyDesign.confidence && (
+            {/* Only show confidence badge when topic evidence is sufficient —
+                "high confidence" on a meta-analysis is misleading if the
+                topic-specific sub-topic only has 1 eligible study. */}
+            {studyDesign.confidence && !isTopicInsufficient && (
               <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full border ${
                 studyDesign.confidence === "high"
                   ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700"
