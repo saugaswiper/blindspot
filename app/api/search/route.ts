@@ -378,25 +378,30 @@ export async function POST(request: Request) {
       Scopus.searchExistingReviews(reviewQuery),
       SemanticScholar.searchExistingReviews(reviewQuery),
       // ── Primary study counts ─────────────────────────────────────────────────
+      // We use reviewQuery (concept-AND boolean) rather than raw baseQuery so
+      // that counts reflect the strict multi-concept intersection. This prevents
+      // individual concept keywords inflating the count on narrow clinical topics
+      // (e.g. "psilocybin AND adolescents AND MDD" vs "psilocybin in adolescents
+      // with MDD" which databases may interpret as a loose OR-style text match).
       // ACC-8: minYear restricts counts to studies published on/after that year.
-      PubMed.countPrimaryStudies(baseQuery, minYear),
-      OpenAlex.countPrimaryStudies(baseQuery, minYear),
-      EuropePMC.countPrimaryStudies(baseQuery, minYear),
-      Scopus.countPrimaryStudies(baseQuery, minYear),
+      PubMed.countPrimaryStudies(reviewQuery, minYear),
+      OpenAlex.countPrimaryStudies(reviewQuery, minYear),
+      EuropePMC.countPrimaryStudies(reviewQuery, minYear),
+      Scopus.countPrimaryStudies(reviewQuery, minYear),
       ClinicalTrials.countPrimaryStudies(baseQuery),
       isQuerySubstantialEnough(baseQuery) ? searchProspero(reviewQuery) : Promise.resolve(0),
       // NEW-2: Count primary studies published in the last 3 years (PubMed only).
-      PubMed.countPrimaryStudiesRecent(baseQuery, 3),
+      PubMed.countPrimaryStudiesRecent(reviewQuery, 3),
       // ACC-6: OSF Registries — third-largest SR registry
       isQuerySubstantialEnough(baseQuery) ? searchOSFRegistrations(reviewQuery) : Promise.resolve(0),
       // ── ID samples for cross-source deduplication ────────────────────────────
       // 200 records per source is sufficient to estimate database overlap with
       // ~±5% precision. These run concurrently with the count calls above so
       // they add no wall-clock latency.
-      PubMed.fetchPrimaryStudyIds(baseQuery, minYear, 200),
-      OpenAlex.fetchPrimaryStudyIds(baseQuery, minYear, 200),
-      EuropePMC.fetchPrimaryStudyIds(baseQuery, minYear, 200),
-      Scopus.fetchPrimaryStudyIds(baseQuery, minYear, 200),
+      PubMed.fetchPrimaryStudyIds(reviewQuery, minYear, 200),
+      OpenAlex.fetchPrimaryStudyIds(reviewQuery, minYear, 200),
+      EuropePMC.fetchPrimaryStudyIds(reviewQuery, minYear, 200),
+      Scopus.fetchPrimaryStudyIds(reviewQuery, minYear, 200),
     ]);
 
     if (pubmedResult.status === "fulfilled") {

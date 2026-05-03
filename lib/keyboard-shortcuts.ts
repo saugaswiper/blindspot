@@ -37,11 +37,6 @@ export const RESULT_SHORTCUTS: KeyboardShortcut[] = [
     description: "Switch to Study Design tab",
     category: "navigation",
   },
-  {
-    key: "4",
-    description: "Switch to PRISMA Flow tab",
-    category: "navigation",
-  },
   // Actions
   {
     key: "r",
