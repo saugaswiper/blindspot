@@ -139,7 +139,7 @@ export function AlternativesSection({ query, primaryStudyCount, headingText, sub
             <AlternativeTopicCard key={alt.displayName} topic={alt} />
           ))}
           <p className="text-[10px] leading-relaxed pt-1" style={{ color: "var(--muted)" }}>
-            Study counts are verified from PubMed in real time. Topics are drawn from the
+            Study counts are verified from PubMed and Scopus in real time. Topics are drawn from the
             OpenAlex research taxonomy and, for interdisciplinary or emerging topics,
             from semantic similarity across 250M+ indexed works.
           </p>

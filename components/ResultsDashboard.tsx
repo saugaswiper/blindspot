@@ -112,7 +112,8 @@ const SOURCE_STYLES: Record<string, string> = {
   PubMed: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
   OpenAlex: "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
   "Europe PMC": "bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800",
-  "Semantic Scholar": "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+  Scopus: "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+  "Semantic Scholar": "bg-stone-50 dark:bg-stone-800/60 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700",
 };
 
 /**
@@ -159,10 +160,12 @@ function SourceBreakdown({
   pubmedCount,
   openalexCount,
   europepmcCount,
+  scopusCount,
 }: {
   pubmedCount: number | null | undefined;
   openalexCount: number | null | undefined;
   europepmcCount: number | null | undefined;
+  scopusCount: number | null | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -170,7 +173,8 @@ function SourceBreakdown({
   const hasAny =
     pubmedCount !== null && pubmedCount !== undefined ||
     openalexCount !== null && openalexCount !== undefined ||
-    europepmcCount !== null && europepmcCount !== undefined;
+    europepmcCount !== null && europepmcCount !== undefined ||
+    scopusCount !== null && scopusCount !== undefined;
 
   if (!hasAny) return null;
 
@@ -178,6 +182,7 @@ function SourceBreakdown({
   if (pubmedCount !== null && pubmedCount !== undefined) entries.push({ label: "PubMed", count: pubmedCount });
   if (openalexCount !== null && openalexCount !== undefined) entries.push({ label: "OpenAlex", count: openalexCount });
   if (europepmcCount !== null && europepmcCount !== undefined) entries.push({ label: "Europe PMC", count: europepmcCount });
+  if (scopusCount !== null && scopusCount !== undefined) entries.push({ label: "Scopus", count: scopusCount });
 
   if (!expanded) {
     return (
@@ -208,7 +213,7 @@ function SourceBreakdown({
         ))}
       </div>
       <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: "var(--muted)" }}>
-        Primary studies only (systematic reviews excluded). Counts may overlap across sources before deduplication.
+        Primary studies only (systematic reviews excluded). Overlap across sources is removed via ID-based deduplication before the total is calculated.
       </p>
       <button
         type="button"
@@ -385,6 +390,8 @@ interface Props {
   pubmedCount?: number | null;
   openalexCount?: number | null;
   europepmcCount?: number | null;
+  /** Scopus primary study count (migration 016). Null when API was unavailable. */
+  scopusCount?: number | null;
   /**
    * Previously-generated protocol draft text (from `search_results.protocol_draft`).
    * When non-null, ProtocolBlock skips the generate-prompt CTA and shows the
@@ -464,6 +471,7 @@ export function ResultsDashboard({
   pubmedCount = null,
   openalexCount = null,
   europepmcCount = null,
+  scopusCount = null,
   feasibilityScore,
   feasibilityExplanation,
   gapAnalysis,
@@ -740,7 +748,7 @@ export function ResultsDashboard({
             </div>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>primary studies</p>
             {/* UI-1: Per-source breakdown — only shown when at least one source count is available */}
-            <SourceBreakdown pubmedCount={pubmedCount} openalexCount={openalexCount} europepmcCount={europepmcCount} />
+            <SourceBreakdown pubmedCount={pubmedCount} openalexCount={openalexCount} europepmcCount={europepmcCount} scopusCount={scopusCount} />
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Existing reviews</p>
@@ -1089,6 +1097,7 @@ export function ResultsDashboard({
               pubmedCount={pubmedCount}
               openalexCount={openalexCount}
               europepmcCount={europepmcCount}
+              scopusCount={scopusCount}
               studyDesign={localStudyDesign}
               gapAnalysis={localGapAnalysis}
               query={query}
@@ -1112,7 +1121,7 @@ export function ResultsDashboard({
       )}
 
       <p className="text-xs text-center mt-6 leading-relaxed" style={{ color: "var(--muted)" }}>
-        Results sourced from PubMed, OpenAlex, Europe PMC (includes Cochrane abstracts), and Semantic Scholar. Trial counts via ClinicalTrials.gov. AI-generated analysis may contain errors — verify all findings with domain expertise.
+        Results sourced from PubMed, OpenAlex, Europe PMC (includes Cochrane abstracts), Scopus, and Semantic Scholar. Trial counts via ClinicalTrials.gov. AI-generated analysis may contain errors — verify all findings with domain expertise.
       </p>
     </div>
 
@@ -2161,6 +2170,7 @@ function PrismaFlowTab({
   pubmedCount = null,
   openalexCount = null,
   europepmcCount = null,
+  scopusCount = null,
   studyDesign = null,
   gapAnalysis = null,
   query,
@@ -2174,6 +2184,7 @@ function PrismaFlowTab({
   pubmedCount?: number | null;
   openalexCount?: number | null;
   europepmcCount?: number | null;
+  scopusCount?: number | null;
   studyDesign?: StudyDesignRecommendation | null;
   gapAnalysis?: GapAnalysis | null;
   query: string;
@@ -2186,6 +2197,7 @@ function PrismaFlowTab({
     pubmedCount,
     openalexCount,
     europepmcCount,
+    scopusCount,
     clinicalTrialsCount,
     prosperoCount: prosperoRegistrationsCount,
     studyDesign,

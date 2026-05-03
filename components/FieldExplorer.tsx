@@ -278,7 +278,7 @@ export function FieldExplorer() {
           )}
 
           <p className="text-[10px] mt-4 text-center" style={{ color: "var(--muted)" }}>
-            Study counts from PubMed · Sorted by evidence volume · Click any topic to run a full feasibility analysis
+            Study counts from PubMed · Sorted by evidence volume · Click any topic to run a full feasibility analysis across PubMed, OpenAlex, Europe PMC &amp; Scopus
           </p>
         </div>
       )}

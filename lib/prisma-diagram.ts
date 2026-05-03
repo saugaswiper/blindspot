@@ -441,6 +441,7 @@ export function computePrimaryStudyPrismaData({
   pubmedCount,
   openalexCount,
   europepmcCount,
+  scopusCount = null,
   clinicalTrialsCount,
   prosperoCount,
   studyDesign,
@@ -451,6 +452,8 @@ export function computePrimaryStudyPrismaData({
   pubmedCount: number | null;
   openalexCount: number | null;
   europepmcCount: number | null;
+  /** Scopus primary study count (migration 016). Null for pre-016 results. */
+  scopusCount?: number | null;
   clinicalTrialsCount: number | null;
   prosperoCount: number | null;
   studyDesign: StudyDesignRecommendation | null;
@@ -462,6 +465,7 @@ export function computePrimaryStudyPrismaData({
   if (pubmedCount !== null) perSourceCounts.push({ name: "PubMed", count: pubmedCount });
   if (openalexCount !== null) perSourceCounts.push({ name: "OpenAlex", count: openalexCount });
   if (europepmcCount !== null) perSourceCounts.push({ name: "Europe PMC", count: europepmcCount });
+  if (scopusCount !== null) perSourceCounts.push({ name: "Scopus", count: scopusCount });
 
   const hasPerSourceData = perSourceCounts.length > 0;
   const totalFromDatabases = perSourceCounts.reduce((sum, s) => sum + s.count, 0);

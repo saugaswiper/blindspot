@@ -32,6 +32,12 @@ const SOURCES: Source[] = [
   },
   {
     kind: "favicon",
+    name: "Scopus",
+    domain: "scopus.com",
+    href: "https://www.scopus.com/",
+  },
+  {
+    kind: "favicon",
     name: "Semantic Scholar",
     domain: "semanticscholar.org",
     href: "https://www.semanticscholar.org/",
