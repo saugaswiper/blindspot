@@ -1542,16 +1542,17 @@ function utf8ToBase64(str: string): string {
 }
 
 function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
+  const sorted = [...reviews].sort((a, b) => (b.year || 0) - (a.year || 0));
   const [exportOpen, setExportOpen] = useState(false);
 
   function handleExportRis() {
-    const content = toRis(reviews);
+    const content = toRis(sorted);
     downloadTextFile(content, "blindspot-reviews.ris", "application/x-research-info-systems");
     setExportOpen(false);
   }
 
   function handleExportBibtex() {
-    const content = toBibtex(reviews);
+    const content = toBibtex(sorted);
     downloadTextFile(content, "blindspot-reviews.bib", "application/x-bibtex");
     setExportOpen(false);
   }
@@ -1563,7 +1564,7 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
    * Users without Zotero installed see a "No application can open" OS dialog.
    */
   function handleZoteroExport() {
-    const content = toRis(reviews);
+    const content = toRis(sorted);
     if (!content) return;
     const encoded = utf8ToBase64(content);
     window.location.href = `zotero://import?format=ris&data=${encoded}`;
@@ -1639,7 +1640,7 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
       </div>
 
     <div className="divide-y divide-gray-100 dark:divide-gray-700">
-      {reviews.map((review, i) => (
+      {sorted.map((review, i) => (
         <div
           key={i}
           className="py-4 first:pt-0 last:pb-0 group transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 -mx-4 sm:-mx-6 px-4 sm:px-6"

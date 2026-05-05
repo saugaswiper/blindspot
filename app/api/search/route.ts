@@ -527,7 +527,9 @@ export async function POST(request: Request) {
 
     // Keep only reviews that mention all key concepts in title or abstract.
     // Applied after dedup so PRISMA duplicate counts remain accurate.
-    const existingReviews = filterByRelevance(dedupedReviews, reviewQuery).slice(0, 50);
+    const existingReviews = filterByRelevance(dedupedReviews, reviewQuery)
+      .sort((a, b) => (b.year || 0) - (a.year || 0))
+      .slice(0, 50);
 
     // Build warnings for failed sources
     const failedSources = [
