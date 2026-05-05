@@ -28,7 +28,7 @@ function StepDots({
         <span
           key={i}
           className={`block w-2 h-2 rounded-full transition-colors ${
-            i === current ? "bg-[#1e3a5f]" : "bg-gray-300"
+            i === current ? "bg-[var(--brand)]" : "bg-gray-300"
           }`}
         />
       ))}
@@ -118,23 +118,21 @@ export function OnboardingTour() {
       <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
 
         {/* Header */}
-        <div className="bg-[#1e3a5f] px-6 py-5">
+        <div className="px-6 py-5" style={{ background: "var(--brand)" }}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-blue-200 tracking-wide uppercase">
+            <span className="text-xs font-medium tracking-wide uppercase" style={{ color: "rgba(244,241,234,0.55)" }}>
               How Blindspot works
             </span>
             <button
               onClick={dismiss}
-              className="text-blue-200 hover:text-white text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded"
+              className="text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded"
+              style={{ color: "rgba(244,241,234,0.55)" }}
               aria-label="Close tour"
             >
               ×
             </button>
           </div>
-          <div className="mt-3 text-3xl" aria-hidden="true">
-            {current.icon}
-          </div>
-          <h2 className="mt-2 text-lg font-semibold text-white leading-snug">
+          <h2 className="mt-4 text-lg font-semibold leading-snug" style={{ color: "var(--background)" }}>
             {current.title}
           </h2>
         </div>
@@ -160,7 +158,7 @@ export function OnboardingTour() {
               <button
                 type="button"
                 onClick={back}
-                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
+                className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded"
               >
                 Back
               </button>
@@ -169,7 +167,7 @@ export function OnboardingTour() {
               <button
                 type="button"
                 onClick={dismiss}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded"
               >
                 Skip
               </button>
@@ -178,7 +176,7 @@ export function OnboardingTour() {
               ref={primaryButtonRef}
               type="button"
               onClick={advance}
-              className="px-4 py-2 text-sm font-medium bg-[#1e3a5f] text-white rounded-lg hover:bg-[#2d5a8e] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2"
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2" style={{ background: "var(--brand)", color: "var(--background)" }}
             >
               {isLastStep(step) ? "Get started" : "Next →"}
             </button>
@@ -280,7 +278,7 @@ export function NavHelpButton() {
       <button
         type="button"
         onClick={() => { setStep(0); setOpen(true); }}
-        className="w-6 h-6 rounded-full border border-gray-300 text-gray-600 hover:text-[#1e3a5f] hover:border-[#1e3a5f] flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
+        className="w-6 h-6 rounded-full border border-gray-300 text-gray-600 hover:text-[var(--brand)] hover:border-[var(--brand)] flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
         aria-label="Open onboarding tour"
         title="How Blindspot works"
       >
@@ -297,23 +295,21 @@ export function NavHelpButton() {
         >
           <div ref={navModalRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             {/* Header */}
-            <div className="bg-[#1e3a5f] px-6 py-5">
+            <div className="px-6 py-5" style={{ background: "var(--brand)" }}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-blue-200 tracking-wide uppercase">
+                <span className="text-xs font-medium tracking-wide uppercase" style={{ color: "rgba(244,241,234,0.55)" }}>
                   How Blindspot works
                 </span>
                 <button
                   onClick={close}
-                  className="text-blue-200 hover:text-white text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded"
+                  className="text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded"
+                  style={{ color: "rgba(244,241,234,0.55)" }}
                   aria-label="Close tour"
                 >
                   ×
                 </button>
               </div>
-              <div className="mt-3 text-3xl" aria-hidden="true">
-                {current.icon}
-              </div>
-              <h2 className="mt-2 text-lg font-semibold text-white leading-snug">
+              <h2 className="mt-4 text-lg font-semibold leading-snug" style={{ color: "var(--background)" }}>
                 {current.title}
               </h2>
             </div>
@@ -336,7 +332,7 @@ export function NavHelpButton() {
                   <button
                     type="button"
                     onClick={back}
-                    className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
+                    className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded"
                   >
                     Back
                   </button>
@@ -345,7 +341,7 @@ export function NavHelpButton() {
                   <button
                     type="button"
                     onClick={close}
-                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] rounded"
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded"
                   >
                     Close
                   </button>
@@ -354,7 +350,7 @@ export function NavHelpButton() {
                   ref={primaryButtonRef}
                   type="button"
                   onClick={advance}
-                  className="px-4 py-2 text-sm font-medium bg-[#1e3a5f] text-white rounded-lg hover:bg-[#2d5a8e] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2"
+                  className="px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2" style={{ background: "var(--brand)", color: "var(--background)" }}
                 >
                   {isLastStep(step) ? "Done" : "Next →"}
                 </button>

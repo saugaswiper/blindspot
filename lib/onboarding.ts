@@ -18,21 +18,21 @@ export const TOUR_STEPS: TourStep[] = [
     title: "Search by topic or PICO",
     description:
       "Enter any research area in the Simple search box, or switch to PICO mode to describe your Population, Intervention, Comparison, and Outcome. PICO mode produces a more structured search and is preferred for clinical or intervention topics.",
-    icon: "🔍",
+    icon: "",
     hint: 'Try: "cognitive behavioral therapy for insomnia in elderly patients"',
   },
   {
     title: "Understand the feasibility score",
     description:
       "After your search, Blindspot scores the topic High, Moderate, Low, or Insufficient based on how many existing systematic reviews and primary studies are available. A High score means there is genuine gap potential; Insufficient means the evidence base is too thin for a new review.",
-    icon: "📊",
+    icon: "",
     hint: "High = a new review is likely viable. Insufficient = primary studies needed first.",
   },
   {
     title: "Explore the Gap Analysis",
     description:
       "Click \u201cRun AI Gap Analysis\u201d on the results page to see gaps across six dimensions: population, methodology, outcome, geographic, temporal, and theoretical. The AI also suggests specific review titles, generates a PubMed Boolean search string, and can draft a full PROSPERO-ready protocol.",
-    icon: "🧠",
+    icon: "",
     hint: "Gap Analysis uses Gemini AI and takes about 15–20 seconds to generate.",
   },
 ];
