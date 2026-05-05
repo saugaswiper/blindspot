@@ -56,44 +56,52 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Search card — elevated, floating below hero */}
-      <section className="max-w-2xl mx-auto px-4 -mt-8 pb-12 relative z-10">
-        <div
-          className="rounded-xl p-6 sm:p-8"
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
-          }}
-        >
-          <Suspense fallback={<div className="h-24 rounded-lg animate-pulse" style={{ background: "var(--surface-2)" }} />}>
-            <TopicInput />
-          </Suspense>
-        </div>
-        <p className="text-center text-xs mt-3" style={{ color: "var(--muted)" }}>
-          Free to use · No credit card required
-        </p>
-      </section>
+      {/* Search + Field Explorer — side by side, floating below hero */}
+      <section className="max-w-6xl mx-auto px-4 -mt-8 pb-16 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-      {/* Field Explorer */}
-      <section style={{ borderTop: "1px solid var(--border)" }}>
-        <div className="max-w-4xl mx-auto px-6 py-16 sm:py-20">
-          <div className="flex items-center gap-4 mb-8">
-            <div>
-              <span className="text-xs font-medium tracking-[0.18em] uppercase" style={{ color: "var(--muted)" }}>
-                Explore a research field
-              </span>
-              <h2 className="font-serif text-2xl sm:text-3xl mt-1 leading-snug" style={{ color: "var(--foreground)" }}>
-                Not sure where to start?
-              </h2>
-              <p className="text-sm mt-2 leading-relaxed max-w-lg" style={{ color: "var(--muted)" }}>
-                Enter a broad topic and Blindspot will surface specific review opportunities within it — each verified against real study counts.
-              </p>
+          {/* Left: search */}
+          <div>
+            <div
+              className="rounded-xl p-6 sm:p-8"
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+              }}
+            >
+              <Suspense fallback={<div className="h-24 rounded-lg animate-pulse" style={{ background: "var(--surface-2)" }} />}>
+                <TopicInput />
+              </Suspense>
             </div>
+            <p className="text-center text-xs mt-3" style={{ color: "var(--muted)" }}>
+              Free to use · No credit card required
+            </p>
           </div>
-          <Suspense fallback={<div className="h-12 rounded-lg animate-pulse" style={{ background: "var(--surface-2)" }} />}>
-            <FieldExplorer />
-          </Suspense>
+
+          {/* Right: field explorer */}
+          <div
+            className="rounded-xl p-6 sm:p-8"
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+            }}
+          >
+            <span className="text-xs font-medium tracking-[0.18em] uppercase" style={{ color: "var(--muted)" }}>
+              Explore a research field
+            </span>
+            <h2 className="font-serif text-xl sm:text-2xl mt-1 mb-1 leading-snug" style={{ color: "var(--foreground)" }}>
+              Not sure where to start?
+            </h2>
+            <p className="text-sm mb-5 leading-relaxed" style={{ color: "var(--muted)" }}>
+              Enter a broad topic to surface specific review opportunities — each verified against real study counts.
+            </p>
+            <Suspense fallback={<div className="h-12 rounded-lg animate-pulse" style={{ background: "var(--surface-2)" }} />}>
+              <FieldExplorer />
+            </Suspense>
+          </div>
+
         </div>
       </section>
 
