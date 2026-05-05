@@ -74,9 +74,6 @@ export default function HomePage() {
                 <TopicInput />
               </Suspense>
             </div>
-            <p className="text-center text-xs mt-3" style={{ color: "var(--muted)" }}>
-              Free to use · No credit card required
-            </p>
           </div>
 
           {/* Right: field explorer */}
