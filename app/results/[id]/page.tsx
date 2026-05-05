@@ -32,6 +32,7 @@ async function getResult(id: string) {
       feasibility_score,
       feasibility_explanation,
       gap_analysis,
+      gap_analysis_generated_at,
       study_design_recommendation,
       protocol_draft,
       is_public,
@@ -146,6 +147,9 @@ export default async function ResultsPage({
           result.feasibility_explanation as string | null
         }
         gapAnalysis={result.gap_analysis as GapAnalysis | null}
+        gapAnalysisGeneratedAt={
+          (result.gap_analysis_generated_at as string | null | undefined) ?? null
+        }
         studyDesign={
           result.study_design_recommendation as StudyDesignRecommendation | null
         }

@@ -4,7 +4,7 @@ import { generateGapAnalysis } from "@/lib/gemini";
 import { recommendStudyDesign } from "@/lib/study-design";
 import { buildGapAnalysisPrompt } from "@/lib/prompts";
 import { toApiError } from "@/lib/errors";
-import { countPrimaryStudies, countSystematicReviews as pubmedCountSRs } from "@/lib/pubmed";
+import { countPrimaryStudies, countSystematicReviews as pubmedCountSRs, checkMeshTerms } from "@/lib/pubmed";
 import { getFeasibilityScore } from "@/lib/feasibility";
 import { countSystematicReviews as europepmcCountSRs } from "@/lib/europepmc";
 import type { ExistingReview } from "@/types";
@@ -187,7 +187,33 @@ export async function POST(request: Request) {
       fallbackCount > 0 ? `(${fallbackCount} used title fallback)` : ""
     );
 
+    // ACC-14: MeSH vocabulary check — flag suggested topics whose pubmed_query
+    // terms are not recognized in PubMed's MeSH database AND have no PubMed title/abstract hits.
+    // Run in parallel with a concurrency limit: all topics at once (typically 3-5 topics,
+    // each requiring up to 2 API calls → well within PubMed's 10 req/s limit with NCBI key).
+    // Fail open: any error sets mesh_validated = true to avoid false-positive warnings.
+    const meshResults = await Promise.allSettled(
+      gapAnalysis.suggested_topics.map((topic) =>
+        checkMeshTerms(topic.pubmed_query ?? topic.title)
+      )
+    );
+
+    gapAnalysis.suggested_topics = gapAnalysis.suggested_topics.map((topic, i) => {
+      const meshResult = meshResults[i];
+      return {
+        ...topic,
+        mesh_validated: meshResult.status === "fulfilled" ? meshResult.value : true,
+      };
+    });
+
+    const nonStandardCount = gapAnalysis.suggested_topics.filter((t) => t.mesh_validated === false).length;
+    if (nonStandardCount > 0) {
+      console.log(`[analyze] ACC-14: ${nonStandardCount} topic(s) flagged with non-standard MeSH terms`);
+    }
+
     // Save all three back to the result row
+    // ACC-12: Store the timestamp when analysis is generated so the UI can display
+    // "Analysis generated on [date]" and offer to refresh analyses older than 6 months
     const { error: updateError } = await supabase
       .from("search_results")
       .update({
@@ -195,6 +221,7 @@ export async function POST(request: Request) {
         feasibility_explanation: feasibility.explanation,
         gap_analysis: gapAnalysis,
         study_design_recommendation: studyDesign,
+        gap_analysis_generated_at: new Date().toISOString(),
       })
       .eq("id", resultId);
 

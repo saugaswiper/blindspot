@@ -373,7 +373,7 @@ function FeasibilityExplainer() {
   );
 }
 
-type Tab = "reviews" | "gaps" | "design";
+type Tab = "reviews" | "gaps" | "design" | "map";
 
 interface Props {
   resultId: string;
@@ -409,6 +409,13 @@ interface Props {
   feasibilityScore: FeasibilityScore | null;
   feasibilityExplanation: string | null;
   gapAnalysis: GapAnalysis | null;
+  /**
+   * ACC-12: Timestamp when the gap analysis was generated.
+   * Used to display "Analysis generated on [date]" and offer to refresh
+   * analyses older than 6 months. Null when analysis doesn't exist or
+   * the result predates migration 019.
+   */
+  gapAnalysisGeneratedAt?: string | null;
   studyDesign: StudyDesignRecommendation | null;
   /** True when the logged-in user is the owner of this result. */
   isOwner?: boolean;
@@ -540,6 +547,7 @@ export function ResultsDashboard({
   feasibilityScore,
   feasibilityExplanation,
   gapAnalysis,
+  gapAnalysisGeneratedAt = null,
   studyDesign,
   isOwner = false,
   isPublic = false,
@@ -646,6 +654,12 @@ export function ResultsDashboard({
           e.preventDefault();
           setActiveTab("design");
           break;
+        case "4":
+          if (localGapAnalysis) {
+            e.preventDefault();
+            setActiveTab("map");
+          }
+          break;
         case "r":
         case "R":
           if (isOwner && !hasAnalysis && !isPending) {
@@ -719,6 +733,8 @@ export function ResultsDashboard({
     { key: "reviews", label: `Existing Reviews (${existingReviews.length})` },
     { key: "gaps", label: "Gap Analysis" },
     { key: "design", label: "Study Design" },
+    // NEW-9: Evidence Gap Map tab — only visible when gap analysis has been run
+    ...(localGapAnalysis ? [{ key: "map" as const, label: "Gap Map" }] : []),
   ];
 
   return (
@@ -1309,10 +1325,13 @@ export function ResultsDashboard({
             <ReviewsTab reviews={existingReviews} />
           )}
           {activeTab === "gaps" && (
-            <GapsTab gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} />
+            <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} />
           )}
           {activeTab === "design" && (
             <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} />
+          )}
+          {activeTab === "map" && localGapAnalysis && (
+            <EvidenceGapMapTab gapAnalysis={localGapAnalysis} onNavigateToGaps={() => setActiveTab("gaps")} />
           )}
         </div>
       </div>
@@ -1816,11 +1835,180 @@ function GapDimensionFilter({
 }
 
 /* -------------------------------------------------------------------------- */
+/* NEW-9: Evidence Gap Map tab                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Evidence Gap Map (EGM) — an intervention×outcome matrix well-established in
+ * evidence synthesis (Cochrane 2024 methodology review: matrix/bubble format is
+ * now the dominant EGM design). Rows = gap dimensions, columns = feasibility
+ * tiers. Each cell shows the count of suggested topics at that intersection.
+ *
+ * Data source: already-loaded gapAnalysis.suggested_topics — pure client-side
+ * render, no extra API calls.
+ *
+ * Clicking a non-empty cell navigates to the Gaps tab. Cells are coloured by
+ * feasibility tier so the matrix reads top-left (High evidence) → bottom-right
+ * (no evidence).
+ */
+const EGM_DIMENSIONS: GapDimension[] = [
+  "population", "methodology", "outcome", "geographic", "temporal", "theoretical",
+];
+const EGM_TIERS: Array<{ key: "high" | "moderate" | "low" | "none"; label: string }> = [
+  { key: "high",     label: "High" },
+  { key: "moderate", label: "Moderate" },
+  { key: "low",      label: "Low" },
+  { key: "none",     label: "None" },
+];
+
+const EGM_CELL_STYLES: Record<"high" | "moderate" | "low" | "none", { filled: string; empty: string }> = {
+  high:     { filled: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer",     empty: "bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-300 dark:text-emerald-800 border-emerald-100 dark:border-emerald-900" },
+  moderate: { filled: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900/60 cursor-pointer",                    empty: "bg-amber-50/50 dark:bg-amber-950/20 text-amber-300 dark:text-amber-800 border-amber-100 dark:border-amber-900" },
+  low:      { filled: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700 hover:bg-orange-200 dark:hover:bg-orange-900/60 cursor-pointer",              empty: "bg-orange-50/50 dark:bg-orange-950/20 text-orange-300 dark:text-orange-800 border-orange-100 dark:border-orange-900" },
+  none:     { filled: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-900/60 cursor-pointer",                                      empty: "bg-slate-50 dark:bg-slate-900/20 text-slate-300 dark:text-slate-700 border-slate-100 dark:border-slate-800" },
+};
+
+function EvidenceGapMapTab({
+  gapAnalysis,
+  onNavigateToGaps,
+}: {
+  gapAnalysis: GapAnalysis;
+  onNavigateToGaps: () => void;
+}) {
+  // Build the dimension × tier count matrix from suggested_topics.
+  // A topic's tier is derived from verified_feasibility (if present) or the AI estimate.
+  // Topics with estimated_studies === 0 or verified_feasibility === "Insufficient" → "none".
+  function getTopicTier(topic: import("@/types").SuggestedTopic): "high" | "moderate" | "low" | "none" {
+    const verified = topic.verified_feasibility;
+    if (verified === "High") return "high";
+    if (verified === "Moderate") return "moderate";
+    if (verified === "Low") return "low";
+    if (verified === "Insufficient") return "none";
+    if (topic.estimated_studies === 0) return "none";
+    // Fall back to AI estimate
+    if (topic.feasibility === "high") return "high";
+    if (topic.feasibility === "moderate") return "moderate";
+    return "low";
+  }
+
+  // Build matrix: matrix[dimension][tier] = array of topic titles
+  const matrix: Record<GapDimension, Record<"high" | "moderate" | "low" | "none", string[]>> = {} as never;
+  for (const dim of EGM_DIMENSIONS) {
+    matrix[dim] = { high: [], moderate: [], low: [], none: [] };
+  }
+  for (const topic of gapAnalysis.suggested_topics) {
+    const tier = getTopicTier(topic);
+    if (matrix[topic.gap_type]) {
+      matrix[topic.gap_type][tier].push(topic.title);
+    }
+  }
+
+  const totalTopics = gapAnalysis.suggested_topics.length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+            Evidence Gap Map
+          </h3>
+          <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+            {totalTopics} suggested topic{totalTopics !== 1 ? "s" : ""} mapped across gap dimensions and feasibility tiers.
+            Click a cell to view those topics in the Gap Analysis tab.
+          </p>
+        </div>
+        <button
+          onClick={onNavigateToGaps}
+          className="shrink-0 text-xs transition-opacity hover:opacity-70"
+          style={{ color: "var(--accent)" }}
+        >
+          View all gaps →
+        </button>
+      </div>
+
+      {/* Scrollable wrapper for mobile */}
+      <div className="overflow-x-auto -mx-2 px-2">
+        <table className="w-full text-xs border-collapse min-w-[480px]">
+          <thead>
+            <tr>
+              <th className="pb-2 pr-3 text-left font-medium w-32" style={{ color: "var(--muted)" }}>
+                Gap dimension
+              </th>
+              {EGM_TIERS.map((tier) => (
+                <th key={tier.key} className="pb-2 px-1 text-center font-medium w-20" style={{ color: "var(--muted)" }}>
+                  {tier.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+            {EGM_DIMENSIONS.map((dim) => {
+              const rowHasAny = EGM_TIERS.some((t) => matrix[dim][t.key].length > 0);
+              return (
+                <tr key={dim} className={rowHasAny ? "" : "opacity-40"}>
+                  <td className="py-2 pr-3 font-medium" style={{ color: "var(--foreground)" }}>
+                    {GAP_LABELS[dim]}
+                  </td>
+                  {EGM_TIERS.map((tier) => {
+                    const topics = matrix[dim][tier.key];
+                    const count = topics.length;
+                    const styles = EGM_CELL_STYLES[tier.key];
+                    const cellClass = count > 0 ? styles.filled : styles.empty;
+                    return (
+                      <td key={tier.key} className="py-1.5 px-1 text-center">
+                        <button
+                          type="button"
+                          disabled={count === 0}
+                          onClick={count > 0 ? onNavigateToGaps : undefined}
+                          className={`inline-flex items-center justify-center w-12 h-9 rounded border font-semibold text-sm transition-colors ${cellClass} disabled:cursor-default`}
+                          title={count > 0 ? topics.join("\n") : `No ${tier.label} feasibility topics in ${GAP_LABELS[dim]} dimension`}
+                          aria-label={
+                            count > 0
+                              ? `${count} ${tier.label} feasibility topic${count !== 1 ? "s" : ""} in ${GAP_LABELS[dim]} — click to view`
+                              : `No topics in ${GAP_LABELS[dim]} at ${tier.label} feasibility`
+                          }
+                        >
+                          {count > 0 ? count : "—"}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
+        <p className="text-[10px] mr-1 self-center font-medium" style={{ color: "var(--muted)" }}>Feasibility:</p>
+        {EGM_TIERS.map((tier) => (
+          <span key={tier.key} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border ${EGM_CELL_STYLES[tier.key].filled.split(" hover:")[0]}`}>
+            {tier.label}
+          </span>
+        ))}
+        <p className="text-[10px] self-center ml-1" style={{ color: "var(--muted)" }}>
+          · Numbers = count of suggested topics. Hover cells for topic titles.
+        </p>
+      </div>
+
+      {gapAnalysis.suggested_topics.length === 0 && (
+        <p className="text-sm text-center py-8" style={{ color: "var(--muted)" }}>
+          No suggested topics yet — run the Gap Analysis to populate this map.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Gaps tab                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query }: {
+function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query }: {
   gapAnalysis: GapAnalysis | null;
+  gapAnalysisGeneratedAt?: string | null;
   isPending: boolean;
   onAnalyze: () => void;
   error: string | null;
@@ -1934,6 +2122,35 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
           </div>
         </div>
       )}
+
+      {/* ACC-12: Gap Analysis Freshness Indicator
+          Shows when the AI analysis was generated and offers to refresh old analyses */}
+      {gapAnalysisGeneratedAt && (() => {
+        const generatedDate = new Date(gapAnalysisGeneratedAt);
+        const now = new Date();
+        const ageMs = now.getTime() - generatedDate.getTime();
+        const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30);
+        const isStale = ageMonths > 6;
+        
+        return (
+          <div className="flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-md px-3 py-2 mb-4">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Analysis generated on {generatedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+              {isStale && ' · outdated'}
+            </p>
+            {isStale && isOwner && (
+              <button
+                onClick={onAnalyze}
+                disabled={isPending}
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                title="Clear and re-run the gap analysis with current data"
+              >
+                {isPending ? "Refreshing..." : "Refresh analysis"}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -2115,6 +2332,19 @@ function GapsTab({ gapAnalysis, isPending, onAnalyze, error, resultId, isOwner, 
                       {isDataBacked && (
                         <span className="text-[10px]" style={{ color: "var(--muted)" }}>
                           {topic.verified_feasibility ? "✓ PubMed-verified" : "✓ 0 studies found"}
+                        </span>
+                      )}
+                      {/* ACC-14: Non-standard MeSH term badge — shown when the topic's
+                          pubmed_query terms are not found in PubMed's MeSH vocabulary AND
+                          have no PubMed title/abstract hits. Warns researchers that the AI
+                          may have invented terminology that won't translate well to a search. */}
+                      {topic.mesh_validated === false && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full border font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+                          title="The search terms for this topic were not found in PubMed's MeSH vocabulary. Verify the terminology before building your search strategy."
+                          aria-label="Non-standard MeSH terminology detected"
+                        >
+                          ⚠ Non-standard term
                         </span>
                       )}
                     </div>

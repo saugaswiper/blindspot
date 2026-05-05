@@ -99,6 +99,13 @@ export interface SuggestedTopic {
    * secondary context only.
    */
   verified_feasibility?: FeasibilityScore;
+  /**
+   * ACC-14: Whether the topic's pubmed_query terms were found in PubMed's MeSH vocabulary.
+   * false = none of the key terms are recognized MeSH concepts → ⚠ Non-standard term badge.
+   * undefined = check not yet run (pre-feature results).
+   * true = at least one term matched MeSH → standard vocabulary.
+   */
+  mesh_validated?: boolean;
 }
 
 export interface GapAnalysis {

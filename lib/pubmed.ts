@@ -139,6 +139,56 @@ export async function countLivingReviews(query: string): Promise<number> {
 }
 
 /**
+ * ACC-14: Check whether a pubmed_query string's key terms are recognized MeSH vocabulary.
+ *
+ * Strategy: query PubMed's MeSH database (`db=mesh`) with the full pubmed_query string.
+ * If at least one MeSH term matches, the query uses standard vocabulary → returns true.
+ * If zero MeSH matches AND the term also returns 0 PubMed title/abstract hits, the
+ * terminology is likely non-standard → returns false.
+ *
+ * This catches cases where Gemini invents composite terms (e.g. "neuro-psychological
+ * intervention") that aren't established MeSH headings, which could mislead researchers
+ * when they build their own searches.
+ *
+ * Graceful degradation: returns true (no badge) on any API failure to avoid false positives.
+ */
+export async function checkMeshTerms(pubmedQuery: string): Promise<boolean> {
+  try {
+    const meshUrl = new URL(`${BASE}/esearch.fcgi`);
+    meshUrl.searchParams.set("db", "mesh");
+    meshUrl.searchParams.set("term", pubmedQuery);
+    meshUrl.searchParams.set("retmax", "1");
+    meshUrl.searchParams.set("retmode", "json");
+    if (API_KEY) meshUrl.searchParams.set("api_key", API_KEY);
+
+    const res = await fetch(meshUrl.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) return true; // degrade gracefully
+    const data = (await res.json()) as ESearchResult;
+    const meshCount = parseInt(data.esearchresult.count) || 0;
+
+    if (meshCount > 0) return true; // recognized MeSH vocabulary
+
+    // Zero MeSH results — also check if the terms appear in PubMed at all ([tiab] search)
+    const tiabUrl = new URL(`${BASE}/esearch.fcgi`);
+    tiabUrl.searchParams.set("db", "pubmed");
+    tiabUrl.searchParams.set("term", `${pubmedQuery}[tiab]`);
+    tiabUrl.searchParams.set("retmax", "1");
+    tiabUrl.searchParams.set("retmode", "json");
+    if (API_KEY) tiabUrl.searchParams.set("api_key", API_KEY);
+
+    const tiabRes = await fetch(tiabUrl.toString(), { next: { revalidate: 0 } });
+    if (!tiabRes.ok) return true;
+    const tiabData = (await tiabRes.json()) as ESearchResult;
+    const tiabCount = parseInt(tiabData.esearchresult.count) || 0;
+
+    // If neither MeSH nor PubMed title/abstract found the term, flag as non-standard
+    return tiabCount > 0;
+  } catch {
+    return true; // fail open — don't flag as non-standard on errors
+  }
+}
+
+/**
  * Fetch PMIDs for a sample of primary studies from PubMed.
  * Used for cross-source deduplication: the route collects IDs from all sources,
  * deduplicates them by PMID/DOI, and uses the overlap fraction to estimate

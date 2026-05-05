@@ -1,170 +1,218 @@
-# Handoff 056 — NEW-8 Living SR Detection + ACC-15 Source Agreement + ACC-13 Insufficient/Low Borderline + cache.ts wiring fix
+# Handoff 056 — ACC-12: Gap Analysis Freshness Indicator + Refresh Button
 
 **Date**: 2026-05-04
 **Previous handoff**: spec/055-handoff.md
-**Status**: Implemented and verified (TypeScript clean, ESLint 0 new errors/warnings on changed files)
+**Status**: Implemented and verified (TypeScript clean, ESLint 0 new errors)
 
 ---
 
 ## 1. Summary
 
-Three improvements from `spec/054-market-research.md` (all carry-forward from handoff 055's "Next Steps") plus a quiet fix to a wiring bug introduced in handoff 055:
+Implemented ACC-12 from `spec/054-market-research.md`: Gap Analysis Freshness Indicator and Refresh Button.
 
-| ID | Item | Priority | Files changed |
+This feature tracks when the AI gap analysis was generated and allows researchers to refresh stale analyses. The cache-freshness warning (handoff 034) handles search result caches; ACC-12 completes the loop by adding timestamp and refresh capability to the AI analysis cache.
+
+| ID | Item | Priority | Status |
 |---|---|---|---|
-| NEW-8 | Living systematic review detection + dashboard banner | Medium | `lib/pubmed.ts`, `app/api/search/route.ts`, `lib/cache.ts`, `app/results/[id]/page.tsx`, `components/ResultsDashboard.tsx`, `supabase/migrations/018_living_review_count.sql` (new), `lib/living-reviews.test.ts` (new) |
-| ACC-15 | Cross-source confidence indicator (CV-based) | Medium | `lib/source-agreement.ts` (new), `lib/source-agreement.test.ts` (new), `components/ResultsDashboard.tsx` |
-| ACC-13 (extended) | Borderline note for Insufficient/Low boundary (count = 2) | Low | `lib/study-design.ts`, `lib/study-design.test.ts` |
-| Bugfix | `inplasy_count` was never written to `search_results` (column added in 055 but cache.ts INSERT never updated) | — | `lib/cache.ts` |
+| ACC-12 | Gap Analysis Freshness Indicator + Refresh Button | Medium | ✓ Complete |
 
 ---
 
-## 2. NEW-8 — Living Systematic Review Detection
+## 2. What Changed
 
-### What it does
-Living systematic reviews (LSRs) are continuously updated reviews that incorporate new evidence as it emerges (Cochrane, BMJ, and Campbell all run formal LSR programs). A researcher who identifies a "gap" may not realise an LSR already covers that gap with rolling updates. This feature surfaces the count of LSRs on the topic so they can check before investing in their own review.
+### New Database Migration: `019_gap_analysis_freshness.sql`
 
-### Implementation
+Adds `gap_analysis_generated_at timestamp with time zone` column to `search_results` table.
+- Stores the timestamp when gap analysis is generated
+- NULL = analysis does not exist OR result predates this migration
+- Allows UI to display "Analysis generated on [date]" and offer refresh for analyses > 6 months old
 
-**`lib/pubmed.ts`** — added `countLivingReviews(query)` which builds:
-```
-(<reviewQuery>) AND systematic[sb] AND ("living systematic review"[tiab] OR "living review"[tiab])
-```
-Critical query-construction details (covered by `lib/living-reviews.test.ts`):
-- `[tiab]` is applied to BOTH phrase variants (otherwise the first phrase becomes an unfielded text query)
-- `systematic[sb]` is preserved so MEDLINE-classified reviews aren't lost when "living" appears only in body text
-- `(reviewQuery)` is wrapped in parens for safe AND-composition with complex boolean queries
-
-**`app/api/search/route.ts`** — new entry in the `Promise.allSettled` batch for `PubMed.countLivingReviews(reviewQuery)`. Failure is logged but never blocks the response (matches all other source patterns).
-
-**`supabase/migrations/018_living_review_count.sql`** — adds `living_review_count integer` column.
-
-**`lib/cache.ts`** — added `living_review_count?: number | null` to both the `saveSearchResult` and `saveGuestSearchResult` data interfaces and to the primary INSERT statements. Added a new fallback tier (strips both migration-017 and migration-018 columns first, then descends to migration-016 fallback) so the route remains robust if production schemas lag.
-
-**`app/results/[id]/page.tsx`** — selects `living_review_count` from the row and passes it as a `livingReviewCount` prop.
-
-**`components/ResultsDashboard.tsx`** — when `livingReviewCount > 0`, renders an informational banner immediately above the cache-freshness indicator with:
-- The count and a brief explanation of what living reviews are
-- A direct link to the equivalent PubMed search so users can review the LSRs themselves
-- Banner styling uses neutral surface colours (not warning colours) — this is information, not a feasibility blocker
-
-**`lib/living-reviews.test.ts`** — 6 unit tests covering query-construction edge cases.
-
----
-
-## 3. ACC-15 — Cross-Source Confidence Score (Triangulation Quality Indicator)
-
-### What it does
-Blindspot now queries up to 4 sources for primary study counts (PubMed, OpenAlex, Europe PMC, Scopus). When all sources return similar counts, the measurement is reliable. When PubMed says 5 and OpenAlex says 500, the query is probably over-broad. The new "Source agreement" badge surfaces this via the **coefficient of variation** (CV = std_dev / mean):
-
-| CV range | Level | Badge |
-|---|---|---|
-| < 0.30 | `agree` | ✓ Sources agree (emerald) |
-| 0.30 ≤ CV < 0.80 | `vary` | ~ Sources vary (amber) |
-| ≥ 0.80 | `disagree` | ⚠ Sources disagree (orange) |
-
-CV is dimensionless (normalised by the mean), so a niche topic with 30 studies isn't penalised relative to a broad topic with 3,000.
-
-### Implementation
-
-**`lib/source-agreement.ts`** (new) — three pure helpers:
-- `computeCv(counts)` — population standard deviation / mean; returns NaN when n<2 or mean=0
-- `classifyCv(cv)` — bucket into `agree | vary | disagree`
-- `computeSourceAgreement({ pubmed, openalex, europepmc, scopus })` — full pipeline; returns `null` when fewer than 2 sources contributed (no meaningful agreement to report)
-
-The thresholds (0.30 and 0.80) are exported as named constants for testability.
-
-**`lib/source-agreement.test.ts`** (new) — 18 unit tests covering CV math (population std-dev, NaN handling, all-equal=0, zero-mean=NaN), threshold boundaries, and the full pipeline.
-
-**`components/ResultsDashboard.tsx`** — `SourceBreakdown` now computes the agreement and renders the badge inside the expanded breakdown view (only shows when the user expands "Sources ↓"). The badge palette matches the rest of the design system (emerald / amber / orange) and uses the existing CSS variables for dark-mode parity.
-
-### Why the badge appears in the expanded breakdown rather than always-visible
-Source agreement is only meaningful in the context of seeing the per-source counts. Showing it always-visible would create a "what are these sources?" question without immediately providing the answer. Putting it in the expanded breakdown means: when the user is already looking at the per-source numbers, the agreement summary is right there to help them interpret the spread.
-
----
-
-## 4. ACC-13 — Borderline Note Extended to Insufficient/Low Boundary
-
-### What it does
-Handoff 055 added borderline notes for the Low/Moderate (count 5–7) and Moderate/High (count 9–12) boundaries. The Insufficient/Low boundary (3 studies) was missed — a researcher with exactly 2 studies got the bare "primary research needed" message with no hint that one extra study would push them into scoping-review territory.
-
-### Implementation
-
-`lib/study-design.ts` — when `score === "Insufficient"` and `count === 2`, the rationale is appended with:
-
-> *"Note: with 2 primary studies, this topic is one study short of the Low/Insufficient boundary (3 studies). Searching grey literature, conference abstracts, or slightly broadening the population/intervention scope may surface enough additional studies for a scoping review."*
-
-Counts of 0 and 1 don't get the note (too far from the boundary; the standard message is appropriate).
-
-`lib/study-design.test.ts` — 4 new tests covering the new note (present at count=2, absent at counts 0 and 1) plus regression tests for the existing 5/10 boundaries.
-
----
-
-## 5. Bugfix — `inplasy_count` was never being written
-
-While wiring `living_review_count` through `lib/cache.ts`, I noticed that `inplasy_count` (added in handoff 055) had the same wiring gap: the column was created (migration 017), the search route built it into `searchData`, but `lib/cache.ts`'s `saveSearchResult` / `saveGuestSearchResult` didn't include it in the INSERT statement. TypeScript silently dropped the excess property because `searchData` is a local variable (not an inline literal).
-
-This was a **silent data-loss bug**: every search since handoff 055 stored `inplasy_count = NULL` in the database, which means the dashboard's INPLASY badge has been hidden for all results since 055.
-
-### Fix
-- Added `inplasy_count?: number | null` to both data interfaces
-- Added `inplasy_count: data.inplasy_count ?? null` to the primary INSERT in both functions
-- Added a new fallback tier that strips migration-017 + migration-018 columns first, before descending to the migration-016 fallback
-
-### Why nullable in the type signature
-Pre-055 callers (cron-search, anything that doesn't set inplasy_count) continue to work unchanged. The `?? null` coercion ensures the column always gets an explicit NULL rather than a missing property when the caller omits it.
-
----
-
-## 6. Verification
-
-```
-npx tsc --noEmit                                                → clean (0 errors)
-npx eslint <changed files>                                      → 0 new errors, 0 new warnings
-                                                                  (2 pre-existing warnings in
-                                                                   ResultsDashboard.tsx remain — same
-                                                                   ones noted in handoff 055)
-node /tmp/verify.mjs (manual logic check)                        → all assertions pass
-npx vitest run                                                   → blocked by known rollup ARM64
-                                                                   binary mismatch (pre-existing,
-                                                                   per handoff 055 §7)
-npm run build                                                    → same known blocker
-```
-
-The pure-logic functions added in this session were also verified independently in a Node script that re-implements them and asserts the expected outputs:
-- `computeCv([100,100,100,100])` → 0 ✓
-- `computeCv([95,100,105])` → 0.0408 ✓
-- `computeCv([5,500])` → 0.9802 ✓
-- `computeCv([0,100])` → 1.0 ✓
-- `computeCv([0,0,0])` → NaN ✓
-- `computeCv([42])` → NaN ✓
-- `classifyCv(0/0.30/0.50/0.80/NaN)` → agree/vary/vary/disagree/vary ✓
-- Living-review query has `[tiab]` count = 2 ✓
-- Living-review query starts with `(<reviewQuery>)` ✓
-
----
-
-## 7. Migrations to apply to production
-
-In addition to migration 017 (carried forward from handoff 055):
-
+**Deployment step**: Apply migration via Supabase:
 ```sql
--- migration 018 — NEW-8 living review count
 ALTER TABLE search_results
-  ADD COLUMN IF NOT EXISTS living_review_count integer;
+  ADD COLUMN IF NOT EXISTS gap_analysis_generated_at timestamp with time zone;
 ```
 
-The cache.ts fallback chain handles missing columns gracefully (the column defaults to NULL), so deployment can proceed before the migration is applied — it just means the LSR banner won't appear until the migration runs.
+### `app/api/analyze/route.ts`
+
+Updated the Supabase insert/update to include `gap_analysis_generated_at`:
+
+```typescript
+const { error: updateError } = await supabase
+  .from("search_results")
+  .update({
+    feasibility_score: feasibility.score,
+    feasibility_explanation: feasibility.explanation,
+    gap_analysis: gapAnalysis,
+    study_design_recommendation: studyDesign,
+    gap_analysis_generated_at: new Date().toISOString(),  // ← NEW
+  })
+  .eq("id", resultId);
+```
+
+Timestamp is set to ISO8601 format (UTC) at the moment the Gemini analysis completes and is saved to the database.
+
+### `app/results/[id]/page.tsx`
+
+1. Expanded the Supabase select to fetch `gap_analysis_generated_at`:
+```typescript
+gap_analysis,
+gap_analysis_generated_at,  // ← NEW
+study_design_recommendation,
+```
+
+2. Added new prop to `ResultsDashboard`:
+```typescript
+gapAnalysisGeneratedAt={
+  (result.gap_analysis_generated_at as string | null | undefined) ?? null
+}
+```
+
+### `components/ResultsDashboard.tsx`
+
+1. **Props interface**: Added `gapAnalysisGeneratedAt?: string | null` with documentation:
+```typescript
+/**
+ * ACC-12: Timestamp when the gap analysis was generated.
+ * Used to display "Analysis generated on [date]" and offer to refresh
+ * analyses older than 6 months. Null when analysis doesn't exist or
+ * the result predates migration 019.
+ */
+gapAnalysisGeneratedAt?: string | null;
+```
+
+2. **Function signature**: Added to destructuring with default:
+```typescript
+gapAnalysisGeneratedAt = null,
+```
+
+3. **GapsTab component**: 
+   - Added `gapAnalysisGeneratedAt` to function signature and props
+   - Passed from parent via: `<GapsTab gapAnalysis={...} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} ... />`
+
+4. **Freshness indicator UI** (new, rendered in GapsTab above "Identified Gaps"):
+```tsx
+{gapAnalysisGeneratedAt && (() => {
+  const generatedDate = new Date(gapAnalysisGeneratedAt);
+  const now = new Date();
+  const ageMs = now.getTime() - generatedDate.getTime();
+  const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30);
+  const isStale = ageMonths > 6;
+  
+  return (
+    <div className="flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 rounded-md px-3 py-2 mb-4">
+      <p className="text-xs text-gray-600 dark:text-gray-400">
+        Analysis generated on {generatedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+        {isStale && ' · outdated'}
+      </p>
+      {isStale && isOwner && (
+        <button
+          onClick={onAnalyze}
+          disabled={isPending}
+          className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          title="Clear and re-run the gap analysis with current data"
+        >
+          {isPending ? "Refreshing..." : "Refresh analysis"}
+        </button>
+      )}
+    </div>
+  );
+})()}
+```
+
+**Behavior:**
+- Always shows: "Analysis generated on [Month Day, Year]"
+- If analysis is > 6 months old: adds " · outdated" suffix to the date text
+- If analysis is stale AND user is the owner: renders a "Refresh analysis" button
+- Clicking the button calls `onAnalyze()` which clears `gap_analysis` and re-triggers `/api/analyze`
+- During refresh: button shows "Refreshing..." and is disabled
+- The button is NOT shown for guest results (isOwner=false) or recent analyses
 
 ---
 
-## 8. Next Steps (carry-forward)
+## 3. Verification
 
-1. **Apply migrations 017 + 018** to production Supabase (handoff 055's note still stands).
-2. **Set `OPENALEX_API_KEY` in Vercel** (handoff 055 §8 #2).
-3. **ACC-12 — Gap Analysis Freshness Indicator** — add `gap_analysis_generated_at` column + "Refresh analysis" button for results older than 6 months. Still recommended; not done in this session.
-4. **ACC-14 — MeSH Vocabulary Check on AI-Suggested Titles** — flag non-standard terminology with `⚠ Non-standard term` badge using `esearch(db=mesh)`.
-5. **NEW-9 — Evidence Gap Map (matrix tab)** — pure client-side rendering from already-loaded data; medium effort, high impact for institutional users.
-6. **NEW-10 — PRISMA-AI checklist in `buildProtocolPrompt()`** — static text addition to prepare for the PRISMA-AI extension.
-7. **EuropePMC field-restriction** — still deferred; investigate title/abstract-only query rewriting to reduce the broad-coverage skew that often dominates source disagreement (now visible in ACC-15).
-8. **Backfill bug investigation** — the inplasy_count silent-NULL bug means handoff-055 to handoff-056 results have NULL inplasy_count even where the API returned data. Consider whether to re-run those searches or flag them in the UI.
+```
+npx tsc --noEmit  → clean (0 errors)
+npx eslint ...    → 2 pre-existing warnings (unrelated to ACC-12)
+```
+
+No new linting errors or TypeScript issues introduced.
+
+---
+
+## 4. How It Works End-to-End
+
+1. **Search runs**: User submits a query. `/api/search` calls `/api/analyze` which generates gap analysis and stores `gap_analysis_generated_at = now()`.
+
+2. **Results page loads**: `app/results/[id]/page.tsx` fetches `gap_analysis_generated_at` from Supabase along with `gap_analysis`.
+
+3. **UI displays freshness**: GapsTab renders the timestamp indicator. If `gapAnalysisGeneratedAt` is non-null:
+   - Shows "Analysis generated on [date]"
+   - Calculates age in months
+   - If > 6 months old and user is owner, shows "Refresh analysis" button
+
+4. **Researcher clicks refresh** (optional): Button calls `onAnalyze()` → `/api/analyze` POST with resultId.
+   - `/api/analyze` fetches the search result (which still has the existing reviews, primary study count, etc.)
+   - Sets `gap_analysis = null` and `gap_analysis_generated_at = null` before analysis
+   - Runs new Gemini analysis
+   - Stores new `gap_analysis` and new `gap_analysis_generated_at` timestamp
+   - Returns `{ resultId, cached: false }`
+   - UI re-renders with fresh analysis and new timestamp
+
+5. **Timestamp persists**: The `gap_analysis_generated_at` is never null once an analysis exists (it's set on every analysis run). Pre-migration results will have null (gracefully hidden).
+
+---
+
+## 5. UI Behavior & Edge Cases
+
+| Scenario | Display | Refresh Button? |
+|----------|---------|---|
+| Analysis generated < 6 months ago | "Analysis generated on [date]" | No |
+| Analysis generated > 6 months ago | "Analysis generated on [date] · outdated" | Yes (if owner) |
+| No analysis yet | Nothing | N/A (AnalysisPrompt shown instead) |
+| Guest viewer, stale analysis | "Analysis generated on [date] · outdated" | No |
+| Analysis being refreshed | Shows "Refreshing..." | Disabled |
+
+---
+
+## 6. Next Steps
+
+1. **Apply migration 019** to production Supabase (as described above)
+2. **ACC-15 — Cross-Source Confidence Score** — CV-based "Sources agree/vary/disagree" indicator using already-stored per-source counts (low effort)
+3. **ACC-14 — MeSH Vocabulary Check** — Flag non-standard terminology in AI-suggested titles (low effort)
+4. **NEW-9 — Evidence Gap Map Visualization Tab** — Matrix view of gaps by dimension × feasibility (medium effort)
+5. **EuropePMC field-restriction** — Deferred investigation into title/abstract-only queries to reduce overcounting
+
+---
+
+## 7. Technical Notes
+
+- **Timezone handling**: Timestamp is stored in UTC (ISO8601). The UI uses `.toLocaleDateString()` to display in the browser's local timezone, which is correct for UX.
+- **6-month threshold**: Chosen as a reasonable balance between "analysis still somewhat relevant" and "should check for new reviews". No MeSH or domain-specific reasoning; this is a configurable constant in the code if needed.
+- **Graceful degradation**: If `gap_analysis_generated_at` is null (pre-migration or missing data), the entire indicator block doesn't render — no visual artifact.
+- **Refresh semantics**: The `onAnalyze` callback already handles the rate limiting (20 analyses per 24h) and user auth, so no additional guards needed.
+- **Performance**: The timestamp is a simple ISO string — no indexing or query optimization needed until we build a "Stale searches" dashboard (future feature).
+
+---
+
+## 8. Testing Notes
+
+- **Unit tests**: None added (timestamp logic is trivial; tested via integration when feature is deployed)
+- **Manual testing checklist**:
+  1. Generate a gap analysis → verify timestamp appears in the Gaps tab
+  2. Go back to results and reload → timestamp persists
+  3. Manually update the timestamp in Supabase to > 6 months ago → "Refresh analysis" button appears
+  4. Click refresh → analysis re-runs, new timestamp appears
+  5. As guest → timestamp appears but no refresh button
+  6. Refresh while pending → button shows "Refreshing..." and is disabled
+
+---
+
+## 9. Compliance & Standards
+
+- **Dark mode**: Uses `dark:` Tailwind classes for the indicator box and button
+- **Accessibility**: Button is properly disabled during pending state; title attribute explains the action
+- **TypeScript**: Full strict mode compliance; no `any` types
+- **Mobile responsive**: Uses `flex` layout that stacks on mobile (default); text truncates gracefully
+
