@@ -254,6 +254,9 @@ function SourceBreakdown({
       <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "var(--muted)" }}>
         Primary studies only (systematic reviews excluded). Overlap across sources is removed via ID-based deduplication before the total is calculated.
       </p>
+      <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: "var(--muted)" }}>
+        Not included: Cochrane CENTRAL · PsycINFO · CINAHL · Embase. For clinical trial NMAs, also search these databases.
+      </p>
       <button
         type="button"
         onClick={() => setExpanded(false)}
@@ -1328,7 +1331,7 @@ export function ResultsDashboard({
             <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} />
           )}
           {activeTab === "design" && (
-            <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} />
+            <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} primaryStudyCount={primaryStudyCount} query={query} />
           )}
           {activeTab === "map" && localGapAnalysis && (
             <EvidenceGapMapTab gapAnalysis={localGapAnalysis} onNavigateToGaps={() => setActiveTab("gaps")} />
@@ -2403,7 +2406,7 @@ const FEASIBILITY_BADGE: Record<string, string> = {
   low: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700",
 };
 
-function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAnalyze, error, isOwner }: {
+function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAnalyze, error, isOwner, primaryStudyCount, query }: {
   studyDesign: StudyDesignRecommendation | null;
   gapAnalysis: GapAnalysis | null;
   feasibilityScore: FeasibilityScore | null;
@@ -2411,6 +2414,8 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
   onAnalyze: () => void;
   error: string | null;
   isOwner: boolean;
+  primaryStudyCount: number;
+  query: string;
 }) {
   if (isPending) {
     return (
@@ -2601,6 +2606,54 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
       </div>
 
       <p className="text-xs text-gray-600 dark:text-gray-400 italic">AI-generated — verify all recommendations with domain expertise.</p>
+
+      {/* Cochrane/PsycINFO coverage note — shown when a meta-analysis is
+          recommended on an XXL corpus (≥1500 studies). Large NMAs and MAs on
+          clinical/mental-health topics frequently draw from Cochrane Central
+          and PsycINFO which Blindspot does not index, so the estimate may
+          undercount eligible trials by up to 66% (calibration run 4, 2026-05). */}
+      {primaryStudyCount >= 1500 && studyDesign.primary.toLowerCase().includes("meta-analysis") && (
+        <div className="rounded-md px-4 py-3 text-xs leading-relaxed border bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 space-y-1">
+          <p className="font-semibold">Additional databases recommended for meta-analyses</p>
+          <p>
+            For network meta-analyses and large clinical trial reviews, also search{" "}
+            <a href="https://www.cochranelibrary.com/central/about-central" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">Cochrane Central Register of Controlled Trials (CENTRAL)</a>{" "}
+            and{" "}
+            <a href="https://www.apa.org/pubs/databases/psycinfo" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">PsycINFO</a>
+            {" "}— these are primary RCT repositories not included in Blindspot&apos;s current estimate (PubMed · OpenAlex · Europe PMC · Scopus).
+            Omitting them can undercount eligible trials by 50% or more on mental health and behavioural intervention topics.
+          </p>
+        </div>
+      )}
+
+      {/* Query-specificity note — shown for XXL corpora (≥1500 studies).
+          Very broad queries return many studies but most will be screened out
+          if the planned review has narrow eligibility criteria. */}
+      {primaryStudyCount >= 1500 && (
+        <div className="rounded-md px-4 py-3 text-xs leading-relaxed border bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 space-y-1">
+          <p className="font-semibold">Large evidence base — refine your eligibility criteria</p>
+          <p>
+            The included-study estimate assumes typical eligibility criteria for a broad review.
+            If your review targets a specific subpopulation, intervention type, or primary outcome,
+            the actual number of included studies may be substantially lower.
+            Consider narrowing your search query or using the year filter to scope the estimate.
+          </p>
+          {query && (() => {
+            // Show the interpreted query so users can verify what was searched
+            const terms = query
+              .replace(/\s*\(after \d{4}\)\s*$/, "")
+              .split(/\s+(?:for|in|with|and|of|on|about|among|between)\s+/i)
+              .map((s) => s.trim())
+              .filter(Boolean);
+            if (terms.length <= 1) return null;
+            return (
+              <p className="mt-1 font-mono text-[11px] bg-amber-100 dark:bg-amber-900/40 rounded px-2 py-1 break-all">
+                Searched: {terms.map((t) => `"${t}"`).join(" AND ")}
+              </p>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
