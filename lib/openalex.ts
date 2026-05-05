@@ -1,7 +1,12 @@
 import { ApiError } from "@/lib/errors";
 import type { ExistingReview } from "@/types";
 
-const EMAIL = process.env.OPENALEX_EMAIL ?? "";
+// CRIT-1: OpenAlex discontinued the `mailto=` polite pool on 2026-02-13.
+// All requests now require an API key (free at openalex.org/settings/api).
+// Fallback to legacy OPENALEX_EMAIL so pre-migration deployments degrade
+// gracefully rather than breaking immediately.
+const OPENALEX_API_KEY =
+  process.env.OPENALEX_API_KEY ?? process.env.OPENALEX_EMAIL ?? "";
 const BASE = "https://api.openalex.org";
 
 interface OpenAlexWork {
@@ -38,12 +43,25 @@ async function searchOpenAlex(
   filterType: "review" | "all" | "primary",
   perPage = 25,
   minYear?: number,
+  searchScope: "full_text" | "title_abstract" = "full_text",
 ): Promise<OpenAlexResponse> {
   const url = new URL(`${BASE}/works`);
-  url.searchParams.set("search", query);
 
   // Build filter string — multiple criteria joined with comma
   const filters: string[] = [];
+
+  if (searchScope === "title_abstract") {
+    // Use title_and_abstract.search filter to restrict to title+abstract only.
+    // This avoids the massive overcounting caused by OpenAlex's default `search`
+    // parameter, which performs full-text search across title, abstract, full
+    // text body, references, and concept descriptions (100–430× PubMed counts).
+    filters.push(`title_and_abstract.search:${query}`);
+  } else {
+    // Full-text search: used for review discovery where recall matters more
+    // than precision. NOT used for primary-study counting.
+    url.searchParams.set("search", query);
+  }
+
   if (filterType === "review") filters.push("type:review");
   // "primary" targets original research articles only — excludes OpenAlex's
   // review-type works (systematic reviews, narrative reviews) so the count
@@ -55,7 +73,7 @@ async function searchOpenAlex(
   if (filters.length > 0) url.searchParams.set("filter", filters.join(","));
   url.searchParams.set("per-page", String(perPage));
   url.searchParams.set("select", "title,publication_year,primary_location,abstract_inverted_index,doi");
-  if (EMAIL) url.searchParams.set("mailto", EMAIL);
+  if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
 
   const res = await fetch(url.toString(), { next: { revalidate: 0 } });
   if (!res.ok) throw new ApiError(`OpenAlex search failed: ${res.status}`, 502);
@@ -87,7 +105,11 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
   // letters — inflating counts for broad topics significantly.
   //
   // ACC-8: Pass minYear through so OpenAlex filters by from_publication_date.
-  const data = await searchOpenAlex(query, "primary", 1, minYear);
+  //
+  // Use title_abstract scope to avoid the 100–430× overcounting caused by
+  // OpenAlex's default full-text `search` parameter. title_and_abstract.search
+  // restricts matching to title and abstract fields, comparable to PubMed scope.
+  const data = await searchOpenAlex(query, "primary", 1, minYear, "title_abstract");
   return data.meta.count;
 }
 
@@ -109,15 +131,19 @@ export async function fetchPrimaryStudyIds(
   limit = 200,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const url = new URL(`${BASE}/works`);
-  url.searchParams.set("search", query);
 
-  const filters: string[] = ["type:article"];
+  // Use title_and_abstract.search filter (not the global `search` param) to
+  // restrict matching to title+abstract only. This keeps the ID sample
+  // representative of the same scope as countPrimaryStudies and avoids pulling
+  // in tens of thousands of tangentially-related works via full-text matching,
+  // which would skew the deduplication fraction calculation.
+  const filters: string[] = ["type:article", `title_and_abstract.search:${query}`];
   if (minYear) filters.push(`from_publication_date:${minYear}-01-01`);
   url.searchParams.set("filter", filters.join(","));
   url.searchParams.set("per-page", String(Math.min(limit, 200)));
   // Request doi and ids (which includes pmid for indexed works)
   url.searchParams.set("select", "doi,ids");
-  if (EMAIL) url.searchParams.set("mailto", EMAIL);
+  if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
 
   const res = await fetch(url.toString(), { next: { revalidate: 0 } });
   if (!res.ok) throw new ApiError(`OpenAlex ID fetch failed: ${res.status}`, 502);

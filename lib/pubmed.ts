@@ -111,6 +111,34 @@ export async function countSystematicReviews(query: string): Promise<number> {
 }
 
 /**
+ * NEW-8: Counts "living systematic reviews" (LSRs) on the topic.
+ *
+ * LSRs are continuously updated reviews that incorporate new evidence as it
+ * emerges. They are increasingly common in clinical research — Cochrane, BMJ,
+ * and Campbell all run formal LSR programs. A researcher who identifies a
+ * "gap" may not realise an LSR already covers that gap with rolling updates,
+ * so we surface the count as an informational banner in the dashboard.
+ *
+ * Uses the same `systematic[sb]` filter as `countSystematicReviews`, narrowed
+ * to records that mention "living systematic review" or "living review" in
+ * the title or abstract via PubMed's `[tiab]` field tag.
+ *
+ * @param query  Concept-AND boolean review query (matches `searchExistingReviews`).
+ * @returns      Count of matching living systematic reviews; 0 on any error.
+ */
+export async function countLivingReviews(query: string): Promise<number> {
+  // Combine the two phrase variants with OR so we catch both terminology choices.
+  // The `[tiab]` (title/abstract) tag prevents false positives from MeSH terms.
+  const livingFilter =
+    '("living systematic review"[tiab] OR "living review"[tiab])';
+  const { count } = await esearch(
+    `(${query}) AND systematic[sb] AND ${livingFilter}`,
+    1,
+  );
+  return count;
+}
+
+/**
  * Fetch PMIDs for a sample of primary studies from PubMed.
  * Used for cross-source deduplication: the route collects IDs from all sources,
  * deduplicates them by PMID/DOI, and uses the overlap fraction to estimate

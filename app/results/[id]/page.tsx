@@ -21,11 +21,13 @@ async function getResult(id: string) {
       clinical_trials_count,
       prospero_registrations_count,
       osf_registrations_count,
+      inplasy_count,
       deduplication_count,
       pubmed_count,
       openalex_count,
       europepmc_count,
       scopus_count,
+      living_review_count,
       existing_reviews,
       feasibility_score,
       feasibility_explanation,
@@ -34,7 +36,7 @@ async function getResult(id: string) {
       protocol_draft,
       is_public,
       created_at,
-      searches (id, query_text, user_id)
+      searches (id, query_text, user_id, pico_population, pico_intervention, pico_comparison, pico_outcome)
     `)
     .eq("id", id)
     .single();
@@ -70,10 +72,26 @@ export default async function ResultsPage({
   if (!result) notFound();
 
   const searchData = (
-    result.searches as unknown as { id: string; query_text: string; user_id: string } | null
+    result.searches as unknown as {
+      id: string;
+      query_text: string;
+      user_id: string;
+      pico_population: string | null;
+      pico_intervention: string | null;
+      pico_comparison: string | null;
+      pico_outcome: string | null;
+    } | null
   );
   const query = searchData?.query_text ?? "";
   const searchId = searchData?.id ?? "";
+  const picoFields = searchData
+    ? {
+        population: searchData.pico_population ?? null,
+        intervention: searchData.pico_intervention ?? null,
+        comparison: searchData.pico_comparison ?? null,
+        outcome: searchData.pico_outcome ?? null,
+      }
+    : null;
 
   // The viewer is the owner if they are logged in and the search belongs to them
   const isOwner = !!(user && searchData?.user_id === user.id);
@@ -106,6 +124,9 @@ export default async function ResultsPage({
         osfRegistrationsCount={
           (result.osf_registrations_count as number | null | undefined) ?? null
         }
+        inplasyCount={
+          (result.inplasy_count as number | null | undefined) ?? null
+        }
         deduplicationCount={
           (result.deduplication_count as number | null | undefined) ?? null
         }
@@ -117,6 +138,9 @@ export default async function ResultsPage({
         openalexCount={(result.openalex_count as number | null | undefined) ?? null}
         europepmcCount={(result.europepmc_count as number | null | undefined) ?? null}
         scopusCount={(result.scopus_count as number | null | undefined) ?? null}
+        livingReviewCount={
+          (result.living_review_count as number | null | undefined) ?? null
+        }
         feasibilityScore={result.feasibility_score as FeasibilityScore | null}
         feasibilityExplanation={
           result.feasibility_explanation as string | null
@@ -130,6 +154,7 @@ export default async function ResultsPage({
         protocolDraft={(result.protocol_draft as string | null | undefined) ?? null}
         isAlertSubscribed={isAlertSubscribed}
         createdAt={(result.created_at as string | null | undefined) ?? undefined}
+        picoFields={picoFields}
       />
     </main>
   );

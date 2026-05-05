@@ -147,6 +147,38 @@ describe("recommendStudyDesign — alignment guard 3 (scoping review upgrade not
 });
 
 // ---------------------------------------------------------------------------
+// ACC-13: Borderline rationale notes
+// ---------------------------------------------------------------------------
+
+describe("recommendStudyDesign — ACC-13 borderline notes", () => {
+  it("adds an Insufficient/Low borderline note when count is 2 (one short of Low)", () => {
+    const result = recommendStudyDesign(makeFeasibility(2, "novel"));
+    expect(result.primary).toBe("Primary Research Needed");
+    expect(result.rationale).toContain("one study short of the Low/Insufficient boundary");
+    expect(result.rationale).toContain("grey literature");
+  });
+
+  it("does NOT add the Insufficient borderline note when count is 0 or 1", () => {
+    const r0 = recommendStudyDesign(makeFeasibility(0, "novel"));
+    const r1 = recommendStudyDesign(makeFeasibility(1, "novel"));
+    expect(r0.rationale).not.toContain("Low/Insufficient boundary");
+    expect(r1.rationale).not.toContain("Low/Insufficient boundary");
+  });
+
+  it("adds a Low/Moderate borderline note when count is 5 (already covered)", () => {
+    const result = recommendStudyDesign(makeFeasibility(5, "novel"));
+    expect(result.primary).toBe("Scoping Review");
+    expect(result.rationale).toContain("Low/Moderate boundary");
+  });
+
+  it("adds a Moderate/High borderline note when count is 10 (already covered)", () => {
+    const result = recommendStudyDesign(makeFeasibility(10, "novel"));
+    expect(result.primary).toBe("Systematic Review (Narrative Synthesis)");
+    expect(result.rationale).toContain("Moderate/High boundary");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Recommendation shape integrity
 // ---------------------------------------------------------------------------
 

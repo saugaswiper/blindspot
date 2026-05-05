@@ -52,10 +52,18 @@ function _buildRecommendation(feasibility: FeasibilityResult): BaseRecommendatio
 
   // Insufficient evidence
   if (score === "Insufficient") {
+    // ACC-13 (extended): Borderline note when count is 2 — one study away from
+    // the Low feasibility threshold (3+). Grey literature, conference abstracts,
+    // or a slightly broader query may push this topic over the line.
+    const nearLowBoundary = count === 2;
+    const borderlineNote = nearLowBoundary
+      ? ` Note: with ${count} primary studies, this topic is one study short of the Low/Insufficient boundary (3 studies). Searching grey literature, conference abstracts, or slightly broadening the population/intervention scope may surface enough additional studies for a scoping review.`
+      : "";
     return {
       primary: "Primary Research Needed",
       rationale:
-        "Fewer than 3 primary studies were found on this topic. There is not enough evidence to conduct any type of systematic review. Original research studies should be conducted first.",
+        "Fewer than 3 primary studies were found on this topic. There is not enough evidence to conduct any type of systematic review. Original research studies should be conducted first." +
+        borderlineNote,
       steps: [
         "Conduct a targeted search to confirm the evidence gap is genuine and not a search artefact.",
         "Consider a scoping review to formally map and report the gap to the research community.",
@@ -79,9 +87,14 @@ function _buildRecommendation(feasibility: FeasibilityResult): BaseRecommendatio
 
   // Low evidence — scoping review
   if (score === "Low") {
+    // ACC-13: Borderline note when count is near the Low/Moderate threshold (5–7)
+    const nearModerateBoundary = count >= 5 && count <= 7;
+    const borderlineNote = nearModerateBoundary
+      ? ` Note: with ${count} primary studies, this topic is near the Low/Moderate boundary. If your database searches surface additional studies during your review, a systematic review may become feasible.`
+      : "";
     return {
       primary: "Scoping Review",
-      rationale: `Only ${count} primary studies were found. A scoping review is the most appropriate design as it maps available evidence without requiring the homogeneity needed for meta-analysis. Follow the JBI Manual for Scoping Reviews and the PRISMA-ScR reporting checklist.`,
+      rationale: `Only ${count} primary studies were found. A scoping review is the most appropriate design as it maps available evidence without requiring the homogeneity needed for meta-analysis. Follow the JBI Manual for Scoping Reviews and the PRISMA-ScR reporting checklist.${borderlineNote}`,
       steps: [
         "Define a broad research question using PCC (Population, Concept, Context) rather than PICO.",
         "Register your protocol and search at least three databases plus grey literature.",
@@ -106,9 +119,14 @@ function _buildRecommendation(feasibility: FeasibilityResult): BaseRecommendatio
 
   // Moderate evidence — systematic review with narrative synthesis
   if (score === "Moderate") {
+    // ACC-13: Borderline note when count is near the Moderate/High threshold (9–12)
+    const nearHighBoundary = count >= 9 && count <= 12;
+    const borderlineNote = nearHighBoundary
+      ? ` Note: with ${count} primary studies, this topic is near the Moderate/High boundary. If additional studies are found during your search, a full meta-analysis may be feasible.`
+      : "";
     return {
       primary: "Systematic Review (Narrative Synthesis)",
-      rationale: `${count} primary studies were found, but the evidence base may be too heterogeneous for statistical pooling. A systematic review with narrative synthesis using the SWiM reporting guideline is recommended. Follow PRISMA 2020.`,
+      rationale: `${count} primary studies were found, but the evidence base may be too heterogeneous for statistical pooling. A systematic review with narrative synthesis using the SWiM reporting guideline is recommended. Follow PRISMA 2020.${borderlineNote}`,
       steps: [
         "Register on PROSPERO and write a protocol defining your PICO question, databases, and inclusion criteria.",
         "Search at least 3 databases (PubMed, Embase, CENTRAL) plus trial registries; document searches with a PRISMA flow diagram.",

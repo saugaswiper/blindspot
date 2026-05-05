@@ -15,6 +15,8 @@ import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
 import { formatOSFWarning, formatOSFStatus } from "@/lib/osf-registry";
+import { formatINPLASYWarning, formatINPLASYStatus } from "@/lib/inplasy";
+import { computeSourceAgreement } from "@/lib/source-agreement";
 import { getPerGapBadgeConfig } from "@/lib/gap-badge";
 import { getCacheFreshnessStatus, formatResultAge } from "@/lib/cache-freshness";
 import {
@@ -197,6 +199,28 @@ function SourceBreakdown({
     );
   }
 
+  // ACC-15: Cross-source agreement indicator. Hidden when fewer than 2 sources
+  // contributed (returns null) — the badge would have nothing meaningful to show.
+  const agreement = computeSourceAgreement({
+    pubmed: pubmedCount,
+    openalex: openalexCount,
+    europepmc: europepmcCount,
+    scopus: scopusCount,
+  });
+
+  // Map agreement level → badge palette. Kept inline rather than in the
+  // pure helper so the colour logic stays tied to the design system.
+  const agreementBadgeClass: Record<"agree" | "vary" | "disagree", string> = {
+    agree: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700",
+    vary: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700",
+    disagree: "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700",
+  };
+  const agreementIcon: Record<"agree" | "vary" | "disagree", string> = {
+    agree: "✓",
+    vary: "~",
+    disagree: "⚠",
+  };
+
   return (
     <div className="mt-1.5">
       <div
@@ -211,7 +235,23 @@ function SourceBreakdown({
           </span>
         ))}
       </div>
-      <p className="text-[10px] mt-0.5 leading-relaxed" style={{ color: "var(--muted)" }}>
+      {/* ACC-15: source-agreement badge surfaces how consistent the per-database
+          counts are. Surfacing CV-derived agreement helps researchers spot
+          over-broad queries (where one database returns 1000s while others
+          return 10s — a strong signal the search needs to be tightened). */}
+      {agreement && (
+        <div className="mt-1.5">
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${agreementBadgeClass[agreement.level]}`}
+            title={agreement.tooltip}
+            aria-label={`Source agreement: ${agreement.label}`}
+          >
+            <span aria-hidden="true">{agreementIcon[agreement.level]}</span>
+            {agreement.label}
+          </span>
+        </div>
+      )}
+      <p className="text-[10px] mt-1 leading-relaxed" style={{ color: "var(--muted)" }}>
         Primary studies only (systematic reviews excluded). Overlap across sources is removed via ID-based deduplication before the total is calculated.
       </p>
       <button
@@ -360,6 +400,12 @@ interface Props {
    * migration 015. Hidden when null.
    */
   osfRegistrationsCount?: number | null;
+  /**
+   * ACC-11: Number of systematic review protocols registered on INPLASY
+   * for this query. INPLASY is the #2 registry by volume (East Asian focus).
+   * Null when the API was unavailable or the result predates migration 017. Hidden when null.
+   */
+  inplasyCount?: number | null;
   feasibilityScore: FeasibilityScore | null;
   feasibilityExplanation: string | null;
   gapAnalysis: GapAnalysis | null;
@@ -390,6 +436,13 @@ interface Props {
   /** Scopus primary study count (migration 016). Null when API was unavailable. */
   scopusCount?: number | null;
   /**
+   * NEW-8: Number of living systematic reviews (continuously updated reviews)
+   * found on this topic. When > 0, an informational banner is shown so
+   * researchers know an LSR program may already be tracking new evidence.
+   * Null when PubMed was unavailable or the result predates migration 018.
+   */
+  livingReviewCount?: number | null;
+  /**
    * Previously-generated protocol draft text (from `search_results.protocol_draft`).
    * When non-null, ProtocolBlock skips the generate-prompt CTA and shows the
    * stored draft immediately. Null means no protocol has been generated yet.
@@ -404,6 +457,19 @@ interface Props {
    * Absent for results loaded via the inline search flow (which are always fresh).
    */
   createdAt?: string;
+  /**
+   * UI-5: PICO fields stored at search time.
+   * When non-null and at least one field is populated, displayed as a collapsible
+   * "Search parameters" row in the results header.
+   * Null when the search was a simple text query (no PICO form used), or when
+   * the result predates PICO-1 storage (handoff 052).
+   */
+  picoFields?: {
+    population: string | null;
+    intervention: string | null;
+    comparison: string | null;
+    outcome: string | null;
+  } | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -463,12 +529,14 @@ export function ResultsDashboard({
   clinicalTrialsCount = null,
   prosperoRegistrationsCount = null,
   osfRegistrationsCount = null,
+  inplasyCount = null,
   deduplicationCount = null,
   studyTrend = null,
   pubmedCount = null,
   openalexCount = null,
   europepmcCount = null,
   scopusCount = null,
+  livingReviewCount = null,
   feasibilityScore,
   feasibilityExplanation,
   gapAnalysis,
@@ -478,6 +546,7 @@ export function ResultsDashboard({
   protocolDraft = null,
   isAlertSubscribed = false,
   createdAt,
+  picoFields = null,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("reviews");
   const [isPending, startTransition] = useTransition();
@@ -635,6 +704,11 @@ export function ResultsDashboard({
     osfRegistrationsCount !== null && osfRegistrationsCount !== undefined
       ? formatOSFStatus(osfRegistrationsCount)
       : null;
+  // ACC-11: Compute INPLASY registry badge status once, outside JSX
+  const inplasyStatus =
+    inplasyCount !== null && inplasyCount !== undefined
+      ? formatINPLASYStatus(inplasyCount)
+      : null;
 
   // UI-3: Compute cache freshness when a createdAt timestamp is available.
   // null means the prop was not provided (inline search flow — always fresh).
@@ -720,6 +794,58 @@ export function ResultsDashboard({
           </div>{/* end flex items-center gap-2 wrapper */}
         </div>
         <h1 className="font-serif text-lg sm:text-xl break-words" style={{ color: "var(--foreground)" }}>{query}</h1>
+
+        {/* UI-5: PICO parameters collapsible — only shown when at least one PICO field was provided */}
+        {picoFields && (picoFields.population || picoFields.intervention || picoFields.comparison || picoFields.outcome) && (
+          <details className="mt-2 group" style={{ color: "var(--muted)" }}>
+            <summary
+              className="text-xs cursor-pointer select-none list-none flex items-center gap-1 hover:opacity-80 transition-opacity"
+              style={{ color: "var(--accent)" }}
+            >
+              <span className="group-open:hidden">▶</span>
+              <span className="hidden group-open:inline">▼</span>
+              Search parameters (PICO)
+            </summary>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {picoFields.population && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border"
+                  style={{ background: "var(--surface-2)", borderColor: "var(--border)" }}
+                >
+                  <span className="font-medium" style={{ color: "var(--foreground)" }}>P:</span>
+                  <span style={{ color: "var(--muted)" }}>{picoFields.population}</span>
+                </span>
+              )}
+              {picoFields.intervention && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border"
+                  style={{ background: "var(--surface-2)", borderColor: "var(--border)" }}
+                >
+                  <span className="font-medium" style={{ color: "var(--foreground)" }}>I:</span>
+                  <span style={{ color: "var(--muted)" }}>{picoFields.intervention}</span>
+                </span>
+              )}
+              {picoFields.comparison && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border"
+                  style={{ background: "var(--surface-2)", borderColor: "var(--border)" }}
+                >
+                  <span className="font-medium" style={{ color: "var(--foreground)" }}>C:</span>
+                  <span style={{ color: "var(--muted)" }}>{picoFields.comparison}</span>
+                </span>
+              )}
+              {picoFields.outcome && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border"
+                  style={{ background: "var(--surface-2)", borderColor: "var(--border)" }}
+                >
+                  <span className="font-medium" style={{ color: "var(--foreground)" }}>O:</span>
+                  <span style={{ color: "var(--muted)" }}>{picoFields.outcome}</span>
+                </span>
+              )}
+            </div>
+          </details>
+        )}
 
         {/* Key metrics row */}
         <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap items-start gap-4 sm:gap-6">
@@ -837,6 +963,34 @@ export function ResultsDashboard({
               <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>registry check</p>
             </div>
           )}
+
+          {/* ACC-11: INPLASY indicator — #2 SR registry (East Asian clinical research focus) */}
+          {inplasyStatus !== null && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>INPLASY</p>
+              <a
+                href={`https://inplasy.com/?s=${encodeURIComponent(query)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-opacity hover:opacity-80 ${
+                  inplasyStatus.hasMatch
+                    ? "bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700"
+                    : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700"
+                }`}
+                title={
+                  inplasyStatus.hasMatch
+                    ? "Possible conflicts in INPLASY — click to check"
+                    : "No registered protocols found in INPLASY for this topic"
+                }
+                aria-label={`INPLASY registry check: ${inplasyStatus.label}`}
+              >
+                <span aria-hidden="true">{inplasyStatus.hasMatch ? "⚠" : "✓"}</span>
+                {inplasyStatus.label}
+              </a>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>registry check</p>
+            </div>
+          )}
+
           {localFeasibilityScore && (
             <div>
               {/* UI-2: Label row with "Why This Score?" explainer */}
@@ -902,6 +1056,88 @@ export function ResultsDashboard({
               className="text-xs text-yellow-700 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-200 underline mt-1.5 inline-flex items-center gap-1"
             >
               Check OSF Registries
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                />
+              </svg>
+            </a>
+          </div>
+        )}
+
+        {/* ACC-11: INPLASY detail banner — shown only when INPLASY matches > 0 */}
+        {inplasyCount !== null && inplasyCount !== undefined && inplasyCount > 0 && (
+          <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md">
+            <p className="text-sm text-yellow-800 dark:text-yellow-300 font-medium">
+              {formatINPLASYWarning(inplasyCount)}
+            </p>
+            <a
+              href={`https://inplasy.com/?s=${encodeURIComponent(query)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-yellow-700 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-200 underline mt-1.5 inline-flex items-center gap-1"
+            >
+              Check INPLASY registry
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                />
+              </svg>
+            </a>
+          </div>
+        )}
+
+        {/* NEW-8: Living systematic review banner — informational, only when count > 0.
+            LSRs are continuously-updated reviews; researchers should know one already
+            tracks new evidence on the topic before investing in a new review. */}
+        {livingReviewCount !== null && livingReviewCount !== undefined && livingReviewCount > 0 && (
+          <div
+            className="mt-3 p-3 rounded-md"
+            style={{
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+            }}
+            role="note"
+            aria-label="Living systematic review notice"
+          >
+            <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
+              ↻ {livingReviewCount === 1
+                ? "1 living systematic review"
+                : `${livingReviewCount.toLocaleString("en-US")} living systematic reviews`}
+              {" "}identified on this topic
+            </p>
+            <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--muted)" }}>
+              Living systematic reviews are continuously updated as new evidence emerges.
+              Some of the gaps Blindspot identifies may already be addressed by the rolling
+              updates of these reviews — review their published versions before committing
+              to a new systematic review on the same topic.
+            </p>
+            <a
+              href={`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`(${query}) AND systematic[sb] AND ("living systematic review"[tiab] OR "living review"[tiab])`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs mt-1.5 inline-flex items-center gap-1 underline transition-opacity hover:opacity-70"
+              style={{ color: "var(--accent)" }}
+            >
+              View living reviews on PubMed
               <svg
                 className="w-3 h-3"
                 fill="none"

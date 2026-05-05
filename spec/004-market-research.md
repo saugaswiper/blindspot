@@ -2,6 +2,15 @@
 **Date:** 2026-03-28
 **Prepared by:** Automated market research agent
 
+> ⚠️ **This file is outdated (2026-03-28).** Newer market research and a full status audit exist.
+> **Daily improver agent: stop here and read the following files in order instead:**
+>
+> 1. `spec/054-market-research.md` — latest competitive landscape + prioritized improvement list (2026-05-03)
+> 2. `spec/055-handoff.md` — what was built most recently and what's next
+>
+> Many items listed below have already been implemented. Do NOT rebuild them.
+> The improvement candidates in spec/054-market-research.md are the authoritative source.
+
 ---
 
 ## What Blindspot Is

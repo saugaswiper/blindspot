@@ -131,6 +131,8 @@ export async function saveSearchResult(
     prospero_registrations_count: number | null;
     /** ACC-6: OSF Registries count. Pass null when the OSF API was unavailable. */
     osf_registrations_count: number | null;
+    /** ACC-11: INPLASY registry count. Pass null when the INPLASY API was unavailable. */
+    inplasy_count?: number | null;
     /** Scopus primary study count. Pass null when the Elsevier API was unavailable. */
     scopus_count: number | null;
     /** Number of cross-database duplicate records removed during deduplication. */
@@ -141,6 +143,8 @@ export async function saveSearchResult(
     pubmed_count: number | null;
     openalex_count: number | null;
     europepmc_count: number | null;
+    /** NEW-8: Living systematic review count. Pass null when PubMed was unavailable. */
+    living_review_count?: number | null;
   },
   /**
    * PICO-1: Structured PICO elements from the search form.
@@ -175,7 +179,7 @@ export async function saveSearchResult(
     throw new Error(`Failed to save search: ${searchError?.message}`);
   }
 
-  // Try inserting with all columns (migrations 012 + 015 + 016).
+  // Try inserting with all columns (migrations 012 + 015 + 016 + 017 + 018).
   // Falls back progressively if a column introduced by a newer migration is missing
   // (Postgres error code 42703 = undefined_column).
   let { data: result, error: resultError } = await supabase
@@ -187,17 +191,44 @@ export async function saveSearchResult(
       clinical_trials_count: data.clinical_trials_count,
       prospero_registrations_count: data.prospero_registrations_count,
       osf_registrations_count: data.osf_registrations_count,
+      inplasy_count: data.inplasy_count ?? null,
       scopus_count: data.scopus_count,
       deduplication_count: data.deduplication_count,
       recent_primary_study_count: data.recent_primary_study_count,
       pubmed_count: data.pubmed_count,
       openalex_count: data.openalex_count,
       europepmc_count: data.europepmc_count,
+      living_review_count: data.living_review_count ?? null,
     })
     .select("id")
     .single();
 
-  // If insertion fails due to missing columns, try older schemas in order
+  // If insertion fails due to missing columns, try older schemas in order.
+  // Migrations 017 (inplasy_count) and 018 (living_review_count) are the newest;
+  // strip both first before falling back to the migration 016 schema.
+  if (resultError?.code === "42703") {
+    const fallbackNewest = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        osf_registrations_count: data.osf_registrations_count,
+        scopus_count: data.scopus_count,
+        deduplication_count: data.deduplication_count,
+        recent_primary_study_count: data.recent_primary_study_count,
+        pubmed_count: data.pubmed_count,
+        openalex_count: data.openalex_count,
+        europepmc_count: data.europepmc_count,
+      })
+      .select("id")
+      .single();
+    result = fallbackNewest.data;
+    resultError = fallbackNewest.error;
+  }
+
   if (resultError?.code === "42703") {
     // scopus_count or osf_registrations_count columns don't exist yet — try without them
     const fallbackScopus = await supabase
@@ -333,6 +364,8 @@ export async function saveGuestSearchResult(
     prospero_registrations_count: number | null;
     /** ACC-6: OSF Registries count. Pass null when the OSF API was unavailable. */
     osf_registrations_count: number | null;
+    /** ACC-11: INPLASY registry count. Pass null when the INPLASY API was unavailable. */
+    inplasy_count?: number | null;
     /** Scopus primary study count. Pass null when the Elsevier API was unavailable. */
     scopus_count: number | null;
     deduplication_count: number;
@@ -341,6 +374,8 @@ export async function saveGuestSearchResult(
     pubmed_count: number | null;
     openalex_count: number | null;
     europepmc_count: number | null;
+    /** NEW-8: Living systematic review count. Pass null when PubMed was unavailable. */
+    living_review_count?: number | null;
   },
   /**
    * SHA-256 hash of the client IP address (truncated to 32 hex chars).
@@ -379,7 +414,8 @@ export async function saveGuestSearchResult(
     throw new Error(`Failed to save guest search: ${searchError?.message}`);
   }
 
-  // Try with all columns (migrations 012 + 015 + 016); fall back if columns don't exist
+  // Try with all columns (migrations 012 + 015 + 016 + 017 + 018);
+  // fall back progressively if columns don't exist.
   let { data: result, error: resultError } = await supabase
     .from("search_results")
     .insert({
@@ -389,16 +425,43 @@ export async function saveGuestSearchResult(
       clinical_trials_count: data.clinical_trials_count,
       prospero_registrations_count: data.prospero_registrations_count,
       osf_registrations_count: data.osf_registrations_count,
+      inplasy_count: data.inplasy_count ?? null,
       scopus_count: data.scopus_count,
       deduplication_count: data.deduplication_count,
       recent_primary_study_count: data.recent_primary_study_count,
       pubmed_count: data.pubmed_count,
       openalex_count: data.openalex_count,
       europepmc_count: data.europepmc_count,
+      living_review_count: data.living_review_count ?? null,
       is_public: true,
     })
     .select("id")
     .single();
+
+  // Strip migrations 017 + 018 columns first if missing
+  if (resultError?.code === "42703") {
+    const fallbackNewest = await supabase
+      .from("search_results")
+      .insert({
+        search_id: search.id,
+        existing_reviews: data.existing_reviews,
+        primary_study_count: data.primary_study_count,
+        clinical_trials_count: data.clinical_trials_count,
+        prospero_registrations_count: data.prospero_registrations_count,
+        osf_registrations_count: data.osf_registrations_count,
+        scopus_count: data.scopus_count,
+        deduplication_count: data.deduplication_count,
+        recent_primary_study_count: data.recent_primary_study_count,
+        pubmed_count: data.pubmed_count,
+        openalex_count: data.openalex_count,
+        europepmc_count: data.europepmc_count,
+        is_public: true,
+      })
+      .select("id")
+      .single();
+    result = fallbackNewest.data;
+    resultError = fallbackNewest.error;
+  }
 
   if (resultError?.code === "42703") {
     // scopus_count or osf_registrations_count not yet added — try without them

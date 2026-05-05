@@ -10,6 +10,7 @@ import * as ClinicalTrials from "@/lib/clinicaltrials";
 import * as SemanticScholar from "@/lib/semanticscholar";
 import { searchProspero, isQuerySubstantialEnough } from "@/lib/prospero";
 import { searchOSFRegistrations } from "@/lib/osf-registry";
+import { searchINPLASY } from "@/lib/inplasy";
 import { getCachedResult, saveSearchResult, saveGuestSearchResult } from "@/lib/cache";
 import { validateSearchInput } from "@/lib/validators";
 import { insertSearchTelemetry } from "@/lib/search-telemetry";
@@ -365,6 +366,8 @@ export async function POST(request: Request) {
       prosperoCount,
       pubmedRecentCount,
       osfCount,
+      inplasyCount,
+      livingReviewCount,
       // ID samples for true deduplication (200 IDs per source, runs in parallel)
       pubmedIds,
       openalexIds,
@@ -394,6 +397,11 @@ export async function POST(request: Request) {
       PubMed.countPrimaryStudiesRecent(reviewQuery, 3),
       // ACC-6: OSF Registries — third-largest SR registry
       isQuerySubstantialEnough(baseQuery) ? searchOSFRegistrations(reviewQuery) : Promise.resolve(0),
+      // ACC-11: INPLASY — second-largest SR registry (2,370+ protocols, East Asian focus)
+      isQuerySubstantialEnough(baseQuery) ? searchINPLASY(reviewQuery) : Promise.resolve(0),
+      // NEW-8: Living systematic reviews — continuously-updated reviews. We surface a
+      // banner when count > 0 so researchers know an LSR is already tracking new evidence.
+      PubMed.countLivingReviews(reviewQuery),
       // ── ID samples for cross-source deduplication ────────────────────────────
       // 200 records per source is sufficient to estimate database overlap with
       // ~±5% precision. These run concurrently with the count calls above so
@@ -466,6 +474,15 @@ export async function POST(request: Request) {
     // ACC-6: OSF Registries count — null means API was unavailable
     const osfCountVal =
       osfCount.status === "fulfilled" ? osfCount.value : null;
+    // ACC-11: INPLASY count — null means API was unavailable
+    const inplasyCountVal =
+      inplasyCount.status === "fulfilled" ? inplasyCount.value : null;
+    // NEW-8: Living systematic review count — null when PubMed was unavailable
+    const livingReviewCountVal =
+      livingReviewCount.status === "fulfilled" ? livingReviewCount.value : null;
+    if (livingReviewCount.status === "rejected") {
+      console.error("[search] Living review count failed:", livingReviewCount.reason);
+    }
 
     // ── True deduplication via sampled IDs ────────────────────────────────────
     // Collect ID samples from each source that succeeded. EuropePMC is the key
@@ -529,6 +546,7 @@ export async function POST(request: Request) {
       clinical_trials_count: clinicalTrialsCountVal,
       prospero_registrations_count: prosperoCountVal,
       osf_registrations_count: osfCountVal,
+      inplasy_count: inplasyCountVal,
       scopus_count: scopusCountVal,
       deduplication_count: deduplicationCount,
       recent_primary_study_count: recentPrimaryStudyCountVal,
@@ -536,6 +554,8 @@ export async function POST(request: Request) {
       pubmed_count: pubmedCountVal,
       openalex_count: openalexCountVal,
       europepmc_count: europepmcCountVal,
+      // NEW-8: Living systematic review count for the banner
+      living_review_count: livingReviewCountVal,
     };
 
     // PICO-1: Pass structured PICO elements so they are stored in the searches row.

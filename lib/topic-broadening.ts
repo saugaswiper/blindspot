@@ -28,7 +28,10 @@ import { getFeasibilityScore } from "@/lib/feasibility";
 import type { FeasibilityScore } from "@/types";
 
 const OPENALEX_BASE = "https://api.openalex.org";
-const EMAIL = process.env.OPENALEX_EMAIL ?? "";
+// CRIT-1: Use api_key= instead of mailto= (OpenAlex discontinued polite pool 2026-02-13).
+// Falls back to OPENALEX_EMAIL for backward compatibility with pre-migration deployments.
+const OPENALEX_API_KEY =
+  process.env.OPENALEX_API_KEY ?? process.env.OPENALEX_EMAIL ?? "";
 
 /** Minimum PubMed count for an alternative to be worth suggesting (Moderate threshold) */
 const MIN_STUDY_COUNT = 6;
@@ -155,7 +158,8 @@ export function filterCandidates(
 // ---------------------------------------------------------------------------
 
 function openAlexHeaders(): HeadersInit {
-  return EMAIL ? { "User-Agent": `blindspot/1.0 (mailto:${EMAIL})` } : {};
+  // Keep a User-Agent for polite identification even without the mailto= pool.
+  return { "User-Agent": "blindspot/1.0 (https://blindspot-sr.dev)" };
 }
 
 /**
@@ -167,7 +171,7 @@ async function searchTopics(query: string, perPage = 3): Promise<OpenAlexTopic[]
   url.searchParams.set("search", query);
   url.searchParams.set("per-page", String(perPage));
   url.searchParams.set("select", "id,display_name,subfield,works_count");
-  if (EMAIL) url.searchParams.set("mailto", EMAIL);
+  if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
 
   const res = await fetch(url.toString(), {
     headers: openAlexHeaders(),
@@ -188,7 +192,7 @@ async function fetchSiblingTopics(subfieldId: string, perPage = 20): Promise<Ope
   url.searchParams.set("sort", "works_count:desc");
   url.searchParams.set("per-page", String(perPage));
   url.searchParams.set("select", "id,display_name,subfield,works_count");
-  if (EMAIL) url.searchParams.set("mailto", EMAIL);
+  if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
 
   const res = await fetch(url.toString(), {
     headers: openAlexHeaders(),
@@ -277,7 +281,7 @@ async function findSemanticAlternativeTopics(
   url.searchParams.set("mode", "semantic");
   url.searchParams.set("per_page", "20");
   url.searchParams.set("select", "id,primary_topic");
-  if (EMAIL) url.searchParams.set("mailto", EMAIL);
+  if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
 
   let res: Response;
   try {
