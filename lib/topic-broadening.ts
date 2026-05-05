@@ -25,6 +25,7 @@
 
 import { countPrimaryStudies } from "@/lib/pubmed";
 import { getFeasibilityScore } from "@/lib/feasibility";
+import { buildNormalizedQuery } from "@/lib/review-query";
 import type { FeasibilityScore } from "@/types";
 
 const OPENALEX_BASE = "https://api.openalex.org";
@@ -312,9 +313,10 @@ async function findSemanticAlternativeTopics(
 
   if (candidates.length === 0) return [];
 
-  // Verify each candidate with real PubMed primary-study count (parallel)
+  // Verify each candidate with real PubMed primary-study count (parallel).
+  // Use buildNormalizedQuery so the count matches what /api/search will run.
   const countResults = await Promise.allSettled(
-    candidates.map((name) => countPrimaryStudies(name))
+    candidates.map((name) => countPrimaryStudies(buildNormalizedQuery(name)))
   );
 
   const verified: AlternativeTopic[] = [];
@@ -387,9 +389,11 @@ export async function findFeasibleAlternativeTopics(
         const candidates = filterCandidates(siblings, topTopic.id, 50, MAX_CANDIDATES);
 
         if (candidates.length > 0) {
-          // Step 4: Verify each candidate with PubMed primary-study count (parallel)
+          // Step 4: Verify each candidate with PubMed primary-study count (parallel).
+          // Use buildNormalizedQuery so the count matches what /api/search will run
+          // when the user clicks the suggestion link.
           const countResults = await Promise.allSettled(
-            candidates.map((c) => countPrimaryStudies(c.display_name))
+            candidates.map((c) => countPrimaryStudies(buildNormalizedQuery(c.display_name)))
           );
 
           // Step 5: Build verified alternatives — keep only ≥ MIN_STUDY_COUNT

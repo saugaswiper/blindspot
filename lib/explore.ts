@@ -7,6 +7,7 @@
 import { ApiError } from "@/lib/errors";
 import { getFeasibilityScore } from "@/lib/feasibility";
 import { countPrimaryStudies } from "@/lib/pubmed";
+import { buildNormalizedQuery } from "@/lib/review-query";
 import type { FeasibilityScore } from "@/types";
 
 export interface ExploreSubtopic {
@@ -38,7 +39,13 @@ Each topic must be:
 - Focused on a particular population, intervention, comparator, or outcome gap
 - Likely to have at least some primary studies in PubMed
 
-For each topic, provide a short PubMed-compatible search query (3–6 terms joined with AND) that will retrieve relevant primary studies.
+For each topic, provide a short PubMed-compatible search query (3–6 content terms joined with AND) that will retrieve relevant PRIMARY studies on that topic.
+
+IMPORTANT rules for pubmed_query:
+- Include ONLY subject/content terms (population, intervention, condition, outcome)
+- Do NOT include study design terms such as "randomized controlled trial", "RCT", "systematic review", "meta-analysis", "cohort study", "clinical trial", "randomized", "placebo", "blinded"
+- Do NOT include methodology words — the search engine adds those filters automatically
+- Example: for "RCT evidence on CBT for elderly depression" → pubmed_query should be "cognitive behavioral therapy AND depression AND elderly", NOT "cognitive behavioral therapy AND elderly depression AND randomized controlled trial"
 
 Respond with this exact JSON structure (no markdown, no explanation):
 {
@@ -46,7 +53,7 @@ Respond with this exact JSON structure (no markdown, no explanation):
     {
       "title": "Specific systematic review question or topic title",
       "rationale": "One sentence: why this gap exists or why this review is needed",
-      "pubmed_query": "term1 AND term2 AND term3"
+      "pubmed_query": "content term1 AND content term2 AND content term3"
     }
   ]
 }`;
@@ -143,10 +150,17 @@ async function callGemini(prompt: string): Promise<GeminiRawSubtopic[]> {
 export async function exploreField(field: string): Promise<ExploreResult> {
   const rawSubtopics = await callGemini(buildExplorePrompt(field));
 
-  // Verify each subtopic with PubMed in parallel
+  // Verify each subtopic with PubMed in parallel.
+  //
+  // We normalise the TITLE (not Gemini's pubmed_query) so that the count
+  // displayed in FieldExplorer is based on the exact same query that the main
+  // /api/search route will run when the user clicks "Search this topic →".
+  // buildNormalizedQuery mirrors the text-splitting logic in buildReviewQuery()
+  // in app/api/search/route.ts — both split on connector words (for/in/with/…)
+  // and AND-join the resulting concept phrases.
   const verified = await Promise.all(
     rawSubtopics.map(async (sub) => {
-      const query = sub.pubmed_query?.trim() || sub.title;
+      const query = buildNormalizedQuery(sub.title);
       let studyCount = 0;
       try {
         studyCount = await countPrimaryStudies(query);
