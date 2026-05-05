@@ -7,7 +7,6 @@
 import { ApiError } from "@/lib/errors";
 import { getFeasibilityScore } from "@/lib/feasibility";
 import { countPrimaryStudies } from "@/lib/pubmed";
-import { buildNormalizedQuery } from "@/lib/review-query";
 import type { FeasibilityScore } from "@/types";
 
 export interface ExploreSubtopic {
@@ -152,15 +151,16 @@ export async function exploreField(field: string): Promise<ExploreResult> {
 
   // Verify each subtopic with PubMed in parallel.
   //
-  // We normalise the TITLE (not Gemini's pubmed_query) so that the count
-  // displayed in FieldExplorer is based on the exact same query that the main
-  // /api/search route will run when the user clicks "Search this topic →".
-  // buildNormalizedQuery mirrors the text-splitting logic in buildReviewQuery()
-  // in app/api/search/route.ts — both split on connector words (for/in/with/…)
-  // and AND-join the resulting concept phrases.
+  // Use Gemini's pubmed_query for verification — it's a curated set of
+  // content-only terms (study-design filters excluded by the prompt) that
+  // reliably returns primary studies for this subtopic.  The actual search
+  // triggered by "Search this topic →" runs buildReviewQuery(title) which
+  // may produce a different count, but the verify step's job is simply to
+  // confirm the topic has real primary evidence (studyCount > 0) before
+  // showing it in the explorer.
   const verified = await Promise.all(
     rawSubtopics.map(async (sub) => {
-      const query = buildNormalizedQuery(sub.title);
+      const query = sub.pubmed_query?.trim() || sub.title;
       let studyCount = 0;
       try {
         studyCount = await countPrimaryStudies(query);
