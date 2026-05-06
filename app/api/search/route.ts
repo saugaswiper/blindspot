@@ -505,13 +505,10 @@ export async function POST(request: Request) {
       .filter((c): c is number => c !== null);
 
     if (availableCounts.length === 0) {
-      primaryStudyCount = clinicalTrialsCountVal ?? 0;
+      primaryStudyCount = 0;
     } else {
       const sumCounts = availableCounts.reduce((a, b) => a + b, 0);
-      primaryStudyCount = Math.max(
-        Math.round(sumCounts * dedupFraction),
-        clinicalTrialsCountVal ?? 0,
-      );
+      primaryStudyCount = Math.round(sumCounts * dedupFraction);
     }
 
     const {

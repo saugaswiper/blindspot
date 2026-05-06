@@ -58,12 +58,12 @@ export default function HomePage() {
 
       {/* Search + Field Explorer — side by side, floating below hero */}
       <section className="max-w-6xl mx-auto px-4 -mt-8 pb-16 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
           {/* Left: search */}
-          <div className="flex flex-col">
+          <div>
             <div
-              className="flex-1 rounded-xl p-6 sm:p-8"
+              className="rounded-xl p-6 sm:p-8"
               style={{
                 background: "var(--surface)",
                 border: "1px solid var(--border)",
@@ -76,9 +76,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right: field explorer */}
+          {/* Right: field explorer — min-h matches the search card at rest; grows freely when results load */}
           <div
-            className="rounded-xl p-6 sm:p-8"
+            className="rounded-xl p-6 sm:p-8 min-h-[300px]"
             style={{
               background: "var(--surface)",
               border: "1px solid var(--border)",
