@@ -3,6 +3,26 @@ import type { ExistingReview } from "@/types";
 
 const BASE = "https://www.ebi.ac.uk/europepmc/webservices/rest";
 
+/**
+ * Restrict a query to EuropePMC's title + abstract fields.
+ *
+ * EuropePMC searches full text by default, which inflates primary-study counts
+ * by ~10–20% compared to PubMed's [tiab]-restricted queries (papers match when
+ * the terms appear only in body text, references, or supplementary material).
+ *
+ * Wrapping with TITLE_ABS:() narrows scope to title + abstract, matching the
+ * intent of PubMed's `[tiab]` and OpenAlex's `title_abstract` filters.
+ *
+ * Not applied when the query already contains EuropePMC field qualifiers
+ * (TITLE_ABS:, SRC:, PUB_TYPE:, FIRST_PDATE:) or PubMed field tags ([tiab],
+ * [MeSH Terms]), which indicates the caller has already crafted a field-aware query.
+ */
+function withFieldRestriction(query: string): string {
+  const hasFieldTag = /(\[[\w\s]+\]|TITLE_ABS:|TITLE:|ABSTRACT:|SRC:|PUB_TYPE:|FIRST_PDATE:)/i.test(query);
+  if (hasFieldTag) return query;
+  return `TITLE_ABS:(${query})`;
+}
+
 interface EuropePMCArticle {
   title?: string;
   pubYear?: string;
@@ -58,15 +78,17 @@ export async function searchExistingReviews(query: string): Promise<ExistingRevi
 
 export async function countPrimaryStudies(query: string, minYear?: number): Promise<number> {
   // Exclude systematic reviews and meta-analyses from the primary study count.
-  // Europe PMC's PUB_TYPE filter matches publication types from MEDLINE.
-  // We wrap the user query in parens to safely append the NOT clauses.
+  // Apply TITLE_ABS field restriction so only records where the query terms
+  // appear in the title or abstract are counted — matching PubMed's [tiab] scope
+  // and preventing inflated counts from full-text-only mentions.
   //
   // ACC-8: When minYear is provided, restrict to studies published on or after
   // that year using Europe PMC's FIRST_PDATE range syntax.
+  const restricted = withFieldRestriction(query);
   const datePart = minYear
     ? ` AND FIRST_PDATE:[${minYear}-01-01 TO 3000-01-01]`
     : "";
-  const primaryQuery = `(${query}) NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
+  const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
   const data = await search(primaryQuery, false, 1);
   return data.hitCount ?? 0;
 }
@@ -91,10 +113,11 @@ export async function fetchPrimaryStudyIds(
   minYear?: number,
   limit = 200,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
+  const restricted = withFieldRestriction(query);
   const datePart = minYear
     ? ` AND FIRST_PDATE:[${minYear}-01-01 TO 3000-01-01]`
     : "";
-  const primaryQuery = `(${query}) NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
+  const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
   const url = new URL(`${BASE}/search`);
   url.searchParams.set("query", primaryQuery);
