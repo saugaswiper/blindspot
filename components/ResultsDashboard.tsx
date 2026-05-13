@@ -13,6 +13,7 @@ import { PrintableReport } from "@/components/PrintableReport";
 import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
+import { generateBooleanSearchStrings } from "@/lib/boolean-search-builder";
 import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
 import { formatOSFWarning, formatOSFStatus } from "@/lib/osf-registry";
 import { formatINPLASYWarning, formatINPLASYStatus } from "@/lib/inplasy";
@@ -36,6 +37,8 @@ import { KeyboardShortcutsHelp, ShortcutsButton, ShortcutsDiscoveryTooltip } fro
 import { deriveProtocolFilename, hasStoredProtocol } from "@/lib/protocol-storage";
 import { downloadProsperoRegistration, type ProsperoRegistration } from "@/lib/prospero-export";
 import { InsufficientEvidencePanel, AlternativesSection } from "@/components/InsufficientEvidencePanel";
+import { PrismaFlowDiagram } from "@/components/PrismaFlowDiagram";
+import { computePrimaryStudyPrismaData } from "@/lib/prisma-diagram";
 
 const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
   High: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 font-medium",
@@ -113,7 +116,7 @@ const SOURCE_STYLES: Record<string, string> = {
   PubMed: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
   OpenAlex: "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
   "Europe PMC": "bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800",
-  Scopus: "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800",
+  Scopus: "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
   "Semantic Scholar": "bg-stone-50 dark:bg-stone-800/60 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700",
 };
 
@@ -376,7 +379,7 @@ function FeasibilityExplainer() {
   );
 }
 
-type Tab = "reviews" | "gaps" | "design" | "map";
+type Tab = "reviews" | "gaps" | "design" | "map" | "prisma";
 
 interface Props {
   resultId: string;
@@ -608,13 +611,13 @@ export function ResultsDashboard({
     }
   }
 
-  async function runAnalysis() {
+  async function runAnalysis(force = false) {
     setAnalysisError(null);
     startTransition(async () => {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resultId }),
+        body: JSON.stringify({ resultId, force }),
       });
       const data = (await res.json()) as { error?: string; message?: string };
 
@@ -738,6 +741,8 @@ export function ResultsDashboard({
     { key: "design", label: "Study Design" },
     // NEW-9: Evidence Gap Map tab — only visible when gap analysis has been run
     ...(localGapAnalysis ? [{ key: "map" as const, label: "Gap Map" }] : []),
+    // PRISMA tab — only visible when study design has been generated (provides studyDesignType for calibration)
+    ...(localStudyDesign ? [{ key: "prisma" as const, label: "PRISMA" }] : []),
   ];
 
   return (
@@ -1245,7 +1250,7 @@ export function ResultsDashboard({
           {isOwner && !hasAnalysis && !isPending && (
             <>
               <button
-                onClick={runAnalysis}
+                onClick={() => runAnalysis()}
                 disabled={localFeasibilityScore === "Insufficient"}
                 className="px-4 py-2 text-sm font-medium rounded-md transition-all"
                 style={
@@ -1331,11 +1336,26 @@ export function ResultsDashboard({
             <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} />
           )}
           {activeTab === "design" && (
-            <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} feasibilityScore={localFeasibilityScore} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} primaryStudyCount={primaryStudyCount} query={query} />
+            <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} primaryStudyCount={primaryStudyCount} query={query} />
           )}
           {activeTab === "map" && localGapAnalysis && (
             <EvidenceGapMapTab gapAnalysis={localGapAnalysis} onNavigateToGaps={() => setActiveTab("gaps")} />
           )}
+          {activeTab === "prisma" && localStudyDesign && (() => {
+            const prismaData = computePrimaryStudyPrismaData({
+              primaryStudyCount,
+              pubmedCount: pubmedCount ?? null,
+              openalexCount: openalexCount ?? null,
+              europepmcCount: europepmcCount ?? null,
+              scopusCount: scopusCount ?? null,
+              clinicalTrialsCount: clinicalTrialsCount ?? null,
+              prosperoCount: prosperoRegistrationsCount ?? null,
+              studyDesign: localStudyDesign,
+              gapAnalysis: localGapAnalysis,
+              query,
+            });
+            return <PrismaFlowDiagram data={prismaData} />;
+          })()}
         </div>
       </div>
 
@@ -2014,7 +2034,7 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
   gapAnalysis: GapAnalysis | null;
   gapAnalysisGeneratedAt?: string | null;
   isPending: boolean;
-  onAnalyze: () => void;
+  onAnalyze: (force?: boolean) => void;
   error: string | null;
   resultId: string;
   isOwner: boolean;
@@ -2144,7 +2164,7 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
             </p>
             {isStale && isOwner && (
               <button
-                onClick={onAnalyze}
+                onClick={() => onAnalyze(true)}
                 disabled={isPending}
                 className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 title="Clear and re-run the gap analysis with current data"
@@ -2400,18 +2420,11 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
 /* Design tab                                                                 */
 /* -------------------------------------------------------------------------- */
 
-const FEASIBILITY_BADGE: Record<string, string> = {
-  high: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700",
-  moderate: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-700",
-  low: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700",
-};
-
-function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAnalyze, error, isOwner, primaryStudyCount, query }: {
+function DesignTab({ studyDesign, gapAnalysis, isPending, onAnalyze, error, isOwner, primaryStudyCount, query }: {
   studyDesign: StudyDesignRecommendation | null;
   gapAnalysis: GapAnalysis | null;
-  feasibilityScore: FeasibilityScore | null;
   isPending: boolean;
-  onAnalyze: () => void;
+  onAnalyze: (force?: boolean) => void;
   error: string | null;
   isOwner: boolean;
   primaryStudyCount: number;
@@ -2605,6 +2618,9 @@ function DesignTab({ studyDesign, gapAnalysis, feasibilityScore, isPending, onAn
         </div>
       </div>
 
+      {/* Boolean Search String Generator */}
+      <BooleanSearchExporter query={query} gapAnalysis={gapAnalysis} />
+
       <p className="text-xs text-gray-600 dark:text-gray-400 italic">AI-generated — verify all recommendations with domain expertise.</p>
 
       {/* Cochrane/PsycINFO coverage note — shown when a meta-analysis is
@@ -2708,6 +2724,135 @@ function AnalysisPrompt({ isPending, onAnalyze, error }: {
         {isPending ? "Analyzing… (~20 seconds)" : "Run AI Gap Analysis"}
       </button>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Boolean Search String Exporter                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * BooleanSearchExporter — export Boolean search strings for PubMed/Embase.
+ *
+ * Generates publication-ready search strings from the research query and
+ * optional PICO elements. Users can view and copy search strings for use
+ * in their systematic review protocol.
+ */
+function BooleanSearchExporter({ query, gapAnalysis }: {
+  query: string;
+  gapAnalysis: GapAnalysis | null;
+}) {
+  const [showExport, setShowExport] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  if (!gapAnalysis || !query) {
+    return null;
+  }
+
+  const searches = generateBooleanSearchStrings(query);
+
+  async function handleCopy(text: string, source: "pubmed" | "embase" | "central") {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(source);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // Clipboard unavailable; silently ignore
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setShowExport(!showExport)}
+        className="text-sm font-semibold text-[#1e3a5f] dark:text-blue-400 hover:underline"
+      >
+        {showExport ? "Hide search strategy" : "Generate search strategy"}
+      </button>
+
+      {showExport && (
+        <div className="mt-3 space-y-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
+            Publication-ready Boolean search strings for your systematic review protocol.
+            Adjust terms as needed for your specific inclusion criteria.
+          </p>
+
+          {/* PubMed */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">PubMed</p>
+              <button
+                onClick={() => handleCopy(searches.pubmed, "pubmed")}
+                className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+              >
+                {copied === "pubmed" ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <code className="block text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto break-all">
+              {searches.pubmed}
+            </code>
+          </div>
+
+          {/* Embase */}
+          <div className="space-y-1.5 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Embase</p>
+              <button
+                onClick={() => handleCopy(searches.embase, "embase")}
+                className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+              >
+                {copied === "embase" ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <code className="block text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto break-all">
+              {searches.embase}
+            </code>
+          </div>
+
+          {/* Cochrane CENTRAL */}
+          <div className="space-y-1.5 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cochrane CENTRAL</p>
+              <button
+                onClick={() => handleCopy(searches.central, "central")}
+                className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+              >
+                {copied === "central" ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <code className="block text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto break-all">
+              {searches.central}
+            </code>
+          </div>
+
+          {/* Notes */}
+          {searches.notes.length > 0 && (
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-1">
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Notes</p>
+              <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+                {searches.notes.map((note, i) => (
+                  <li key={i}>• {note}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* PubMed link */}
+          {searches.pubmedUrl && (
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+              <a
+                href={searches.pubmedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[#4a90d9] dark:text-blue-400 hover:underline"
+              >
+                Try this search on PubMed →
+              </a>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
