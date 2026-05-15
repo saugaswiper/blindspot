@@ -247,6 +247,40 @@ describe("computePrimaryStudyPrismaData — screening funnel estimates", () => {
     // actual=8; Blindspot can't know SR will restrict to digital-only
   });
 
+  // --- Run 4 ground-truth calibration (2026-05-05) via PubMed MCP ---
+  //
+  // 7 published SRs validated using PubMed metadata retrieval.
+  // PMIDs: 38231522, 38355154, 38669625, 36103100, 34582962, 34693994, 40240318
+  //
+  // 1 within ±50% (well-matched query vs SR scope).
+  // 1 underestimate due to database-coverage gap (Cochrane/PsycINFO not in Blindspot).
+  // 5 overestimates due to query-specificity mismatch (consistent with runs 1-3).
+  // No new systematic rate calibration error found.
+
+  it("run4: smoking cessation primary care Cochrane MA (+11%): estimate within ±50% of 81", () => {
+    // PMID 34693994 — doi:10.1002/14651858.CD011556.pub2
+    // Cochrane SR (Lindson 2021), afterDedup estimated ~4000, included=81
+    // Expected: 4000 × 0.05 × 0.45 ≈ 90 (+11.1% vs actual 81)
+    const result = makePrismaInput(4000, "meta-analysis");
+    expect(result.included).toBeGreaterThanOrEqual(40);  // −50% of 81
+    expect(result.included).toBeLessThanOrEqual(122);    // +50% of 81
+  });
+
+  it("run4: database-coverage gap — CBT-I component NMA underestimate is expected", () => {
+    // PMID 38231522 — JAMA Psychiatry (Furukawa 2024), 241 trials included (NMA)
+    // SR searched PubMed + Cochrane + PsycInfo + ICTRP; Blindspot lacks Cochrane + PsycINFO.
+    // afterDedup estimated ~3600 (PubMed+OpenAlex+EuropePMC+Scopus only)
+    // Expected Blindspot estimate: 3600 × 0.05 × 0.45 ≈ 81 (-66% vs actual 241)
+    // This test documents the EXPECTED estimate; it will NOT be within ±50% of 241.
+    // The gap is a database-coverage limitation, not a calibration error.
+    const result = makePrismaInput(3600, "meta-analysis");
+    // Estimate is well-defined and plausible for the databases Blindspot actually searches
+    expect(result.included).toBeGreaterThanOrEqual(50);
+    expect(result.included).toBeLessThanOrEqual(120);
+    // actual=241; Blindspot underestimates because it doesn't index Cochrane Central or PsycINFO,
+    // which are the primary RCT repositories for mental health intervention trials.
+  });
+
   // --- Tier boundary continuity ---
 
   it("tier transitions are monotonically ordered in included count for same design", () => {

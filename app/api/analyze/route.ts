@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Please sign in to run analysis." }, { status: 401 });
     }
 
-    const { resultId } = (await request.json()) as { resultId?: string };
+    const { resultId, force } = (await request.json()) as { resultId?: string; force?: boolean };
     if (!resultId) {
       return Response.json({ error: "resultId is required." }, { status: 400 });
     }
@@ -59,8 +59,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Result not found." }, { status: 404 });
     }
 
-    // Return early if analysis already exists
-    if (result.gap_analysis) {
+    // ACC-12: Return early if analysis already exists, unless force=true (refresh request)
+    if (result.gap_analysis && !force) {
       return Response.json({ resultId, cached: true });
     }
 

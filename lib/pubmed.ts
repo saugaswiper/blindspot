@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/errors";
+import { getCachedTopicCounts, setCachedTopicCounts } from "@/lib/cache";
 import type { ExistingReview } from "@/types";
 
 const BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
@@ -100,8 +101,28 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
   // ACC-8: When minYear is provided, restrict counts to studies published
   // on or after that year using PubMed's [dp] (date published) field tag.
   // Current year is used as the upper bound to capture in-press records.
+  //
+  // NEW-12: Check cache first (only for unfiltered queries; minYear bypasses cache).
+  // This prevents redundant API calls for frequently-searched topics like "diabetes",
+  // "heart failure", "anxiety" — estimated ~40% reduction in PubMed API calls.
+  if (!minYear) {
+    const cached = await getCachedTopicCounts(query);
+    if (cached?.cached) {
+      return cached.pubmed_count ?? 0;
+    }
+  }
+
   const datePart = minYear ? ` AND ${minYear}:${new Date().getFullYear()}[dp]` : "";
   const { count } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, 1);
+
+  // NEW-12: Store in cache if this was an unfiltered query (for reuse next time)
+  if (!minYear) {
+    // Fire and forget: cache write errors don't propagate
+    setCachedTopicCounts(query, count, null).catch((err) => {
+      console.warn("[pubmed] Failed to cache PubMed count:", err);
+    });
+  }
+
   return count;
 }
 

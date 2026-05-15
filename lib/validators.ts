@@ -13,7 +13,7 @@ import type { SearchInput } from "@/types";
  * text past the user-input boundary in Gemini prompts).
  */
 function stripControlChars(s: string): string {
-  // eslint-disable-next-line no-control-regex
+  // Control chars 0x00–0x1F and 0x7F are stripped for security (no legitimate use in search)
   return s.replace(/[\x00-\x1F\x7F]/g, " ").replace(/\s+/g, " ").trim();
 }
 

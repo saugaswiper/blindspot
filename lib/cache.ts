@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import type { ExistingReview } from "@/types";
@@ -531,4 +532,126 @@ export async function saveGuestSearchResult(
   }
 
   return result.id;
+}
+
+// ---------------------------------------------------------------------------
+// NEW-12: Topic Search Cache — cache countPrimaryStudies results per-topic
+// ---------------------------------------------------------------------------
+
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
+/**
+ * Normalize and hash a query for deterministic cache lookups
+ * Removes extra whitespace, lowercases, and computes SHA-256
+ */
+function getQueryHash(query: string): string {
+  const normalized = query.trim().toLowerCase();
+  return crypto.createHash("sha256").update(normalized).digest("hex");
+}
+
+/**
+ * Check if a cache entry is still valid (< 7 days old)
+ */
+function isCacheValid(updatedAt: string): boolean {
+  const lastUpdate = new Date(updatedAt).getTime();
+  const now = Date.now();
+  return now - lastUpdate < CACHE_TTL_MS;
+}
+
+/**
+ * Fetch cached counts for a topic query, if valid
+ * Returns { pubmed_count, openalex_count, cached: true } or null
+ * Used by countPrimaryStudies in pubmed.ts and openalex.ts to avoid redundant API calls
+ */
+export async function getCachedTopicCounts(query: string): Promise<{
+  pubmed_count: number | null;
+  openalex_count: number | null;
+  cached: true;
+} | null> {
+  try {
+    const supabase = await createClient();
+    const queryHash = getQueryHash(query);
+
+    const { data, error } = await supabase
+      .from("topic_search_cache")
+      .select("pubmed_count, openalex_count, updated_at")
+      .eq("query_hash", queryHash)
+      .single();
+
+    if (error || !data) {
+      return null; // Cache miss
+    }
+
+    // Check TTL: if older than 7 days, treat as miss
+    if (!isCacheValid(data.updated_at)) {
+      return null;
+    }
+
+    return {
+      pubmed_count: data.pubmed_count,
+      openalex_count: data.openalex_count,
+      cached: true,
+    };
+  } catch (error) {
+    // Fail open: if cache lookup fails, return null and proceed with API calls
+    console.warn("[topic-cache] getCachedTopicCounts error:", error);
+    return null;
+  }
+}
+
+/**
+ * Store or update cached counts for a topic query
+ * Call this after fetching fresh counts from PubMed/OpenAlex
+ */
+export async function setCachedTopicCounts(
+  query: string,
+  pubmedCount: number | null,
+  openalexCount: number | null
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const queryHash = getQueryHash(query);
+
+    // Upsert: insert or update if already exists (via UNIQUE constraint on query_hash)
+    const { error } = await supabase.from("topic_search_cache").upsert(
+      {
+        query_hash: queryHash,
+        pubmed_count: pubmedCount,
+        openalex_count: openalexCount,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "query_hash",
+      }
+    );
+
+    if (error) {
+      console.warn("[topic-cache] setCachedTopicCounts error:", error.message);
+    }
+  } catch (error) {
+    // Fail open: if cache write fails, continue normally
+    console.warn("[topic-cache] setCachedTopicCounts exception:", error);
+  }
+}
+
+/**
+ * Invalidate cache entry for a topic query (force refresh on next request)
+ * Used when manually triggering a gap analysis refresh
+ */
+export async function invalidateTopicCache(query: string): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const queryHash = getQueryHash(query);
+
+    const { error } = await supabase
+      .from("topic_search_cache")
+      .delete()
+      .eq("query_hash", queryHash);
+
+    if (error) {
+      console.warn("[topic-cache] invalidateTopicCache error:", error.message);
+    }
+  } catch (error) {
+    console.warn("[topic-cache] invalidateTopicCache exception:", error);
+  }
 }

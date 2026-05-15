@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/errors";
+import { getCachedTopicCounts, setCachedTopicCounts } from "@/lib/cache";
 import type { ExistingReview } from "@/types";
 
 // CRIT-1: OpenAlex discontinued the `mailto=` polite pool on 2026-02-13.
@@ -109,8 +110,28 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
   // Use title_abstract scope to avoid the 100–430× overcounting caused by
   // OpenAlex's default full-text `search` parameter. title_and_abstract.search
   // restricts matching to title and abstract fields, comparable to PubMed scope.
+  //
+  // NEW-12: Check cache first (only for unfiltered queries; minYear bypasses cache).
+  // This prevents redundant API calls for frequently-searched topics.
+  if (!minYear) {
+    const cached = await getCachedTopicCounts(query);
+    if (cached?.cached) {
+      return cached.openalex_count ?? 0;
+    }
+  }
+
   const data = await searchOpenAlex(query, "primary", 1, minYear, "title_abstract");
-  return data.meta.count;
+  const count = data.meta.count;
+
+  // NEW-12: Store in cache if this was an unfiltered query (for reuse next time)
+  if (!minYear) {
+    // Fire and forget: cache write errors don't propagate
+    setCachedTopicCounts(query, null, count).catch((err) => {
+      console.warn("[openalex] Failed to cache OpenAlex count:", err);
+    });
+  }
+
+  return count;
 }
 
 /**

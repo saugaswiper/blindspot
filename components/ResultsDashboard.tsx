@@ -13,7 +13,7 @@ import { PrintableReport } from "@/components/PrintableReport";
 import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
-import { generateBooleanSearchStrings } from "@/lib/boolean-search-builder";
+import { generateBooleanSearchStrings, validateBooleanQuery } from "@/lib/boolean-search-builder";
 import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
 import { formatOSFWarning, formatOSFStatus } from "@/lib/osf-registry";
 import { formatINPLASYWarning, formatINPLASYStatus } from "@/lib/inplasy";
@@ -2739,6 +2739,14 @@ function AnalysisPrompt({ isPending, onAnalyze, error }: {
  * optional PICO elements. Users can view and copy search strings for use
  * in their systematic review protocol.
  */
+/**
+ * BooleanSearchExporter — export Boolean search strings for PubMed/Embase.
+ *
+ * Generates publication-ready search strings from the research query and
+ * optional PICO elements. Users can view and copy search strings for use
+ * in their systematic review protocol. Includes real-time validation of
+ * Boolean query syntax with helpful warnings.
+ */
 function BooleanSearchExporter({ query, gapAnalysis }: {
   query: string;
   gapAnalysis: GapAnalysis | null;
@@ -2751,6 +2759,7 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
   }
 
   const searches = generateBooleanSearchStrings(query);
+  const validation = validateBooleanQuery(searches.pubmed);
 
   async function handleCopy(text: string, source: "pubmed" | "embase" | "central") {
     try {
@@ -2777,6 +2786,20 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
             Publication-ready Boolean search strings for your systematic review protocol.
             Adjust terms as needed for your specific inclusion criteria.
           </p>
+
+          {/* Validation warnings (if any) */}
+          {!validation.valid && validation.warnings.length > 0 && (
+            <div className="p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-300 mb-1">
+                ⚠️ Syntax Warnings
+              </p>
+              <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-0.5">
+                {validation.warnings.map((warning, i) => (
+                  <li key={i}>• {warning}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* PubMed */}
           <div className="space-y-1.5">

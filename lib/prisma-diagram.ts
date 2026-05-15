@@ -219,6 +219,29 @@ export function computePrismaData(
  * are query-specificity mismatches (pre-existing documented limitation), not calibration
  * errors. No new systematic bias found; current tier calibration remains appropriate.
  *
+ * Ground-truth validation (2026-05-05, run 4) against 7 published SRs via PubMed MCP:
+ *   PMIDs: 38231522, 38355154, 38669625, 36103100, 34582962, 34693994, 40240318
+ *   [Within ±50% — calibration confirmed:]
+ *   - Smoking cessation primary care Cochrane (2021, MA, afterDedup~4000):
+ *       est. ~90, actual 81 (+11.1%) ✓  (doi:10.1002/14651858.CD011556.pub2)
+ *   [Database-coverage mismatch — Blindspot misses Cochrane Central + PsycINFO:]
+ *   - CBT-I component NMA (2024, NMA, afterDedup~3600):  est. ~81, actual 241 (-66%)
+ *       → SR searched PubMed+Cochrane+PsycInfo+ICTRP; Blindspot lacks last two sources.
+ *         For topics where Cochrane and PsycINFO are primary RCT repositories, Blindspot
+ *         will undercount available primary studies. Pre-existing limitation.
+ *   [Query-specificity mismatch — documented limitation, not calibration errors:]
+ *   - Hand hygiene compliance → HAI rate SR (2021, afterDedup~8000+): est. ~216, actual 35 (+517%)
+ *       → Very specific RQ (HHC threshold vs HAI incidence); broad "hand hygiene+HAI" query
+ *   - Omega-3 cardiovascular (2022, 15 RCTs): est. ~261, actual 15 (+1640%)
+ *       → Only specific omega-3 formulations vs specific CV endpoints
+ *   - Mind-body exercise menopausal (2024, 11 RCTs): est. ~56, actual 11 (+409%)
+ *       → Restricted to menopausal women; "mindfulness anxiety" query is much broader
+ * Run 4 conclusion: 1/7 within ±50% for unambiguous query match. 1 underestimate case
+ * (database coverage gap — Cochrane/PsycINFO not in Blindspot). 5 overestimates are
+ * query-specificity mismatches (consistent with runs 1-3). No new systematic rate bias.
+ * Recommendation: add informational note in UI when study design is NMA/large MA advising
+ * users to also check Cochrane Library and PsycINFO manually.
+ *
  * Tier boundaries and calibration rationale:
  *   Large  60–499:  query-targeted, most results plausibly relevant → ~10% combined
  *   XL   500–1499:  moderately broad query → ~4–5% combined

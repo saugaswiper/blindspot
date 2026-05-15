@@ -102,7 +102,7 @@ function buildScopusQuery(reviewQuery: string): string {
   // Split on AND/OR/AND NOT boundaries and wrap each concept
   const parts = reviewQuery
     .split(/(\s+AND NOT\s+|\s+AND\s+|\s+OR\s+)/i)
-    .map((part, i) => {
+    .map((part) => {
       const op = part.trim().toUpperCase();
       if (op === "AND" || op === "OR" || op === "AND NOT") return ` ${op} `;
       const term = part.trim().replace(/^["']|["']$/g, "");

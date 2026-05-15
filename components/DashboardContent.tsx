@@ -13,7 +13,7 @@
  * fetching and passes the results as props.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { isUserBooleanQuery } from "@/lib/boolean-search";
 import { deriveStudyTrend } from "@/types";
@@ -591,7 +591,12 @@ export function DashboardContent({
     setShowComparison(false);
   }, []);
 
-  const comparisonRows = buildComparisonRows(searches, selectedIds);
+  // NEW-13: Memoize comparison rows to avoid recalculating deriveStudyTrend
+  // for unchanged searches/selections on component re-renders
+  const comparisonRows = useMemo(
+    () => buildComparisonRows(searches, selectedIds),
+    [searches, selectedIds]
+  );
 
   if (searches.length === 0) {
     return (
