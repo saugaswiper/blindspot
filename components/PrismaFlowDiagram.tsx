@@ -350,6 +350,25 @@ export function PrismaFlowDiagram({
       <PhaseLabel label="Identification" />
       <FlowRow main={<IdentificationPhase data={data} />} />
 
+      {/* Databases not covered — shown always; critical for NMA/large MA topics */}
+      <div
+        className="mt-2 mb-1 rounded-md px-3 py-2.5 text-xs leading-relaxed"
+        style={{
+          background: "rgba(251,191,36,0.08)",
+          border: "1px solid rgba(251,191,36,0.3)",
+          color: "var(--foreground)",
+        }}
+      >
+        <span className="font-semibold" style={{ color: "#92400e" }}>
+          Databases not searched by Blindspot:
+        </span>{" "}
+        <span style={{ color: "var(--muted)" }}>
+          Cochrane CENTRAL, PsycINFO, Embase, CINAHL. For clinical trials and mental health topics,
+          these can add 30–60% more eligible studies. Search them manually before finalising your
+          protocol.
+        </span>
+      </div>
+
       {/* Deduplication */}
       <VerticalArrow />
       <FlowRow

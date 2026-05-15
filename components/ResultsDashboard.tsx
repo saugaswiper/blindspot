@@ -2753,13 +2753,21 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
 }) {
   const [showExport, setShowExport] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const searches = generateBooleanSearchStrings(query);
+  // editedPubmed tracks user edits to the PubMed string so validation is useful
+  const [editedPubmed, setEditedPubmed] = useState<string | null>(null);
 
   if (!gapAnalysis || !query) {
     return null;
   }
 
-  const searches = generateBooleanSearchStrings(query);
-  const validation = validateBooleanQuery(searches.pubmed);
+  const pubmedValue = editedPubmed ?? searches.pubmed;
+  const validation = validateBooleanQuery(pubmedValue);
+  // Only show unquoted-phrase warning when the user has edited the string
+  // (the generated string always passes, so that warning is only useful after editing)
+  const displayedWarnings = editedPubmed !== null
+    ? validation.warnings
+    : validation.warnings.filter(w => !w.includes("quoting multi-word"));
 
   async function handleCopy(text: string, source: "pubmed" | "embase" | "central") {
     try {
@@ -2784,37 +2792,57 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
         <div className="mt-3 space-y-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
           <p className="text-xs text-gray-600 dark:text-gray-400">
             Publication-ready Boolean search strings for your systematic review protocol.
-            Adjust terms as needed for your specific inclusion criteria.
+            Edit the PubMed string directly to refine terms — syntax is validated in real time.
           </p>
 
-          {/* Validation warnings (if any) */}
-          {!validation.valid && validation.warnings.length > 0 && (
+          {/* Validation warnings — only shown when there are real issues */}
+          {displayedWarnings.length > 0 && (
             <div className="p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
               <p className="text-xs font-semibold text-amber-900 dark:text-amber-300 mb-1">
-                ⚠️ Syntax Warnings
+                ⚠️ Syntax warnings
               </p>
               <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-0.5">
-                {validation.warnings.map((warning, i) => (
+                {displayedWarnings.map((warning, i) => (
                   <li key={i}>• {warning}</li>
                 ))}
               </ul>
             </div>
           )}
 
-          {/* PubMed */}
+          {/* PubMed — editable textarea */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">PubMed</p>
-              <button
-                onClick={() => handleCopy(searches.pubmed, "pubmed")}
-                className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
-              >
-                {copied === "pubmed" ? "Copied!" : "Copy"}
-              </button>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">PubMed</p>
+                <span className="text-[10px] text-gray-400 dark:text-gray-500">(editable)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {editedPubmed !== null && (
+                  <button
+                    onClick={() => setEditedPubmed(null)}
+                    className="text-xs px-2 py-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded transition-colors"
+                    title="Reset to generated string"
+                  >
+                    Reset
+                  </button>
+                )}
+                <button
+                  onClick={() => handleCopy(pubmedValue, "pubmed")}
+                  className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                >
+                  {copied === "pubmed" ? "Copied!" : "Copy"}
+                </button>
+              </div>
             </div>
-            <code className="block text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto break-all">
-              {searches.pubmed}
-            </code>
+            <textarea
+              value={pubmedValue}
+              onChange={(e) => setEditedPubmed(e.target.value)}
+              rows={4}
+              spellCheck={false}
+              className="w-full text-xs font-mono bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 resize-y focus:outline-none focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-600"
+              style={{ color: "var(--foreground)" }}
+              aria-label="PubMed search string (editable)"
+            />
           </div>
 
           {/* Embase */}
