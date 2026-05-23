@@ -119,6 +119,18 @@ export interface GapAnalysis {
    */
   boolean_search_string?: string;
   /**
+   * AI-generated Embase Boolean search string for the topic.
+   * Optional: absent on results generated before multi-database support (handoff 068+).
+   * Uses Embase-specific syntax: EMTREE terms with / qualifier, free-text with :ti,ab/
+   */
+  embase_string?: string;
+  /**
+   * AI-generated Cochrane CENTRAL Boolean search string for the topic.
+   * Optional: absent on results generated before multi-database support (handoff 068+).
+   * Uses CENTRAL/Cochrane syntax similar to PubMed with MeSH compatibility.
+   */
+  central_string?: string;
+  /**
    * ACC-3: Number of existing reviews actually sent to Gemini for analysis
    * (capped at 20 by the prompt builder). Absent on pre-v028 results.
    * Used to display an AI confidence badge:

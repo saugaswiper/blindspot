@@ -27,6 +27,7 @@ async function getResult(id: string) {
       openalex_count,
       europepmc_count,
       scopus_count,
+      cochrane_count,
       living_review_count,
       existing_reviews,
       feasibility_score,
@@ -139,6 +140,7 @@ export default async function ResultsPage({
         openalexCount={(result.openalex_count as number | null | undefined) ?? null}
         europepmcCount={(result.europepmc_count as number | null | undefined) ?? null}
         scopusCount={(result.scopus_count as number | null | undefined) ?? null}
+        cochraneCount={(result.cochrane_count as number | null | undefined) ?? null}
         livingReviewCount={
           (result.living_review_count as number | null | undefined) ?? null
         }

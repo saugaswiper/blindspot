@@ -39,6 +39,28 @@ export function buildPubMedUrl(booleanString: string): string {
   return `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(booleanString)}`;
 }
 
+/**
+ * Builds an Embase search URL that pre-populates the query box with the
+ * provided Boolean search string.
+ *
+ * Note: Embase uses `#search` fragment for dynamic search, but the main
+ * entry point accepts query parameter. Users will be directed to the search
+ * interface where they can copy/paste the query if needed.
+ */
+export function buildEmbaseUrl(booleanString: string): string {
+  return `https://www.elsevier.com/products/embase?utm_source=blindspot&q=${encodeURIComponent(booleanString)}`;
+}
+
+/**
+ * Builds a CINAHL search URL pointing to the EBSCO CINAHL interface.
+ *
+ * CINAHL is hosted by EBSCO. Users need institutional access; this link
+ * directs to the login + search interface.
+ */
+export function buildCINAHLUrl(booleanString: string): string {
+  return `https://search.ebscohost.com/login.aspx?direct=true&db=cmedm&bquery=${encodeURIComponent(booleanString)}`;
+}
+
 // ---------------------------------------------------------------------------
 // User-entered Boolean query detection
 // ---------------------------------------------------------------------------

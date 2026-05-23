@@ -94,12 +94,14 @@ export function computeSourceAgreement(sources: {
   openalex?: number | null;
   europepmc?: number | null;
   scopus?: number | null;
+  cochrane?: number | null;
 }): SourceAgreement | null {
   const counts: number[] = [];
   if (typeof sources.pubmed === "number") counts.push(sources.pubmed);
   if (typeof sources.openalex === "number") counts.push(sources.openalex);
   if (typeof sources.europepmc === "number") counts.push(sources.europepmc);
   if (typeof sources.scopus === "number") counts.push(sources.scopus);
+  if (typeof sources.cochrane === "number") counts.push(sources.cochrane);
 
   if (counts.length < 2) return null;
 

@@ -136,6 +136,8 @@ export async function saveSearchResult(
     inplasy_count?: number | null;
     /** Scopus primary study count. Pass null when the Elsevier API was unavailable. */
     scopus_count: number | null;
+    /** Cochrane Library systematic review count. Pass null when the Cochrane API was unavailable. */
+    cochrane_count?: number | null;
     /** Number of cross-database duplicate records removed during deduplication. */
     deduplication_count: number;
     /** Pass null when the PubMed recent-count API was unavailable. */
@@ -180,7 +182,7 @@ export async function saveSearchResult(
     throw new Error(`Failed to save search: ${searchError?.message}`);
   }
 
-  // Try inserting with all columns (migrations 012 + 015 + 016 + 017 + 018).
+  // Try inserting with all columns (migrations 012 + 015 + 016 + 017 + 018 + 021).
   // Falls back progressively if a column introduced by a newer migration is missing
   // (Postgres error code 42703 = undefined_column).
   let { data: result, error: resultError } = await supabase
@@ -194,6 +196,7 @@ export async function saveSearchResult(
       osf_registrations_count: data.osf_registrations_count,
       inplasy_count: data.inplasy_count ?? null,
       scopus_count: data.scopus_count,
+      cochrane_count: data.cochrane_count ?? null,
       deduplication_count: data.deduplication_count,
       recent_primary_study_count: data.recent_primary_study_count,
       pubmed_count: data.pubmed_count,
@@ -218,6 +221,7 @@ export async function saveSearchResult(
         prospero_registrations_count: data.prospero_registrations_count,
         osf_registrations_count: data.osf_registrations_count,
         scopus_count: data.scopus_count,
+        cochrane_count: data.cochrane_count ?? null,
         deduplication_count: data.deduplication_count,
         recent_primary_study_count: data.recent_primary_study_count,
         pubmed_count: data.pubmed_count,
@@ -240,6 +244,7 @@ export async function saveSearchResult(
         primary_study_count: data.primary_study_count,
         clinical_trials_count: data.clinical_trials_count,
         prospero_registrations_count: data.prospero_registrations_count,
+        cochrane_count: data.cochrane_count ?? null,
         deduplication_count: data.deduplication_count,
         recent_primary_study_count: data.recent_primary_study_count,
         pubmed_count: data.pubmed_count,
@@ -369,6 +374,8 @@ export async function saveGuestSearchResult(
     inplasy_count?: number | null;
     /** Scopus primary study count. Pass null when the Elsevier API was unavailable. */
     scopus_count: number | null;
+    /** Cochrane Library systematic review count. Pass null when the Cochrane API was unavailable. */
+    cochrane_count?: number | null;
     deduplication_count: number;
     recent_primary_study_count: number | null;
     /** UI-1: Per-source primary study counts. Pass null when a source API was unavailable. */
@@ -415,7 +422,7 @@ export async function saveGuestSearchResult(
     throw new Error(`Failed to save guest search: ${searchError?.message}`);
   }
 
-  // Try with all columns (migrations 012 + 015 + 016 + 017 + 018);
+  // Try with all columns (migrations 012 + 015 + 016 + 017 + 018 + 021);
   // fall back progressively if columns don't exist.
   let { data: result, error: resultError } = await supabase
     .from("search_results")
@@ -428,6 +435,7 @@ export async function saveGuestSearchResult(
       osf_registrations_count: data.osf_registrations_count,
       inplasy_count: data.inplasy_count ?? null,
       scopus_count: data.scopus_count,
+      cochrane_count: data.cochrane_count ?? null,
       deduplication_count: data.deduplication_count,
       recent_primary_study_count: data.recent_primary_study_count,
       pubmed_count: data.pubmed_count,
@@ -451,6 +459,7 @@ export async function saveGuestSearchResult(
         prospero_registrations_count: data.prospero_registrations_count,
         osf_registrations_count: data.osf_registrations_count,
         scopus_count: data.scopus_count,
+        cochrane_count: data.cochrane_count ?? null,
         deduplication_count: data.deduplication_count,
         recent_primary_study_count: data.recent_primary_study_count,
         pubmed_count: data.pubmed_count,
@@ -474,6 +483,7 @@ export async function saveGuestSearchResult(
         primary_study_count: data.primary_study_count,
         clinical_trials_count: data.clinical_trials_count,
         prospero_registrations_count: data.prospero_registrations_count,
+        cochrane_count: data.cochrane_count ?? null,
         deduplication_count: data.deduplication_count,
         recent_primary_study_count: data.recent_primary_study_count,
         pubmed_count: data.pubmed_count,

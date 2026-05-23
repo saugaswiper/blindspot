@@ -6,6 +6,7 @@ import * as PubMed from "@/lib/pubmed";
 import * as OpenAlex from "@/lib/openalex";
 import * as EuropePMC from "@/lib/europepmc";
 import * as Scopus from "@/lib/scopus";
+import * as Cochrane from "@/lib/cochrane";
 import * as ClinicalTrials from "@/lib/clinicaltrials";
 import * as SemanticScholar from "@/lib/semanticscholar";
 import { searchProspero, isQuerySubstantialEnough } from "@/lib/prospero";
@@ -347,6 +348,7 @@ export async function POST(request: Request) {
     let europepmcReviews: ExistingReview[] = [];
     let scopusReviews: ExistingReview[] = [];
     let semanticScholarReviews: ExistingReview[] = [];
+    let cochraneReviews: ExistingReview[] = [];
     let primaryStudyCount = 0;
     let pubmedFailed = false;
     let openalexFailed = false;
@@ -358,10 +360,12 @@ export async function POST(request: Request) {
       europepmcResult,
       scopusResult,
       semanticScholarResult,
+      cochraneResult,
       pubmedCount,
       openalexCount,
       europepmcCount,
       scopusCount,
+      cochraneCount,
       clinicalTrialsCount,
       prosperoCount,
       pubmedRecentCount,
@@ -380,6 +384,8 @@ export async function POST(request: Request) {
       EuropePMC.searchExistingReviews(reviewQuery),
       Scopus.searchExistingReviews(reviewQuery),
       SemanticScholar.searchExistingReviews(reviewQuery),
+      // Cochrane Library — gold standard for systematic reviews, direct integration
+      Cochrane.searchExistingReviews(reviewQuery),
       // ── Primary study counts ─────────────────────────────────────────────────
       // We use reviewQuery (concept-AND boolean) rather than raw baseQuery so
       // that counts reflect the strict multi-concept intersection. This prevents
@@ -391,6 +397,8 @@ export async function POST(request: Request) {
       OpenAlex.countPrimaryStudies(reviewQuery, minYear),
       EuropePMC.countPrimaryStudies(reviewQuery, minYear),
       Scopus.countPrimaryStudies(reviewQuery, minYear),
+      // Cochrane Library count — supplementary source for systematic review discovery
+      Cochrane.countSystematicReviews(reviewQuery),
       ClinicalTrials.countPrimaryStudies(baseQuery),
       isQuerySubstantialEnough(baseQuery) ? searchProspero(reviewQuery) : Promise.resolve(0),
       // NEW-2: Count primary studies published in the last 3 years (PubMed only).
@@ -446,6 +454,13 @@ export async function POST(request: Request) {
       console.error("Semantic Scholar failed:", semanticScholarResult.reason);
     }
 
+    // Cochrane is supplementary — never fail the request
+    if (cochraneResult.status === "fulfilled") {
+      cochraneReviews = cochraneResult.value;
+    } else {
+      console.error("Cochrane Library failed:", cochraneResult.reason);
+    }
+
     if (pubmedFailed && openalexFailed && europepmcFailed) {
       return Response.json(
         { error: "Academic databases are temporarily unavailable. Please try again in a few minutes." },
@@ -458,11 +473,15 @@ export async function POST(request: Request) {
     const openalexCountVal = openalexCount.status === "fulfilled" ? openalexCount.value : null;
     const europepmcCountVal = europepmcCount.status === "fulfilled" ? europepmcCount.value : null;
     const scopusCountVal = scopusCount.status === "fulfilled" ? scopusCount.value : null;
+    const cochraneCountVal = cochraneCount.status === "fulfilled" ? cochraneCount.value : null;
     if (scopusCount.status === "rejected") {
       console.error("[search] Scopus count failed:", scopusCount.reason);
     }
     if (scopusIds.status === "rejected") {
       console.error("[search] Scopus ID fetch failed:", scopusIds.reason);
+    }
+    if (cochraneCount.status === "rejected") {
+      console.error("[search] Cochrane count failed:", cochraneCount.reason);
     }
     const clinicalTrialsCountVal =
       clinicalTrialsCount.status === "fulfilled" ? clinicalTrialsCount.value : null;
@@ -520,6 +539,7 @@ export async function POST(request: Request) {
       europepmcReviews,
       scopusReviews,
       semanticScholarReviews,
+      cochraneReviews,
     );
 
     // Keep only reviews that mention all key concepts in title or abstract.
@@ -547,6 +567,7 @@ export async function POST(request: Request) {
       osf_registrations_count: osfCountVal,
       inplasy_count: inplasyCountVal,
       scopus_count: scopusCountVal,
+      cochrane_count: cochraneCountVal,
       deduplication_count: deduplicationCount,
       recent_primary_study_count: recentPrimaryStudyCountVal,
       // UI-1: Per-source primary study counts — stored for breakdown display

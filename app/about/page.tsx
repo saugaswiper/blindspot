@@ -172,6 +172,11 @@ export default function AboutPage() {
                 "200M+ academic papers",
               ],
               [
+                "Scopus",
+                "Primary study count; existing systematic reviews (clinical/interdisciplinary coverage)",
+                "90M+ documents; Elsevier's comprehensive multidisciplinary database (requires institutional access)",
+              ],
+              [
                 "ClinicalTrials.gov",
                 "Active registered trial count (context signal for clinical topics)",
                 "US and international registered clinical trials",
@@ -186,17 +191,26 @@ export default function AboutPage() {
                 "Registered systematic review protocols in progress",
                 "Open Science Framework; ~2,960 SR protocols (2026); broader social science / psychology / education coverage than PROSPERO",
               ],
+              [
+                "INPLASY",
+                "Registered systematic review and meta-analysis protocols in progress",
+                "International Platform of Registered Systematic Review and Meta-analysis Protocols; ~2,370+ protocols (2026); strong East Asian academic coverage",
+              ],
             ]}
           />
 
           <SubHeading>Deduplication</SubHeading>
           <Prose>
             Reviews retrieved from multiple sources are deduplicated by DOI, PubMed ID,
-            and normalised title before display. A conservative 0.75 deduplication factor
-            is applied to the blended primary study count to account for approximately
-            25% inter-database overlap (PubMed/OpenAlex overlap is 50–70%; PubMed/Europe
-            PMC overlap is 40–60%). This factor will be refined as search telemetry data
-            accumulates.
+            and normalised title before display. The primary study count applies
+            <strong style={{ color: "var(--foreground)" }}>ID-based deduplication</strong> —
+            Blindspot samples IDs from each source and computes the actual overlap fraction rather than applying a fixed estimate. This approach adapts to the specific query: queries with high PubMed/OpenAlex overlap apply a stronger deduplication factor than queries with low overlap.
+            Typical inter-database overlap: PubMed/OpenAlex 50–70%, PubMed/Europe PMC 40–60%.
+          </Prose>
+
+          <SubHeading>Living Systematic Reviews</SubHeading>
+          <Prose>
+            Blindspot identifies "living systematic reviews" (LSRs) — continuously updated reviews that incorporate new evidence as it emerges. If one or more LSRs are found on your topic, an informational banner is displayed indicating that the research area may already be under active review. This is particularly relevant for rapidly-evolving clinical topics where an LSR program may already be addressing the gaps you identified.
           </Prose>
 
           <SubHeading>OpenAlex Coverage Limitation</SubHeading>
