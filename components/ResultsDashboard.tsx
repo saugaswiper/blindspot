@@ -117,6 +117,7 @@ const SOURCE_STYLES: Record<string, string> = {
   OpenAlex: "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
   "Europe PMC": "bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800",
   Scopus: "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
+  Cochrane: "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800",
   "Semantic Scholar": "bg-stone-50 dark:bg-stone-800/60 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700",
 };
 
@@ -165,11 +166,13 @@ function SourceBreakdown({
   openalexCount,
   europepmcCount,
   scopusCount,
+  cochraneCount,
 }: {
   pubmedCount: number | null | undefined;
   openalexCount: number | null | undefined;
   europepmcCount: number | null | undefined;
   scopusCount: number | null | undefined;
+  cochraneCount: number | null | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -178,7 +181,8 @@ function SourceBreakdown({
     pubmedCount !== null && pubmedCount !== undefined ||
     openalexCount !== null && openalexCount !== undefined ||
     europepmcCount !== null && europepmcCount !== undefined ||
-    scopusCount !== null && scopusCount !== undefined;
+    scopusCount !== null && scopusCount !== undefined ||
+    cochraneCount !== null && cochraneCount !== undefined;
 
   if (!hasAny) return null;
 
@@ -187,6 +191,7 @@ function SourceBreakdown({
   if (openalexCount !== null && openalexCount !== undefined) entries.push({ label: "OpenAlex", count: openalexCount });
   if (europepmcCount !== null && europepmcCount !== undefined) entries.push({ label: "Europe PMC", count: europepmcCount });
   if (scopusCount !== null && scopusCount !== undefined) entries.push({ label: "Scopus", count: scopusCount });
+  if (cochraneCount !== null && cochraneCount !== undefined) entries.push({ label: "Cochrane", count: cochraneCount });
 
   if (!expanded) {
     return (
@@ -209,6 +214,7 @@ function SourceBreakdown({
     openalex: openalexCount,
     europepmc: europepmcCount,
     scopus: scopusCount,
+    cochrane: cochraneCount,
   });
 
   // Map agreement level → badge palette. Kept inline rather than in the
@@ -448,6 +454,8 @@ interface Props {
   europepmcCount?: number | null;
   /** Scopus primary study count (migration 016). Null when API was unavailable. */
   scopusCount?: number | null;
+  /** Cochrane Library systematic review count (migration 021). Null when API was unavailable. */
+  cochraneCount?: number | null;
   /**
    * NEW-8: Number of living systematic reviews (continuously updated reviews)
    * found on this topic. When > 0, an informational banner is shown so
@@ -549,6 +557,7 @@ export function ResultsDashboard({
   openalexCount = null,
   europepmcCount = null,
   scopusCount = null,
+  cochraneCount = null,
   livingReviewCount = null,
   feasibilityScore,
   feasibilityExplanation,
@@ -890,7 +899,7 @@ export function ResultsDashboard({
             </div>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>primary studies</p>
             {/* UI-1: Per-source breakdown — only shown when at least one source count is available */}
-            <SourceBreakdown pubmedCount={pubmedCount} openalexCount={openalexCount} europepmcCount={europepmcCount} scopusCount={scopusCount} />
+            <SourceBreakdown pubmedCount={pubmedCount} openalexCount={openalexCount} europepmcCount={europepmcCount} scopusCount={scopusCount} cochraneCount={cochraneCount} />
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.15em] mb-1" style={{ color: "var(--muted)" }}>Existing reviews</p>
@@ -1354,7 +1363,7 @@ export function ResultsDashboard({
               gapAnalysis: localGapAnalysis,
               query,
             });
-            return <PrismaFlowDiagram data={prismaData} />;
+            return <PrismaFlowDiagram data={prismaData} query={query} />;
           })()}
         </div>
       </div>
@@ -1567,6 +1576,26 @@ function utf8ToBase64(str: string): string {
 function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
   const sorted = [...reviews].sort((a, b) => (b.year || 0) - (a.year || 0));
   const [exportOpen, setExportOpen] = useState(false);
+  const [activeSource, setActiveSource] = useState<string | null>(null);
+  const [expandedAbstracts, setExpandedAbstracts] = useState<Set<number>>(new Set());
+
+  // Derive unique source labels for filter pills
+  const uniqueSources = Array.from(
+    new Set(sorted.map((r) => r.source).filter(Boolean))
+  ).sort() as string[];
+
+  const filtered = activeSource
+    ? sorted.filter((r) => r.source === activeSource)
+    : sorted;
+
+  function toggleAbstract(idx: number) {
+    setExpandedAbstracts((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }
 
   function handleExportRis() {
     const content = toRis(sorted);
@@ -1662,8 +1691,44 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
         </div>
       </div>
 
+      {/* Source filter pills — only shown when multiple sources are present */}
+      {uniqueSources.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <button
+            onClick={() => setActiveSource(null)}
+            className="px-2.5 py-1 text-xs rounded-full border font-medium transition-colors"
+            style={
+              activeSource === null
+                ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)", borderColor: "var(--brand, #1e3a5f)" }
+                : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
+            }
+          >
+            All ({sorted.length})
+          </button>
+          {uniqueSources.map((src) => {
+            const count = sorted.filter((r) => r.source === src).length;
+            return (
+              <button
+                key={src}
+                onClick={() => setActiveSource(activeSource === src ? null : src)}
+                className="px-2.5 py-1 text-xs rounded-full border font-medium transition-colors"
+                style={
+                  activeSource === src
+                    ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)", borderColor: "var(--brand, #1e3a5f)" }
+                    : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
+                }
+              >
+                {src} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
     <div className="divide-y divide-gray-100 dark:divide-gray-700">
-      {sorted.map((review, i) => (
+      {filtered.map((review, i) => {
+        const isExpanded = expandedAbstracts.has(i);
+        return (
         <div
           key={i}
           className="py-4 first:pt-0 last:pb-0 group transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 -mx-4 sm:-mx-6 px-4 sm:px-6"
@@ -1701,12 +1766,22 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
             )}
           </p>
           {review.abstract_snippet && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed line-clamp-3">
-              {review.abstract_snippet}
-            </p>
+            <div className="mt-1.5">
+              <p className={`text-xs text-gray-500 dark:text-gray-400 leading-relaxed${isExpanded ? "" : " line-clamp-3"}`}>
+                {review.abstract_snippet}
+              </p>
+              <button
+                onClick={() => toggleAbstract(i)}
+                className="mt-0.5 text-[11px] font-medium transition-opacity hover:opacity-70"
+                style={{ color: "var(--accent, #4a90d9)" }}
+              >
+                {isExpanded ? "Show less ↑" : "Show more ↓"}
+              </button>
+            </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
     </div>
   );
@@ -2753,21 +2828,40 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
 }) {
   const [showExport, setShowExport] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const searches = generateBooleanSearchStrings(query);
-  // editedPubmed tracks user edits to the PubMed string so validation is useful
+  const heuristicSearches = generateBooleanSearchStrings(query);
+  // Track user edits to Boolean strings for PubMed, Embase, and CENTRAL
   const [editedPubmed, setEditedPubmed] = useState<string | null>(null);
+  const [editedEmbase, setEditedEmbase] = useState<string | null>(null);
+  const [editedCentral, setEditedCentral] = useState<string | null>(null);
 
   if (!gapAnalysis || !query) {
     return null;
   }
 
-  const pubmedValue = editedPubmed ?? searches.pubmed;
-  const validation = validateBooleanQuery(pubmedValue);
+  // Resolve actual values: prefer AI-generated from gapAnalysis, fall back to heuristic
+  // This ensures better search strings when AI analysis is available
+  const pubmedValue = editedPubmed ?? gapAnalysis.boolean_search_string ?? heuristicSearches.pubmed;
+  const embaseValue = editedEmbase ?? gapAnalysis.embase_string ?? heuristicSearches.embase;
+  const centralValue = editedCentral ?? gapAnalysis.central_string ?? heuristicSearches.central;
+
+  // Validate each string
+  const pubmedValidation = validateBooleanQuery(pubmedValue);
+  const embaseValidation = validateBooleanQuery(embaseValue);
+  const centralValidation = validateBooleanQuery(centralValue);
+
   // Only show unquoted-phrase warning when the user has edited the string
-  // (the generated string always passes, so that warning is only useful after editing)
-  const displayedWarnings = editedPubmed !== null
-    ? validation.warnings
-    : validation.warnings.filter(w => !w.includes("quoting multi-word"));
+  // (the generated strings always pass, so that warning is only useful after editing)
+  const pubmedWarnings = editedPubmed !== null
+    ? pubmedValidation.warnings
+    : pubmedValidation.warnings.filter(w => !w.includes("quoting multi-word"));
+
+  const embaseWarnings = editedEmbase !== null
+    ? embaseValidation.warnings
+    : embaseValidation.warnings.filter(w => !w.includes("quoting multi-word"));
+
+  const centralWarnings = editedCentral !== null
+    ? centralValidation.warnings
+    : centralValidation.warnings.filter(w => !w.includes("quoting multi-word"));
 
   async function handleCopy(text: string, source: "pubmed" | "embase" | "central") {
     try {
@@ -2795,15 +2889,21 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
             Edit the PubMed string directly to refine terms — syntax is validated in real time.
           </p>
 
-          {/* Validation warnings — only shown when there are real issues */}
-          {displayedWarnings.length > 0 && (
+          {/* Validation warnings — show for any database with issues */}
+          {(pubmedWarnings.length > 0 || embaseWarnings.length > 0 || centralWarnings.length > 0) && (
             <div className="p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
               <p className="text-xs font-semibold text-amber-900 dark:text-amber-300 mb-1">
                 ⚠️ Syntax warnings
               </p>
               <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-0.5">
-                {displayedWarnings.map((warning, i) => (
-                  <li key={i}>• {warning}</li>
+                {pubmedWarnings.map((warning, i) => (
+                  <li key={i}>• PubMed: {warning}</li>
+                ))}
+                {embaseWarnings.map((warning, i) => (
+                  <li key={i}>• Embase: {warning}</li>
+                ))}
+                {centralWarnings.map((warning, i) => (
+                  <li key={i}>• CENTRAL: {warning}</li>
                 ))}
               </ul>
             </div>
@@ -2845,44 +2945,84 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
             />
           </div>
 
-          {/* Embase */}
+          {/* Embase — editable textarea */}
           <div className="space-y-1.5 pt-2 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Embase</p>
-              <button
-                onClick={() => handleCopy(searches.embase, "embase")}
-                className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
-              >
-                {copied === "embase" ? "Copied!" : "Copy"}
-              </button>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Embase</p>
+                <span className="text-[10px] text-gray-400 dark:text-gray-500">(editable)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {editedEmbase !== null && (
+                  <button
+                    onClick={() => setEditedEmbase(null)}
+                    className="text-xs px-2 py-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded transition-colors"
+                    title="Reset to generated string"
+                  >
+                    Reset
+                  </button>
+                )}
+                <button
+                  onClick={() => handleCopy(embaseValue, "embase")}
+                  className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                >
+                  {copied === "embase" ? "Copied!" : "Copy"}
+                </button>
+              </div>
             </div>
-            <code className="block text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto break-all">
-              {searches.embase}
-            </code>
+            <textarea
+              value={embaseValue}
+              onChange={(e) => setEditedEmbase(e.target.value)}
+              rows={4}
+              spellCheck={false}
+              className="w-full text-xs font-mono bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 resize-y focus:outline-none focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-600"
+              style={{ color: "var(--foreground)" }}
+              aria-label="Embase search string (editable)"
+            />
           </div>
 
-          {/* Cochrane CENTRAL */}
+          {/* Cochrane CENTRAL — editable textarea */}
           <div className="space-y-1.5 pt-2 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cochrane CENTRAL</p>
-              <button
-                onClick={() => handleCopy(searches.central, "central")}
-                className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
-              >
-                {copied === "central" ? "Copied!" : "Copy"}
-              </button>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cochrane CENTRAL</p>
+                <span className="text-[10px] text-gray-400 dark:text-gray-500">(editable)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {editedCentral !== null && (
+                  <button
+                    onClick={() => setEditedCentral(null)}
+                    className="text-xs px-2 py-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded transition-colors"
+                    title="Reset to generated string"
+                  >
+                    Reset
+                  </button>
+                )}
+                <button
+                  onClick={() => handleCopy(centralValue, "central")}
+                  className="text-xs px-2 py-1 text-[#4a90d9] dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                >
+                  {copied === "central" ? "Copied!" : "Copy"}
+                </button>
+              </div>
             </div>
-            <code className="block text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto break-all">
-              {searches.central}
-            </code>
+            <textarea
+              value={centralValue}
+              onChange={(e) => setEditedCentral(e.target.value)}
+              rows={4}
+              spellCheck={false}
+              className="w-full text-xs font-mono bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 resize-y focus:outline-none focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-600"
+              style={{ color: "var(--foreground)" }}
+              aria-label="Cochrane CENTRAL search string (editable)"
+            />
           </div>
 
           {/* Notes */}
-          {searches.notes.length > 0 && (
+          {heuristicSearches.notes.length > 0 && (
             <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-1">
               <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Notes</p>
               <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
-                {searches.notes.map((note, i) => (
+                {heuristicSearches.notes.map((note: string, i: number) => (
                   <li key={i}>• {note}</li>
                 ))}
               </ul>
@@ -2890,10 +3030,10 @@ function BooleanSearchExporter({ query, gapAnalysis }: {
           )}
 
           {/* PubMed link */}
-          {searches.pubmedUrl && (
+          {heuristicSearches.pubmedUrl && (
             <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
               <a
-                href={searches.pubmedUrl}
+                href={heuristicSearches.pubmedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-[#4a90d9] dark:text-blue-400 hover:underline"

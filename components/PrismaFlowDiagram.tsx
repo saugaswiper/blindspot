@@ -13,6 +13,8 @@
 
 import { useState } from "react";
 import type { PrimaryStudyPrismaData } from "@/lib/prisma-diagram";
+import { buildEmbaseUrl, buildCINAHLUrl } from "@/lib/boolean-search";
+import { generateBooleanSearchStrings } from "@/lib/boolean-search-builder";
 
 /* -------------------------------------------------------------------------- */
 /* Sub-components                                                               */
@@ -174,10 +176,29 @@ function PhaseLabel({ label }: { label: string }) {
 /* Identification phase                                                         */
 /* -------------------------------------------------------------------------- */
 
-function IdentificationPhase({ data }: { data: PrimaryStudyPrismaData }) {
+function IdentificationPhase({
+  data,
+  query
+}: {
+  data: PrimaryStudyPrismaData;
+  query?: string;
+}) {
   const hasRegisters =
     (data.clinicalTrialsCount !== null && data.clinicalTrialsCount !== undefined) ||
     (data.prosperoCount !== null && data.prosperoCount !== undefined);
+
+  // Generate Embase/CINAHL search strings for clickable links
+  let embaseString = "";
+  let centralString = "";
+  if (query) {
+    try {
+      const searches = generateBooleanSearchStrings(query);
+      embaseString = searches.embase;
+      centralString = searches.central;
+    } catch {
+      // Silently fail if string generation errors
+    }
+  }
 
   if (!data.hasPerSourceData) {
     /* Fallback: no per-source breakdown stored (pre-migration 012 result) */
@@ -233,6 +254,52 @@ function IdentificationPhase({ data }: { data: PrimaryStudyPrismaData }) {
           </ul>
           <p className="text-[10px] mt-2 leading-relaxed" style={{ color: "var(--muted)" }}>
             Trial registrations are not included in the screening funnel — they are tracked separately.
+          </p>
+        </FlowBox>
+      )}
+
+      {/* Additional databases (Embase, CINAHL) with clickable search links */}
+      {query && (embaseString || centralString) && (
+        <FlowBox>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--muted)" }}>
+            Search additional databases
+          </p>
+          <div className="space-y-1.5">
+            {embaseString && (
+              <a
+                href={buildEmbaseUrl(embaseString)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs font-medium transition-opacity hover:opacity-75"
+                style={{
+                  background: "rgba(99,102,241,0.1)",
+                  color: "var(--brand, #1e3a5f)",
+                  textDecoration: "none",
+                }}
+                title={`Search Embase: ${embaseString}`}
+              >
+                <span>Embase →</span>
+              </a>
+            )}
+            {centralString && (
+              <a
+                href={buildCINAHLUrl(centralString)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs font-medium transition-opacity hover:opacity-75"
+                style={{
+                  background: "rgba(34,197,94,0.1)",
+                  color: "var(--brand, #1e3a5f)",
+                  textDecoration: "none",
+                }}
+                title={`Search CINAHL: ${centralString}`}
+              >
+                <span>CINAHL →</span>
+              </a>
+            )}
+          </div>
+          <p className="text-[10px] mt-2 leading-relaxed" style={{ color: "var(--muted)" }}>
+            Note: Most institutions require subscriptions to access these databases. Contact your library for access.
           </p>
         </FlowBox>
       )}
@@ -315,8 +382,10 @@ function CriteriaSection({ data }: { data: PrimaryStudyPrismaData }) {
 
 export function PrismaFlowDiagram({
   data,
+  query,
 }: {
   data: PrimaryStudyPrismaData;
+  query?: string;
 }) {
   const [showCriteria, setShowCriteria] = useState(false);
 
@@ -348,7 +417,7 @@ export function PrismaFlowDiagram({
 
       {/* Phase: IDENTIFICATION */}
       <PhaseLabel label="Identification" />
-      <FlowRow main={<IdentificationPhase data={data} />} />
+      <FlowRow main={<IdentificationPhase data={data} query={query} />} />
 
       {/* Databases not covered — shown always; critical for NMA/large MA topics */}
       <div
