@@ -1644,20 +1644,47 @@ function utf8ToBase64(str: string): string {
   );
 }
 
+/** Year options for the Reviews tab year filter. */
+const REVIEWS_YEAR_OPTIONS: { label: string; value: number | undefined }[] = [
+  { label: "All years", value: undefined },
+  { label: "Since 2010", value: 2010 },
+  { label: "Since 2015", value: 2015 },
+  { label: "Since 2018", value: 2018 },
+  { label: "Since 2020", value: 2020 },
+  { label: "Since 2022", value: 2022 },
+];
+
+/**
+ * Format a single ExistingReview as a compact citation string (APA-style, no authors).
+ * Since Blindspot doesn't store author lists, the format is:
+ *   Title. Journal, Year. doi/pmid
+ */
+function formatCitation(review: ExistingReview): string {
+  const parts: string[] = [];
+  parts.push(review.title);
+  const journalYear = [review.journal, review.year ? String(review.year) : ""].filter(Boolean).join(", ");
+  if (journalYear) parts.push(journalYear);
+  if (review.doi) parts.push(`https://doi.org/${review.doi}`);
+  else if (review.pmid) parts.push(`https://pubmed.ncbi.nlm.nih.gov/${review.pmid}/`);
+  return parts.join(". ");
+}
+
 function ReviewsTab({ resultId, reviews }: { resultId: string; reviews: ExistingReview[] }) {
   const sorted = [...reviews].sort((a, b) => (b.year || 0) - (a.year || 0));
   const [exportOpen, setExportOpen] = useState(false);
   const [activeSource, setActiveSource] = usePersistentSourceFilter(resultId);
+  const [minYear, setMinYear] = useState<number | undefined>(undefined);
   const [expandedAbstracts, setExpandedAbstracts] = useState<Set<number>>(new Set());
+  const [copiedCitation, setCopiedCitation] = useState<number | null>(null);
 
   // Derive unique source labels for filter pills
   const uniqueSources = Array.from(
     new Set(sorted.map((r) => r.source).filter(Boolean))
   ).sort() as string[];
 
-  const filtered = activeSource
-    ? sorted.filter((r) => r.source === activeSource)
-    : sorted;
+  const filtered = sorted
+    .filter((r) => !activeSource || r.source === activeSource)
+    .filter((r) => !minYear || (r.year && r.year >= minYear));
 
   function toggleAbstract(idx: number) {
     setExpandedAbstracts((prev) => {
@@ -1666,6 +1693,16 @@ function ReviewsTab({ resultId, reviews }: { resultId: string; reviews: Existing
       else next.add(idx);
       return next;
     });
+  }
+
+  async function handleCopyCitation(review: ExistingReview, idx: number) {
+    try {
+      await navigator.clipboard.writeText(formatCitation(review));
+      setCopiedCitation(idx);
+      setTimeout(() => setCopiedCitation(null), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
   }
 
   function handleExportRis() {
@@ -1763,38 +1800,75 @@ function ReviewsTab({ resultId, reviews }: { resultId: string; reviews: Existing
         </div>
       </div>
 
-      {/* Source filter pills — only shown when multiple sources are present */}
-      {uniqueSources.length > 1 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          <button
-            onClick={() => setActiveSource(null)}
-            className="px-2.5 py-1 text-xs rounded-full border font-medium transition-colors"
-            style={
-              activeSource === null
-                ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)", borderColor: "var(--brand, #1e3a5f)" }
-                : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
-            }
-          >
-            All ({sorted.length})
-          </button>
-          {uniqueSources.map((src) => {
-            const count = sorted.filter((r) => r.source === src).length;
-            return (
+      {/* Filter bar: source pills + year dropdown */}
+      {(uniqueSources.length > 1 || true) && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {/* Source filter pills */}
+          {uniqueSources.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
               <button
-                key={src}
-                onClick={() => setActiveSource(activeSource === src ? null : src)}
+                onClick={() => setActiveSource(null)}
                 className="px-2.5 py-1 text-xs rounded-full border font-medium transition-colors"
                 style={
-                  activeSource === src
+                  activeSource === null
                     ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)", borderColor: "var(--brand, #1e3a5f)" }
                     : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
                 }
               >
-                {src} ({count})
+                All ({sorted.length})
               </button>
-            );
-          })}
+              {uniqueSources.map((src) => {
+                const count = sorted.filter((r) => r.source === src).length;
+                return (
+                  <button
+                    key={src}
+                    onClick={() => setActiveSource(activeSource === src ? null : src)}
+                    className="px-2.5 py-1 text-xs rounded-full border font-medium transition-colors"
+                    style={
+                      activeSource === src
+                        ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)", borderColor: "var(--brand, #1e3a5f)" }
+                        : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
+                    }
+                  >
+                    {src} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Year filter dropdown */}
+          <select
+            value={minYear ?? ""}
+            onChange={(e) => setMinYear(e.target.value ? Number(e.target.value) : undefined)}
+            className="ml-auto text-xs px-2 py-1 rounded border font-medium focus:outline-none"
+            style={{
+              background: "var(--surface)",
+              color: minYear ? "var(--foreground)" : "var(--muted)",
+              borderColor: "var(--border)",
+            }}
+            aria-label="Filter reviews by publication year"
+          >
+            {REVIEWS_YEAR_OPTIONS.map((opt) => (
+              <option key={opt.label} value={opt.value ?? ""}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
+      )}
+
+      {/* No results after filtering */}
+      {filtered.length === 0 && sorted.length > 0 && (
+        <p className="text-xs text-center py-6" style={{ color: "var(--muted)" }}>
+          No reviews match the current filters.{" "}
+          <button
+            onClick={() => { setActiveSource(null); setMinYear(undefined); }}
+            className="underline hover:opacity-70"
+          >
+            Clear filters
+          </button>
+        </p>
       )}
 
     <div className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -1842,12 +1916,28 @@ function ReviewsTab({ resultId, reviews }: { resultId: string; reviews: Existing
               )}
             </div>
           </div>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
-            {review.journal} &middot; {review.year || "Year unknown"}
-            {review.doi && (
-              <> &middot; <span className="text-gray-300 dark:text-gray-600">DOI: {review.doi.replace("https://doi.org/", "")}</span></>
-            )}
-          </p>
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              {review.journal} &middot; {review.year || "Year unknown"}
+              {review.doi && (
+                <> &middot; <span className="text-gray-300 dark:text-gray-600">DOI: {review.doi.replace("https://doi.org/", "")}</span></>
+              )}
+            </p>
+            {/* Copy citation button */}
+            <button
+              onClick={() => handleCopyCitation(review, i)}
+              className="shrink-0 text-[11px] px-2 py-0.5 rounded border font-medium transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+                color: "var(--muted)",
+              }}
+              title="Copy citation to clipboard"
+              aria-label="Copy citation"
+            >
+              {copiedCitation === i ? "Copied ✓" : "Cite"}
+            </button>
+          </div>
           {review.abstract_snippet && (
             <div className="mt-1.5">
               <p className={`text-xs text-gray-500 dark:text-gray-400 leading-relaxed${isExpanded ? "" : " line-clamp-3"}`}>

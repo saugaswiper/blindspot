@@ -126,22 +126,50 @@ export async function countSystematicReviews(query: string): Promise<number> {
 /**
  * Count Cochrane reviews published in the recent period (default: last 3 years).
  *
- * Used to populate the "Recent reviews" metric in the results dashboard.
- * Cochrane publishes approximately 300–400 new reviews per year, so this
- * gives a sense of recent activity on the topic.
- *
- * Note: The Cochrane API doesn't have explicit date filtering yet, so this
- * function wraps countSystematicReviews() and returns the same value.
- * A future improvement would parse publication dates from the response
- * and filter client-side if the API continues to lack date parameters.
+ * The Cochrane API lacks a native date filter, so we fetch up to 100 results
+ * and filter by publicationYear client-side. For topics with ≤ 100 total
+ * Cochrane reviews this is exact; for more popular topics it's a lower bound
+ * (but Cochrane publishes ~300–400 reviews/year total, so most individual
+ * topics have well under 100 entries — the approximation is good in practice).
  *
  * @param query  Boolean search string
  * @param years  Number of years to look back (default: 3)
- * @returns      Count of Cochrane reviews from recent years; 0 on error
+ * @returns      Count of matching Cochrane reviews from recent years; 0 on error
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function countRecentReviews(query: string, years = 3): Promise<number> {
-  // TODO: Once Cochrane API supports publicationDate filtering,
-  // add date parameter to the query above. For now, return all reviews.
-  return countSystematicReviews(query);
+  try {
+    const cutoffYear = new Date().getFullYear() - years;
+    const url = new URL(BASE);
+    url.searchParams.set("q", `(${query}) AND type:"Review"`);
+    // Fetch enough to cover most topics; Cochrane has ~8000 reviews total
+    url.searchParams.set("ps", "100");
+    url.searchParams.set("format", "json");
+
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) {
+      console.warn(`[cochrane] countRecentReviews failed: ${res.status}`);
+      return 0;
+    }
+
+    const data = (await res.json()) as CochraneResponse;
+    const items = data.items ?? [];
+
+    // Filter client-side by publication year
+    const recentCount = items.filter(
+      (item) => typeof item.publicationYear === "number" && item.publicationYear > cutoffYear
+    ).length;
+
+    // If the total results exceed our page size, the count is a lower bound;
+    // return the higher of the client-filtered count and a pro-rated estimate
+    const total = data.totalResults ?? 0;
+    if (total > items.length && items.length > 0) {
+      const recentFraction = recentCount / items.length;
+      return Math.round(total * recentFraction);
+    }
+
+    return recentCount;
+  } catch (error) {
+    console.warn("[cochrane] countRecentReviews exception:", error);
+    return 0;
+  }
 }
