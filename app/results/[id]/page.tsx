@@ -30,6 +30,7 @@ async function getResult(id: string) {
       cochrane_count,
       living_review_count,
       existing_reviews,
+      living_reviews,
       feasibility_score,
       feasibility_explanation,
       gap_analysis,
@@ -143,6 +144,9 @@ export default async function ResultsPage({
         cochraneCount={(result.cochrane_count as number | null | undefined) ?? null}
         livingReviewCount={
           (result.living_review_count as number | null | undefined) ?? null
+        }
+        livingReviews={
+          (result.living_reviews as Array<{ title: string; year: number; source: string; pmid?: string; doi?: string }> | null | undefined) ?? null
         }
         feasibilityScore={result.feasibility_score as FeasibilityScore | null}
         feasibilityExplanation={

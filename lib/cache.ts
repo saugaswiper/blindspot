@@ -148,6 +148,8 @@ export async function saveSearchResult(
     europepmc_count: number | null;
     /** NEW-8: Living systematic review count. Pass null when PubMed was unavailable. */
     living_review_count?: number | null;
+    /** NEW-8 Enhancement: Array of living review details (titles, sources, years). Pass null or empty array when unavailable. */
+    living_reviews?: Array<{ title: string; year: number; source: string; pmid?: string; doi?: string }> | null;
   },
   /**
    * PICO-1: Structured PICO elements from the search form.
@@ -182,7 +184,7 @@ export async function saveSearchResult(
     throw new Error(`Failed to save search: ${searchError?.message}`);
   }
 
-  // Try inserting with all columns (migrations 012 + 015 + 016 + 017 + 018 + 021).
+  // Try inserting with all columns (migrations 012 + 015 + 016 + 017 + 018 + 021 + 022).
   // Falls back progressively if a column introduced by a newer migration is missing
   // (Postgres error code 42703 = undefined_column).
   let { data: result, error: resultError } = await supabase
@@ -203,6 +205,7 @@ export async function saveSearchResult(
       openalex_count: data.openalex_count,
       europepmc_count: data.europepmc_count,
       living_review_count: data.living_review_count ?? null,
+      living_reviews: data.living_reviews ?? null,
     })
     .select("id")
     .single();
@@ -384,6 +387,8 @@ export async function saveGuestSearchResult(
     europepmc_count: number | null;
     /** NEW-8: Living systematic review count. Pass null when PubMed was unavailable. */
     living_review_count?: number | null;
+    /** NEW-8 Enhancement: Array of living review details (titles, sources, years). Pass null or empty array when unavailable. */
+    living_reviews?: Array<{ title: string; year: number; source: string; pmid?: string; doi?: string }> | null;
   },
   /**
    * SHA-256 hash of the client IP address (truncated to 32 hex chars).
@@ -422,7 +427,7 @@ export async function saveGuestSearchResult(
     throw new Error(`Failed to save guest search: ${searchError?.message}`);
   }
 
-  // Try with all columns (migrations 012 + 015 + 016 + 017 + 018 + 021);
+  // Try with all columns (migrations 012 + 015 + 016 + 017 + 018 + 021 + 022);
   // fall back progressively if columns don't exist.
   let { data: result, error: resultError } = await supabase
     .from("search_results")
@@ -442,6 +447,7 @@ export async function saveGuestSearchResult(
       openalex_count: data.openalex_count,
       europepmc_count: data.europepmc_count,
       living_review_count: data.living_review_count ?? null,
+      living_reviews: data.living_reviews ?? null,
       is_public: true,
     })
     .select("id")

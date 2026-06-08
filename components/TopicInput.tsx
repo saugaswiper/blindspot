@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PICOForm } from "@/components/PICOForm";
 import { validateSearchInput } from "@/lib/validators";
 import { isUserBooleanQuery } from "@/lib/boolean-search";
+import { usePersistentYearFilter } from "@/lib/use-persistent-year-filter";
+import { usePersistentSearchMode } from "@/lib/use-persistent-search-mode";
 import type { PICOInput, SearchMode } from "@/types";
 
 const EMPTY_PICO: PICOInput = {
@@ -30,14 +32,15 @@ const YEAR_OPTIONS: { label: string; value: number | undefined }[] = [
 export function TopicInput() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<SearchMode>("simple");
+  /** NEW-13: Search mode preference (simple or PICO). Persisted across sessions. */
+  const [mode, setMode] = usePersistentSearchMode();
   const [queryText, setQueryText] = useState(searchParams.get("q") ?? "");
   const [pico, setPico] = useState<PICOInput>(EMPTY_PICO);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showBooleanHints, setShowBooleanHints] = useState(false);
-  /** ACC-8: Selected minimum publication year (undefined = all time) */
-  const [minYear, setMinYear] = useState<number | undefined>(undefined);
+  /** ACC-8 + NEW-12: Selected minimum publication year (undefined = all time). Persisted across searches. */
+  const [minYear, setMinYear] = usePersistentYearFilter();
 
   // Ref to track whether an autosubmit has already fired (prevents double-fire in strict mode)
   const autosubmitFired = useRef(false);

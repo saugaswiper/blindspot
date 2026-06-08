@@ -57,6 +57,12 @@ export interface ExistingReview {
   pmid?: string;
   doi?: string;
   source?: string;
+  /**
+   * NEW-7: Whether this review is a living systematic review (continuously updated).
+   * Set when title or abstract mentions "living systematic review" or "living review".
+   * Helps researchers prioritize continuously-updated reviews over one-time snapshots.
+   */
+  isLivingReview?: boolean;
 }
 
 export type FeasibilityScore = "High" | "Moderate" | "Low" | "Insufficient";

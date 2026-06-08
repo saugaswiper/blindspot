@@ -14,6 +14,7 @@ import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
 import { sanitizeBooleanString, looksLikeBooleanString, buildPubMedUrl } from "@/lib/boolean-search";
 import { generateBooleanSearchStrings, validateBooleanQuery } from "@/lib/boolean-search-builder";
+import { usePersistentSourceFilter } from "@/lib/use-persistent-filter";
 import { formatProsperoWarning, formatProsperoStatus } from "@/lib/prospero";
 import { formatOSFWarning, formatOSFStatus } from "@/lib/osf-registry";
 import { formatINPLASYWarning, formatINPLASYStatus } from "@/lib/inplasy";
@@ -150,6 +151,11 @@ const STUDY_TREND_CONFIG: Record<
     tooltip: "Fewer than 15% of primary studies on this topic were published in the last 3 years — publication in this field may be slowing.",
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/* NEW-14: Animation styles for gap dimension filter badges                   */
+/* -------------------------------------------------------------------------- */
+const animationStyle = "@keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } } .animate-badge-in { animation: fadeInUp 0.3s ease-out forwards; }";
 
 /**
  * UI-1: Per-source study count breakdown.
@@ -464,6 +470,12 @@ interface Props {
    */
   livingReviewCount?: number | null;
   /**
+   * NEW-8 Enhancement: Actual living review details (titles, years, sources).
+   * When provided, displays a list of LSRs with links instead of just a count.
+   * Each item includes title, year, source (PubMed/OpenAlex/etc), and optionally PMID/DOI.
+   */
+  livingReviews?: Array<{ title: string; year: number; source: string; pmid?: string; doi?: string }> | null;
+  /**
    * Previously-generated protocol draft text (from `search_results.protocol_draft`).
    * When non-null, ProtocolBlock skips the generate-prompt CTA and shows the
    * stored draft immediately. Null means no protocol has been generated yet.
@@ -559,6 +571,7 @@ export function ResultsDashboard({
   scopusCount = null,
   cochraneCount = null,
   livingReviewCount = null,
+  livingReviews = null,
   feasibilityScore,
   feasibilityExplanation,
   gapAnalysis,
@@ -755,7 +768,9 @@ export function ResultsDashboard({
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <>
+      <style dangerouslySetInnerHTML={{ __html: animationStyle }} />
+      <div className="max-w-4xl mx-auto px-4 py-8">
 
       {/* Public viewer CTA banner — shown to non-owners viewing a shared result */}
       {!isOwner && localIsPublic && (
@@ -1140,7 +1155,8 @@ export function ResultsDashboard({
 
         {/* NEW-8: Living systematic review banner — informational, only when count > 0.
             LSRs are continuously-updated reviews; researchers should know one already
-            tracks new evidence on the topic before investing in a new review. */}
+            tracks new evidence on the topic before investing in a new review.
+            NEW-8 Enhancement: Display actual living review titles + links (not just count). */}
         {livingReviewCount !== null && livingReviewCount !== undefined && livingReviewCount > 0 && (
           <div
             className="mt-3 p-3 rounded-md"
@@ -1163,29 +1179,83 @@ export function ResultsDashboard({
               updates of these reviews — review their published versions before committing
               to a new systematic review on the same topic.
             </p>
-            <a
-              href={`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`(${query}) AND systematic[sb] AND ("living systematic review"[tiab] OR "living review"[tiab])`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs mt-1.5 inline-flex items-center gap-1 underline transition-opacity hover:opacity-70"
-              style={{ color: "var(--accent)" }}
-            >
-              View living reviews on PubMed
-              <svg
-                className="w-3 h-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                aria-hidden="true"
+
+            {/* NEW-8 Enhancement: Show actual living reviews when available */}
+            {livingReviews && livingReviews.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {livingReviews.map((lsr, idx) => {
+                  // Build link based on available identifiers
+                  const pmidUrl = lsr.pmid
+                    ? `https://pubmed.ncbi.nlm.nih.gov/${lsr.pmid}/`
+                    : null;
+                  const doiUrl = lsr.doi
+                    ? `https://doi.org/${lsr.doi}`
+                    : null;
+                  const linkUrl = pmidUrl || doiUrl;
+
+                  return (
+                    <div key={idx} className="flex items-start gap-2">
+                      <span
+                        className="text-[9px] font-medium px-1.5 py-0.5 rounded-full shrink-0 mt-0.5"
+                        style={{
+                          background: "rgba(59, 130, 246, 0.1)",
+                          color: "var(--accent)",
+                        }}
+                      >
+                        LSR
+                      </span>
+                      <div className="min-w-0">
+                        {linkUrl ? (
+                          <a
+                            href={linkUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-medium underline transition-opacity hover:opacity-70 break-words"
+                            style={{ color: "var(--accent)" }}
+                          >
+                            {lsr.title}
+                          </a>
+                        ) : (
+                          <span className="text-xs font-medium break-words" style={{ color: "var(--foreground)" }}>
+                            {lsr.title}
+                          </span>
+                        )}
+                        <div className="text-[10px] mt-0.5" style={{ color: "var(--muted)" }}>
+                          {lsr.source} {lsr.year > 0 && `· ${lsr.year}`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Fallback PubMed link when living reviews list unavailable */}
+            {(!livingReviews || livingReviews.length === 0) && (
+              <a
+                href={`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(`(${query}) AND systematic[sb] AND ("living systematic review"[tiab] OR "living review"[tiab])`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs mt-1.5 inline-flex items-center gap-1 underline transition-opacity hover:opacity-70"
+                style={{ color: "var(--accent)" }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                />
-              </svg>
-            </a>
+                View living reviews on PubMed
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
+                  />
+                </svg>
+              </a>
+            )}
           </div>
         )}
 
@@ -1339,7 +1409,7 @@ export function ResultsDashboard({
 
         <div className="p-4 sm:p-6">
           {activeTab === "reviews" && (
-            <ReviewsTab reviews={existingReviews} />
+            <ReviewsTab resultId={resultId} reviews={existingReviews} />
           )}
           {activeTab === "gaps" && (
             <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} />
@@ -1411,6 +1481,7 @@ export function ResultsDashboard({
         onClose={() => setShowShortcuts(false)}
       />
     </div>
+    </>
   );
 }
 
@@ -1573,10 +1644,10 @@ function utf8ToBase64(str: string): string {
   );
 }
 
-function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
+function ReviewsTab({ resultId, reviews }: { resultId: string; reviews: ExistingReview[] }) {
   const sorted = [...reviews].sort((a, b) => (b.year || 0) - (a.year || 0));
   const [exportOpen, setExportOpen] = useState(false);
-  const [activeSource, setActiveSource] = useState<string | null>(null);
+  const [activeSource, setActiveSource] = usePersistentSourceFilter(resultId);
   const [expandedAbstracts, setExpandedAbstracts] = useState<Set<number>>(new Set());
 
   // Derive unique source labels for filter pills
@@ -1619,6 +1690,7 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
     const content = toRis(sorted);
     if (!content) return;
     const encoded = utf8ToBase64(content);
+    // eslint-disable-next-line react-hooks/immutability -- Browser API for protocol handler navigation
     window.location.href = `zotero://import?format=ris&data=${encoded}`;
     setExportOpen(false);
   }
@@ -1757,7 +1829,18 @@ function ReviewsTab({ reviews }: { reviews: ExistingReview[] }) {
                 review.title
               )}
             </p>
-            <SourceBadge source={review.source} />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <SourceBadge source={review.source} />
+              {/* NEW-7: Living review indicator — continuously-updated reviews */}
+              {review.isLivingReview && (
+                <span
+                  className="inline-flex items-center gap-0.5 px-2 py-1 text-[10px] font-semibold rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-600 whitespace-nowrap"
+                  title="This is a living systematic review — continuously updated with new evidence as it emerges"
+                >
+                  🔄 Living
+                </span>
+              )}
+            </div>
           </div>
           <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
             {review.journal} &middot; {review.year || "Year unknown"}
@@ -1892,11 +1975,19 @@ function GapDimensionFilter({
   onReset: () => void;
 }) {
   const filtered = !isUnfiltered(activeDimensions);
+  /** NEW-14: Track animation state for staggered badge entrance */
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    // Trigger animation on mount with a small delay to ensure CSS animations work
+    const timer = setTimeout(() => setShouldAnimate(true), 16);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs text-gray-600 dark:text-gray-400 mr-0.5 shrink-0">Filter:</span>
-      {ALL_DIMENSIONS.map((d) => {
+      {ALL_DIMENSIONS.map((d, index) => {
         const isActive = activeDimensions.has(d);
         const count = gapCounts[d];
         // Hide dimensions with zero gaps — no point filtering by them
@@ -1909,7 +2000,8 @@ function GapDimensionFilter({
             aria-pressed={isActive}
             className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full border font-medium transition-colors ${
               isActive ? colors.active : colors.inactive
-            }`}
+            } ${shouldAnimate ? "animate-badge-in" : "opacity-0"}`}
+            style={shouldAnimate ? { animationDelay: `${index * 50}ms` } : undefined}
           >
             {DIMENSION_LABELS[d]}
             {count > 0 && (
@@ -1923,7 +2015,10 @@ function GapDimensionFilter({
       {filtered && (
         <button
           onClick={onReset}
-          className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ml-1 underline underline-offset-2"
+          className={`inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ml-1 underline underline-offset-2 ${
+            shouldAnimate ? "animate-badge-in" : "opacity-0"
+          }`}
+          style={shouldAnimate ? { animationDelay: `${ALL_DIMENSIONS.length * 50}ms` } : undefined}
           aria-label="Clear all gap dimension filters"
         >
           Clear

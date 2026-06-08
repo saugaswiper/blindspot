@@ -18,6 +18,7 @@ import { insertSearchTelemetry } from "@/lib/search-telemetry";
 import { toApiError } from "@/lib/errors";
 import { expandConcept } from "@/lib/synonyms";
 import { isUserBooleanQuery } from "@/lib/boolean-search";
+import { isLivingReview } from "@/lib/living-review-detection";
 import type { ExistingReview } from "@/types";
 
 /**
@@ -544,9 +545,29 @@ export async function POST(request: Request) {
 
     // Keep only reviews that mention all key concepts in title or abstract.
     // Applied after dedup so PRISMA duplicate counts remain accurate.
+    // NEW-7: Flag living systematic reviews (continuously-updated reviews)
     const existingReviews = filterByRelevance(dedupedReviews, reviewQuery)
+      .map(review => ({
+        ...review,
+        isLivingReview: isLivingReview(review.title, review.abstract_snippet),
+      }))
       .sort((a, b) => (b.year || 0) - (a.year || 0))
       .slice(0, 50);
+
+    // NEW-8 Enhancement: Extract actual living reviews (not just count).
+    // These are continuously-updated reviews that researchers should know about
+    // before starting a new systematic review on the same topic.
+    // We include up to 5 LSRs with full details (title, year, source, link).
+    const livingReviews = existingReviews
+      .filter(r => r.isLivingReview)
+      .slice(0, 5)
+      .map(r => ({
+        title: r.title,
+        year: r.year,
+        source: r.source,
+        pmid: r.pmid,
+        doi: r.doi,
+      }));
 
     // Build warnings for failed sources
     const failedSources = [
@@ -576,6 +597,8 @@ export async function POST(request: Request) {
       europepmc_count: europepmcCountVal,
       // NEW-8: Living systematic review count for the banner
       living_review_count: livingReviewCountVal,
+      // NEW-8 Enhancement: Actual living review details (titles, links, sources)
+      living_reviews: livingReviews,
     };
 
     // PICO-1: Pass structured PICO elements so they are stored in the searches row.
@@ -591,8 +614,18 @@ export async function POST(request: Request) {
       : undefined;
 
     const resultId = isGuest
-      ? await saveGuestSearchResult(query, searchData, hashIp(getClientIp(request)), picoFields)
-      : await saveSearchResult(user!.id, query, searchData, picoFields);
+      ? await saveGuestSearchResult(
+          query,
+          searchData as unknown as Parameters<typeof saveGuestSearchResult>[1],
+          hashIp(getClientIp(request)),
+          picoFields
+        )
+      : await saveSearchResult(
+          user!.id,
+          query,
+          searchData as unknown as Parameters<typeof saveSearchResult>[2],
+          picoFields
+        );
 
     // Best-effort telemetry insert (migration 014).
     // Records after_dedup, tier, and PRISMA included estimate for retrospective
