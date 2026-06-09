@@ -635,7 +635,7 @@ export function ScreeningPanel({
             }}
           />
         </div>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>~20–30 seconds</p>
+        <p className="text-xs" style={{ color: "var(--muted)" }}>Fetching from PubMed, OpenAlex &amp; Scopus then screening — ~30–45 seconds</p>
       </div>
     );
   }

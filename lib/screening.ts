@@ -12,7 +12,83 @@
 
 import { ApiError } from "@/lib/errors";
 import { SYSTEM_PROMPT } from "@/lib/prompts";
+import { fetchPrimaryStudiesForScreening as pubmedFetch } from "@/lib/pubmed";
+import { fetchPrimaryStudiesForScreening as openalexFetch } from "@/lib/openalex";
+import { fetchPrimaryStudiesForScreening as scopusFetch } from "@/lib/scopus";
 import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode } from "@/types";
+
+// ---------------------------------------------------------------------------
+// Multi-source primary study fetch with deduplication
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch primary study records from PubMed, OpenAlex, and Scopus in parallel,
+ * then deduplicate by PMID and DOI so Gemini sees each article only once.
+ *
+ * Each source contributes up to `limitPerSource` records. After dedup the
+ * combined list is capped at `maxTotal` to stay within Gemini's practical
+ * screening capacity. Sources are prioritised in order: PubMed → OpenAlex →
+ * Scopus (by dedup insertion order).
+ *
+ * Graceful degradation: a failure from any single source is logged and ignored;
+ * the remaining sources still contribute their records.
+ *
+ * @param query          Original search query (same string used in /api/search)
+ * @param limitPerSource Max records per source (default 100)
+ * @param maxTotal       Hard cap on combined deduped list (default 250)
+ */
+export async function fetchAllPrimaryStudiesForScreening(
+  query: string,
+  limitPerSource = 100,
+  maxTotal = 250,
+): Promise<ExistingReview[]> {
+  const [pubmed, openalex, scopus] = await Promise.allSettled([
+    pubmedFetch(query, limitPerSource),
+    openalexFetch(query, limitPerSource),
+    scopusFetch(query, limitPerSource),
+  ]);
+
+  const allRecords: ExistingReview[] = [];
+  const seenPmids = new Set<string>();
+  const seenDois  = new Set<string>();
+
+  function normalizeDoi(doi: string | undefined): string | undefined {
+    if (!doi) return undefined;
+    return doi.toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim();
+  }
+
+  function addRecords(records: ExistingReview[]) {
+    for (const r of records) {
+      const pmid = r.pmid?.trim();
+      const doi  = normalizeDoi(r.doi);
+
+      // Skip if we've already added this article from another source
+      if (pmid && seenPmids.has(pmid)) continue;
+      if (doi  && seenDois.has(doi))   continue;
+
+      if (pmid) seenPmids.add(pmid);
+      if (doi)  seenDois.add(doi);
+      allRecords.push(r);
+
+      if (allRecords.length >= maxTotal) return; // cap reached
+    }
+  }
+
+  if (pubmed.status === "fulfilled")   addRecords(pubmed.value);
+  else console.warn("[screening] PubMed fetch failed:", (pubmed.reason as Error)?.message);
+
+  if (allRecords.length < maxTotal) {
+    if (openalex.status === "fulfilled") addRecords(openalex.value);
+    else console.warn("[screening] OpenAlex fetch failed:", (openalex.reason as Error)?.message);
+  }
+
+  if (allRecords.length < maxTotal) {
+    if (scopus.status === "fulfilled")   addRecords(scopus.value);
+    else console.warn("[screening] Scopus fetch failed:", (scopus.reason as Error)?.message);
+  }
+
+  return allRecords;
+}
 
 // ---------------------------------------------------------------------------
 // Gemini plumbing (reuses same model / key as gemini.ts)
@@ -53,7 +129,7 @@ async function callGemini(userPrompt: string): Promise<string> {
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 16384, // Increased: 250 decisions with criterion_results need ~10k tokens
         responseMimeType: "application/json",
       },
     }),

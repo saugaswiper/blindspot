@@ -159,6 +159,45 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
 }
 
 /**
+ * Fetch primary study records (title + abstract) from Scopus for AI screening.
+ *
+ * Uses DOCTYPE(ar) to restrict to original research articles (not reviews/editorials).
+ * Requests title, abstract, year, journal, DOI, and PMID in one call.
+ *
+ * @param query  Boolean search string
+ * @param limit  Max articles to fetch (capped at 200 per Scopus API page)
+ */
+export async function fetchPrimaryStudiesForScreening(
+  query: string,
+  limit = 100,
+): Promise<ExistingReview[]> {
+  if (!API_KEY) return []; // Graceful degradation when Scopus key not configured
+  const scopusQuery = `${buildScopusQuery(query)} AND DOCTYPE(ar)`;
+  const data = await scopusSearch(
+    scopusQuery,
+    Math.min(limit, 200),
+    "dc:title,prism:coverDate,prism:publicationName,dc:description,prism:doi,pubmed-id",
+  );
+
+  const entries = data["search-results"]?.entry ?? [];
+  return entries
+    .filter((e) => e["dc:title"])
+    .map((e) => {
+      const abstract = e["dc:description"] ?? "";
+      const year = parseInt(e["prism:coverDate"]?.slice(0, 4) ?? "0") || 0;
+      return {
+        title: e["dc:title"]!,
+        year,
+        journal: e["prism:publicationName"] ?? "Unknown journal",
+        abstract_snippet: abstract.slice(0, 400) + (abstract.length > 400 ? "…" : ""),
+        doi: e["prism:doi"] || undefined,
+        pmid: e["pubmed-id"] || undefined,
+        source: "Scopus",
+      } satisfies ExistingReview;
+    });
+}
+
+/**
  * Fetch DOIs and PubMed IDs for a sample of primary studies from Scopus.
  * Used for cross-source deduplication in the search route.
  *

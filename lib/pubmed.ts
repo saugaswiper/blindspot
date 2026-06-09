@@ -210,6 +210,24 @@ export async function checkMeshTerms(pubmedQuery: string): Promise<boolean> {
 }
 
 /**
+ * Fetch primary study records (title + abstract) from PubMed for AI screening.
+ *
+ * Uses ESearch to get up to `limit` PMIDs for primary studies, then EFetch to
+ * retrieve full records (title, abstract, year, journal, PMID).
+ *
+ * @param query  Boolean search string
+ * @param limit  Max articles to fetch (capped at 200 — PubMed EFetch limit)
+ */
+export async function fetchPrimaryStudiesForScreening(
+  query: string,
+  limit = 100,
+): Promise<ExistingReview[]> {
+  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]`, Math.min(limit, 200));
+  if (ids.length === 0) return [];
+  return efetch(ids);
+}
+
+/**
  * Fetch PMIDs for a sample of primary studies from PubMed.
  * Used for cross-source deduplication: the route collects IDs from all sources,
  * deduplicates them by PMID/DOI, and uses the overlap fraction to estimate

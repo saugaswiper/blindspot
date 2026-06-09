@@ -17,8 +17,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { runTitleAbstractScreening } from "@/lib/screening";
-import { fetchPrimaryStudiesForScreening } from "@/lib/openalex";
+import { runTitleAbstractScreening, fetchAllPrimaryStudiesForScreening } from "@/lib/screening";
 import { toApiError } from "@/lib/errors";
 import type { ExistingReview, ScreeningCriteria, ScreeningResult } from "@/types";
 
@@ -68,8 +67,8 @@ export async function POST(request: Request) {
         return Response.json({ error: "Search query not found — cannot fetch primary studies." }, { status: 400 });
       }
 
-      console.log(`[screening/run] Fetching primary studies from OpenAlex for query: "${query}"`);
-      records = await fetchPrimaryStudiesForScreening(query, 100);
+      console.log(`[screening/run] Fetching primary studies from PubMed + OpenAlex + Scopus for query: "${query}"`);
+      records = await fetchAllPrimaryStudiesForScreening(query, 100, 250);
 
       if (records.length === 0) {
         return Response.json({ error: "No primary studies found for this search query." }, { status: 400 });
