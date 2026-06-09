@@ -22,7 +22,8 @@
  */
 
 import { useState } from "react";
-import type { ScreeningCriteria, ScreeningResult } from "@/types";
+import type { ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
+import { downloadTextFile } from "@/lib/citation-export";
 
 // ---------------------------------------------------------------------------
 // Decision badge helpers
@@ -48,6 +49,88 @@ const DECISION_STYLES = {
     label: "Uncertain",
   },
 };
+
+// ---------------------------------------------------------------------------
+// Reason code display
+// ---------------------------------------------------------------------------
+
+const REASON_CODE_LABELS: Record<ScreeningReasonCode, string> = {
+  wrong_population:      "Wrong population",
+  wrong_intervention:    "Wrong intervention",
+  wrong_outcome:         "Wrong outcome",
+  wrong_design:          "Wrong design",
+  wrong_timeframe:       "Wrong timeframe",
+  duplicate:             "Duplicate",
+  not_systematic_review: "Not a SR",
+  insufficient_data:     "Insufficient data",
+  off_topic:             "Off-topic",
+};
+
+function ReasonCodeBadge({ code }: { code: ScreeningReasonCode }) {
+  return (
+    <span
+      className="inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full border shrink-0"
+      style={{
+        background: "rgba(239,68,68,0.08)",
+        color: "#b91c1c",
+        border: "1px solid rgba(239,68,68,0.25)",
+      }}
+    >
+      {REASON_CODE_LABELS[code]}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Confidence indicator
+// ---------------------------------------------------------------------------
+
+const CONFIDENCE_CONFIG = {
+  high:   { dot: "#10b981", label: "High confidence" },
+  medium: { dot: "#f59e0b", label: "Medium confidence" },
+  low:    { dot: "#ef4444", label: "Low confidence — review recommended" },
+};
+
+function ConfidenceDot({ level }: { level: "high" | "medium" | "low" }) {
+  const cfg = CONFIDENCE_CONFIG[level];
+  return (
+    <span
+      className="inline-block w-2 h-2 rounded-full shrink-0 mt-1"
+      style={{ background: cfg.dot }}
+      title={cfg.label}
+      aria-label={cfg.label}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CSV export
+// ---------------------------------------------------------------------------
+
+function buildCsv(decisions: ScreeningDecision[], criteria: ScreeningResult["criteria"]): string {
+  const header = ["Title", "Year", "Journal", "Decision", "Confidence", "Reason Code", "Reason"].join(",");
+  const escape = (s: string | number | undefined) => {
+    const str = String(s ?? "");
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+  const rows = decisions.map((d) =>
+    [
+      escape(d.title),
+      escape(d.year),
+      escape(d.journal),
+      escape(d.decision),
+      escape(d.confidence ?? ""),
+      escape(d.reason_code ?? ""),
+      escape(d.reason),
+    ].join(",")
+  );
+  const meta = [
+    `# Screening results for gap: ${criteria.topic_title}`,
+    `# Gap focus: ${criteria.focus_gap}`,
+    `# Exported from Blindspot`,
+  ].join("\n");
+  return [meta, header, ...rows].join("\n");
+}
 
 // ---------------------------------------------------------------------------
 // Criteria editor helpers
@@ -135,13 +218,20 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
 
   const { decisions, included_count, excluded_count, uncertain_count, criteria } = result;
   const total = decisions.length;
+  const lowConfidenceCount = decisions.filter((d) => d.confidence === "low").length;
 
   const filtered = filter === "all" ? decisions : decisions.filter((d) => d.decision === filter);
 
+  function handleDownloadCsv() {
+    const csv = buildCsv(decisions, criteria);
+    const slug = criteria.topic_title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+    downloadTextFile(csv, `screening-${slug}.csv`, "text/csv");
+  }
+
   return (
     <div className="space-y-4">
-      {/* Summary counts */}
-      <div className="flex flex-wrap gap-3">
+      {/* Summary counts + CSV download */}
+      <div className="flex flex-wrap items-center gap-3">
         {(
           [
             { key: "all",       label: `All (${total})`,                 cls: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700" },
@@ -159,7 +249,24 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
             {label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={handleDownloadCsv}
+          className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-opacity hover:opacity-80"
+          style={{ color: "var(--foreground)", border: "1px solid var(--border)", background: "var(--surface-2)" }}
+          title="Download decisions as CSV"
+        >
+          ↓ CSV
+        </button>
       </div>
+
+      {/* Low-confidence warning */}
+      {lowConfidenceCount > 0 && (
+        <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0" />
+          {lowConfidenceCount} decision{lowConfidenceCount !== 1 ? "s" : ""} flagged as low confidence — verify these with full-text review.
+        </p>
+      )}
 
       {/* Criteria reminder */}
       <details className="text-xs" style={{ color: "var(--muted)" }}>
@@ -232,10 +339,13 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
                       </p>
                     )}
 
-                    {/* Year · Journal */}
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--muted)" }}>
-                      {d.journal && <>{d.journal} · </>}{d.year || "Year unknown"}
-                    </p>
+                    {/* Year · Journal · Reason code */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <p className="text-[11px]" style={{ color: "var(--muted)" }}>
+                        {d.journal && <>{d.journal} · </>}{d.year || "Year unknown"}
+                      </p>
+                      {d.reason_code && <ReasonCodeBadge code={d.reason_code} />}
+                    </div>
 
                     {/* Reason — toggle on click */}
                     <button
@@ -287,10 +397,13 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
                     )}
                   </div>
 
-                  {/* Decision label */}
-                  <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
-                    {style.label}
-                  </span>
+                  {/* Confidence dot + decision label */}
+                  <div className="shrink-0 flex flex-col items-center gap-1">
+                    {d.confidence && <ConfidenceDot level={d.confidence} />}
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
+                      {style.label}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

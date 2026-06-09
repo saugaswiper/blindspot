@@ -12,7 +12,7 @@
 
 import { ApiError } from "@/lib/errors";
 import { SYSTEM_PROMPT } from "@/lib/prompts";
-import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision } from "@/types";
+import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Gemini plumbing (reuses same model / key as gemini.ts)
@@ -207,12 +207,31 @@ Decision rules:
 - "exclude"   → fails at least one exclusion criterion OR fails a key inclusion criterion
 - "uncertain" → title/abstract lacks enough information to decide reliably
 
+reason_code (ONLY for "exclude" decisions — pick the single best-fitting code):
+  "wrong_population"       – participants do not match target population
+  "wrong_intervention"     – intervention/exposure differs from gap focus
+  "wrong_outcome"          – does not measure relevant outcomes
+  "wrong_design"           – study design does not meet inclusion criteria
+  "wrong_timeframe"        – publication or follow-up period outside scope
+  "duplicate"              – duplicate of another record
+  "not_systematic_review"  – not a systematic review (e.g. primary study, editorial)
+  "insufficient_data"      – too little information in title/abstract to assess
+  "off_topic"              – topic does not address the identified gap
+For "include" and "uncertain" decisions, omit reason_code or set it to null.
+
+confidence:
+  "high"   – clear-cut decision; title/abstract make the verdict unambiguous
+  "medium" – moderately confident; abstract provides enough but not complete information
+  "low"    – borderline; human should verify before accepting
+
 Respond with a JSON array — one object per review, in the same order as the input list:
 [
   {
     "index": 0,
     "decision": "include|exclude|uncertain",
     "reason": "One sentence summary referencing the key criterion that determined the decision.",
+    "reason_code": "off_topic|wrong_population|...|null",
+    "confidence": "high|medium|low",
     "criterion_results": [
       {"criterion": "exact criterion text", "type": "inclusion", "met": true, "note": "one sentence explaining how the title/abstract does or does not satisfy this criterion"},
       {"criterion": "exact criterion text", "type": "exclusion", "met": false, "note": "one sentence"}
@@ -234,7 +253,24 @@ interface DecisionRaw {
   index: number;
   decision: "include" | "exclude" | "uncertain";
   reason: string;
+  reason_code?: string | null;
+  confidence?: "high" | "medium" | "low";
   criterion_results?: CriterionResultRaw[];
+}
+
+const VALID_REASON_CODES = new Set<string>([
+  "wrong_population", "wrong_intervention", "wrong_outcome", "wrong_design",
+  "wrong_timeframe", "duplicate", "not_systematic_review", "insufficient_data", "off_topic",
+]);
+
+function parseReasonCode(raw: string | null | undefined, decision: string): ScreeningReasonCode | undefined {
+  if (decision !== "exclude" || !raw || typeof raw !== "string") return undefined;
+  return VALID_REASON_CODES.has(raw) ? (raw as ScreeningReasonCode) : undefined;
+}
+
+function parseConfidence(raw: string | undefined): "high" | "medium" | "low" | undefined {
+  if (raw === "high" || raw === "medium" || raw === "low") return raw;
+  return undefined;
 }
 
 function validateDecisions(arr: unknown, expectedLength: number): arr is DecisionRaw[] {
@@ -294,6 +330,8 @@ export async function runTitleAbstractScreening(
         doi: reviews[i].doi,
         decision: d.decision,
         reason: d.reason,
+        reason_code: parseReasonCode(d.reason_code, d.decision),
+        confidence: parseConfidence(d.confidence),
         criterion_results: d.criterion_results,
       }));
     }
@@ -312,6 +350,8 @@ export async function runTitleAbstractScreening(
     doi: reviews[i].doi,
     decision: d.decision,
     reason: d.reason,
+    reason_code: parseReasonCode(d.reason_code, d.decision),
+    confidence: parseConfidence(d.confidence),
     criterion_results: d.criterion_results,
   }));
 }

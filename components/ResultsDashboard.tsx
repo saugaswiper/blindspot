@@ -1442,7 +1442,7 @@ export function ResultsDashboard({
               gapAnalysis: localGapAnalysis,
               query,
             });
-            return <PrismaFlowDiagram data={prismaData} query={query} />;
+            return <PrismaFlowDiagram data={prismaData} query={query} screeningResult={screeningResult} />;
           })()}
         </div>
       </div>

@@ -266,6 +266,22 @@ export interface ScreeningCriteria {
   topic_title: string;
 }
 
+/**
+ * PRISMA-aligned exclusion reason codes for the "exclude" decision.
+ * Maps to the standard reason categories required by PRISMA 2020 flow diagrams.
+ * Only present on "exclude" decisions; undefined on "include" / "uncertain".
+ */
+export type ScreeningReasonCode =
+  | "wrong_population"      // participants do not match the target population
+  | "wrong_intervention"    // intervention/exposure differs from the gap focus
+  | "wrong_outcome"         // does not measure relevant outcomes
+  | "wrong_design"          // study design does not meet inclusion criteria
+  | "wrong_timeframe"       // publication or follow-up period outside scope
+  | "duplicate"             // duplicate of another included record
+  | "not_systematic_review" // not a systematic review (e.g. primary study, editorial)
+  | "insufficient_data"     // too little information in title/abstract to assess
+  | "off_topic";            // topic does not address the identified gap
+
 /** AI screening verdict for a single existing review. */
 export interface ScreeningDecision {
   title: string;
@@ -281,6 +297,16 @@ export interface ScreeningDecision {
   decision: "include" | "exclude" | "uncertain";
   /** One-sentence reason for the decision. */
   reason: string;
+  /**
+   * PRISMA-aligned reason code for excluded decisions.
+   * Undefined for "include" and "uncertain" decisions.
+   */
+  reason_code?: ScreeningReasonCode;
+  /**
+   * AI confidence in the decision. High = clear-cut; low = borderline.
+   * Used to flag which decisions most need human review.
+   */
+  confidence?: "high" | "medium" | "low";
   /**
    * Per-criterion chain-of-thought breakdown from Gemini.
    * Optional: absent on results generated before chain-of-thought support.

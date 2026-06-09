@@ -13,6 +13,7 @@
 
 import { useState } from "react";
 import type { PrimaryStudyPrismaData } from "@/lib/prisma-diagram";
+import type { ScreeningResult, ScreeningReasonCode } from "@/types";
 import { buildEmbaseUrl, buildCINAHLUrl } from "@/lib/boolean-search";
 import { generateBooleanSearchStrings } from "@/lib/boolean-search-builder";
 
@@ -380,12 +381,128 @@ function CriteriaSection({ data }: { data: PrimaryStudyPrismaData }) {
 /* Main export                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------- */
+/* Existing Reviews Screening mini-PRISMA                                      */
+/* -------------------------------------------------------------------------- */
+
+const REASON_CODE_LABELS: Record<ScreeningReasonCode, string> = {
+  wrong_population:      "Wrong population",
+  wrong_intervention:    "Wrong intervention",
+  wrong_outcome:         "Wrong outcome",
+  wrong_design:          "Wrong design",
+  wrong_timeframe:       "Wrong timeframe",
+  duplicate:             "Duplicate",
+  not_systematic_review: "Not a SR",
+  insufficient_data:     "Insufficient data",
+  off_topic:             "Off-topic",
+};
+
+function ExistingReviewsScreeningSection({ result }: { result: ScreeningResult }) {
+  const { criteria, decisions, included_count, excluded_count, uncertain_count } = result;
+  const total = decisions.length;
+
+  // Tally reason codes for excluded decisions
+  const reasonTally: Partial<Record<ScreeningReasonCode, number>> = {};
+  for (const d of decisions) {
+    if (d.decision === "exclude" && d.reason_code) {
+      reasonTally[d.reason_code] = (reasonTally[d.reason_code] ?? 0) + 1;
+    }
+  }
+  const topReasons = Object.entries(reasonTally)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4) as [ScreeningReasonCode, number][];
+
+  const runDate = new Date(result.run_at).toLocaleDateString("en-US", {
+    year: "numeric", month: "short", day: "numeric",
+  });
+
+  return (
+    <div
+      className="mt-6 rounded-xl p-4 space-y-4"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+    >
+      {/* Header */}
+      <div>
+        <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+          Existing Reviews Screened
+        </p>
+        <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+          AI screening run against gap: <span style={{ color: "var(--foreground)" }}>{criteria.topic_title}</span>
+          {" · "}{runDate}
+        </p>
+      </div>
+
+      {/* Mini PRISMA flow */}
+      <div className="flex flex-col items-center gap-1 max-w-xs mx-auto">
+        {/* Identified */}
+        <div className="w-full rounded-lg px-4 py-2.5 text-sm text-center" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <span className="font-bold">{total}</span> existing reviews identified
+        </div>
+        <VerticalArrow />
+        {/* Screened */}
+        <div className="w-full rounded-lg px-4 py-2.5 text-sm text-center" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
+          <span className="font-bold">{total}</span> titles &amp; abstracts screened
+        </div>
+        {/* Branch row */}
+        <div className="grid grid-cols-3 gap-2 w-full mt-1">
+          {/* Include */}
+          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)" }}>
+            <p className="text-lg font-bold" style={{ color: "#059669" }}>{included_count}</p>
+            <p className="text-[10px]" style={{ color: "#059669" }}>Included</p>
+          </div>
+          {/* Uncertain */}
+          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
+            <p className="text-lg font-bold" style={{ color: "#d97706" }}>{uncertain_count}</p>
+            <p className="text-[10px]" style={{ color: "#d97706" }}>Uncertain</p>
+          </div>
+          {/* Exclude */}
+          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <p className="text-lg font-bold" style={{ color: "#dc2626" }}>{excluded_count}</p>
+            <p className="text-[10px]" style={{ color: "#dc2626" }}>Excluded</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Exclusion reason breakdown */}
+      {topReasons.length > 0 && (
+        <div>
+          <p className="text-[11px] font-medium mb-1.5" style={{ color: "var(--muted)" }}>
+            Exclusion reasons
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {topReasons.map(([code, count]) => (
+              <span
+                key={code}
+                className="text-[10px] px-2 py-0.5 rounded-full border"
+                style={{
+                  background: "rgba(239,68,68,0.06)",
+                  color: "#b91c1c",
+                  borderColor: "rgba(239,68,68,0.2)",
+                }}
+              >
+                {REASON_CODE_LABELS[code]} ({count})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Gap focus note */}
+      <p className="text-[10px] italic leading-relaxed" style={{ color: "var(--muted)" }}>
+        Screened for: {criteria.focus_gap}
+      </p>
+    </div>
+  );
+}
+
 export function PrismaFlowDiagram({
   data,
   query,
+  screeningResult = null,
 }: {
   data: PrimaryStudyPrismaData;
   query?: string;
+  screeningResult?: ScreeningResult | null;
 }) {
   const [showCriteria, setShowCriteria] = useState(false);
 
@@ -608,6 +725,11 @@ export function PrismaFlowDiagram({
         live searches of PubMed, OpenAlex, Europe PMC, and Scopus. Screening/eligibility/included
         counts are estimates — verify with domain expertise before use in a protocol.
       </p>
+
+      {/* Existing reviews screening — shown when AI screening has been run */}
+      {screeningResult && (
+        <ExistingReviewsScreeningSection result={screeningResult} />
+      )}
     </div>
   );
 }
