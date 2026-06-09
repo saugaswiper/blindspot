@@ -34,13 +34,14 @@ import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision
  * the remaining sources still contribute their records.
  *
  * @param query          Original search query (same string used in /api/search)
- * @param limitPerSource Max records per source (default 100)
- * @param maxTotal       Hard cap on combined deduped list (default 250)
+ * @param limitPerSource Max records per source (default 200; PubMed/Scopus cap at 200, OpenAlex at 200)
+ * @param maxTotal       Hard cap on the combined deduped list (default 500)
+ *                       Increase freely — batching in runTitleAbstractScreening handles any size.
  */
 export async function fetchAllPrimaryStudiesForScreening(
   query: string,
-  limitPerSource = 100,
-  maxTotal = 250,
+  limitPerSource = 200,
+  maxTotal = 500,
 ): Promise<ExistingReview[]> {
   const [pubmed, openalex, scopus] = await Promise.allSettled([
     pubmedFetch(query, limitPerSource),
@@ -89,6 +90,26 @@ export async function fetchAllPrimaryStudiesForScreening(
 
   return allRecords;
 }
+
+// ---------------------------------------------------------------------------
+// Screening capacity constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum articles sent to Gemini in a single screening call.
+ *
+ * Gemini 2.5 Flash supports up to 65 536 output tokens. With criterion_results
+ * (per-criterion chain-of-thought) each decision costs ~300–400 tokens, so
+ * a batch of 150 comfortably fits within the output budget.
+ *
+ * runTitleAbstractScreening splits larger lists into batches of this size and
+ * merges the results — so the overall cap is determined only by how many
+ * articles you fetch, not by Gemini's per-call limits.
+ *
+ * Raise this number if you find Gemini reliably handling larger batches for
+ * your typical query (simpler criteria = smaller output per decision).
+ */
+const SCREENING_BATCH_SIZE = 150;
 
 // ---------------------------------------------------------------------------
 // Gemini plumbing (reuses same model / key as gemini.ts)
@@ -364,13 +385,12 @@ function validateDecisions(arr: unknown, expectedLength: number): arr is Decisio
   );
 }
 
-export async function runTitleAbstractScreening(
-  reviews: ExistingReview[],
+/** Screen a single batch (≤ SCREENING_BATCH_SIZE records) against criteria. */
+async function screenBatch(
+  batch: ExistingReview[],
   criteria: ScreeningCriteria
 ): Promise<ScreeningDecision[]> {
-  if (reviews.length === 0) return [];
-
-  const prompt = buildScreeningPrompt(reviews, criteria);
+  const prompt = buildScreeningPrompt(batch, criteria);
   const raw = await callGemini(prompt);
   const json = extractJson(raw);
 
@@ -385,10 +405,10 @@ export async function runTitleAbstractScreening(
     );
   }
 
-  if (!validateDecisions(parsed, reviews.length)) {
+  if (!validateDecisions(parsed, batch.length)) {
     // Attempt to work with a partial / length-mismatch response by padding
     if (Array.isArray(parsed) && parsed.length > 0) {
-      const filled: DecisionRaw[] = reviews.map((_, i) => {
+      const filled: DecisionRaw[] = batch.map((_, i) => {
         const found = (parsed as DecisionRaw[]).find((d) => d.index === i);
         return (
           found ?? {
@@ -398,18 +418,7 @@ export async function runTitleAbstractScreening(
           }
         );
       });
-      return filled.map((d, i) => ({
-        title: reviews[i].title,
-        year: reviews[i].year,
-        journal: reviews[i].journal,
-        pmid: reviews[i].pmid,
-        doi: reviews[i].doi,
-        decision: d.decision,
-        reason: d.reason,
-        reason_code: parseReasonCode(d.reason_code, d.decision),
-        confidence: parseConfidence(d.confidence),
-        criterion_results: d.criterion_results,
-      }));
+      return filled.map((d, i) => mapDecision(d, batch[i]));
     }
     throw new ApiError(
       "Screening response validation failed",
@@ -418,16 +427,55 @@ export async function runTitleAbstractScreening(
     );
   }
 
-  return (parsed as DecisionRaw[]).map((d, i) => ({
-    title: reviews[i].title,
-    year: reviews[i].year,
-    journal: reviews[i].journal,
-    pmid: reviews[i].pmid,
-    doi: reviews[i].doi,
+  return (parsed as DecisionRaw[]).map((d, i) => mapDecision(d, batch[i]));
+}
+
+function mapDecision(d: DecisionRaw, record: ExistingReview): ScreeningDecision {
+  return {
+    title: record.title,
+    year: record.year,
+    journal: record.journal,
+    pmid: record.pmid,
+    doi: record.doi,
     decision: d.decision,
     reason: d.reason,
     reason_code: parseReasonCode(d.reason_code, d.decision),
     confidence: parseConfidence(d.confidence),
     criterion_results: d.criterion_results,
-  }));
+  };
+}
+
+/**
+ * Screen a list of records against inclusion/exclusion criteria.
+ *
+ * Automatically batches large lists into chunks of SCREENING_BATCH_SIZE
+ * (default 150) and runs each batch sequentially against Gemini, then merges
+ * results. This removes the per-call output-token ceiling — you can screen
+ * hundreds or thousands of articles limited only by API rate limits and time.
+ *
+ * Batches are sequential (not parallel) to respect Gemini rate limits.
+ */
+export async function runTitleAbstractScreening(
+  reviews: ExistingReview[],
+  criteria: ScreeningCriteria
+): Promise<ScreeningDecision[]> {
+  if (reviews.length === 0) return [];
+
+  // If the list fits in one batch, skip the overhead
+  if (reviews.length <= SCREENING_BATCH_SIZE) {
+    return screenBatch(reviews, criteria);
+  }
+
+  // Split into batches and process sequentially
+  const allDecisions: ScreeningDecision[] = [];
+  for (let start = 0; start < reviews.length; start += SCREENING_BATCH_SIZE) {
+    const batch = reviews.slice(start, start + SCREENING_BATCH_SIZE);
+    console.log(
+      `[screening] Batch ${Math.floor(start / SCREENING_BATCH_SIZE) + 1}/${Math.ceil(reviews.length / SCREENING_BATCH_SIZE)} — ${batch.length} records`
+    );
+    const decisions = await screenBatch(batch, criteria);
+    allDecisions.push(...decisions);
+  }
+
+  return allDecisions;
 }
