@@ -34,14 +34,14 @@ import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision
  * the remaining sources still contribute their records.
  *
  * @param query          Original search query (same string used in /api/search)
- * @param limitPerSource Max records per source (default 200; PubMed/Scopus cap at 200, OpenAlex at 200)
- * @param maxTotal       Hard cap on the combined deduped list (default 500)
+ * @param limitPerSource Max records per source (default 500; each source paginates to this ceiling)
+ * @param maxTotal       Hard cap on the combined deduped list (default 1000)
  *                       Increase freely — batching in runTitleAbstractScreening handles any size.
  */
 export async function fetchAllPrimaryStudiesForScreening(
   query: string,
-  limitPerSource = 200,
-  maxTotal = 500,
+  limitPerSource = 500,
+  maxTotal = 1000,
 ): Promise<ExistingReview[]> {
   const [pubmed, openalex, scopus] = await Promise.allSettled([
     pubmedFetch(query, limitPerSource),

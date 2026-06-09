@@ -48,6 +48,7 @@ async function scopusSearch(
   query: string,
   count: number,
   fields?: string,
+  start = 0,
 ): Promise<ScopusResponse> {
   if (!API_KEY) {
     throw new ApiError("ELSEVIER_API_KEY not configured", 500);
@@ -56,6 +57,7 @@ async function scopusSearch(
   const url = new URL(BASE);
   url.searchParams.set("query", query);
   url.searchParams.set("count", String(Math.min(count, 200)));
+  if (start > 0) url.searchParams.set("start", String(start));
   // Pass the API key as a URL parameter in addition to the header — some
   // reverse-proxy setups strip custom headers, and Elsevier accepts both.
   url.searchParams.set("apiKey", API_KEY);
@@ -162,39 +164,57 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
  * Fetch primary study records (title + abstract) from Scopus for AI screening.
  *
  * Uses DOCTYPE(ar) to restrict to original research articles (not reviews/editorials).
- * Requests title, abstract, year, journal, DOI, and PMID in one call.
+ * Paginates using the Scopus `start` offset parameter (200 records per page) until
+ * `limit` is reached or no more results are available.
  *
  * @param query  Boolean search string
- * @param limit  Max articles to fetch (capped at 200 per Scopus API page)
+ * @param limit  Max articles to fetch (default 500; pages of 200 each)
  */
 export async function fetchPrimaryStudiesForScreening(
   query: string,
-  limit = 100,
+  limit = 500,
 ): Promise<ExistingReview[]> {
   if (!API_KEY) return []; // Graceful degradation when Scopus key not configured
+  const PAGE_SIZE = 200;
+  const results: ExistingReview[] = [];
   const scopusQuery = `${buildScopusQuery(query)} AND DOCTYPE(ar)`;
-  const data = await scopusSearch(
-    scopusQuery,
-    Math.min(limit, 200),
-    "dc:title,prism:coverDate,prism:publicationName,dc:description,prism:doi,pubmed-id",
-  );
+  const fields = "dc:title,prism:coverDate,prism:publicationName,dc:description,prism:doi,pubmed-id";
+  let start = 0;
 
-  const entries = data["search-results"]?.entry ?? [];
-  return entries
-    .filter((e) => e["dc:title"])
-    .map((e) => {
-      const abstract = e["dc:description"] ?? "";
-      const year = parseInt(e["prism:coverDate"]?.slice(0, 4) ?? "0") || 0;
-      return {
-        title: e["dc:title"]!,
-        year,
-        journal: e["prism:publicationName"] ?? "Unknown journal",
-        abstract_snippet: abstract.slice(0, 400) + (abstract.length > 400 ? "…" : ""),
-        doi: e["prism:doi"] || undefined,
-        pmid: e["pubmed-id"] || undefined,
-        source: "Scopus",
-      } satisfies ExistingReview;
-    });
+  while (results.length < limit) {
+    const count = Math.min(PAGE_SIZE, limit - results.length);
+    let data: ScopusResponse;
+    try {
+      data = await scopusSearch(scopusQuery, count, fields, start);
+    } catch {
+      break; // graceful degradation on API error
+    }
+
+    const entries = data["search-results"]?.entry ?? [];
+    if (entries.length === 0) break;
+
+    const page = entries
+      .filter((e) => e["dc:title"])
+      .map((e) => {
+        const abstract = e["dc:description"] ?? "";
+        const year = parseInt(e["prism:coverDate"]?.slice(0, 4) ?? "0") || 0;
+        return {
+          title: e["dc:title"]!,
+          year,
+          journal: e["prism:publicationName"] ?? "Unknown journal",
+          abstract_snippet: abstract.slice(0, 400) + (abstract.length > 400 ? "…" : ""),
+          doi: e["prism:doi"] || undefined,
+          pmid: e["pubmed-id"] || undefined,
+          source: "Scopus",
+        } satisfies ExistingReview;
+      });
+
+    results.push(...page);
+    if (page.length < count) break; // last page — fewer results than requested
+    start += count;
+  }
+
+  return results;
 }
 
 /**

@@ -24,7 +24,7 @@ interface OpenAlexWork {
 
 interface OpenAlexResponse {
   results: OpenAlexWork[];
-  meta: { count: number };
+  meta: { count: number; next_cursor?: string | null };
 }
 
 // OpenAlex stores abstracts as inverted index — reconstruct plain text
@@ -182,28 +182,53 @@ export async function fetchPrimaryStudyIds(
 }
 
 /**
- * Fetches primary study records (title + abstract) for AI screening.
+ * Fetches primary study records (title + abstract) from OpenAlex for AI screening.
  *
- * Unlike fetchPrimaryStudyIds (which returns only PMIDs/DOIs for deduplication),
- * this function retrieves the full metadata needed to screen each record:
- * title, year, journal, and abstract.
+ * Uses cursor-based pagination to retrieve beyond the 200-record per-page limit.
+ * Each page requests 200 records; pages continue until `limit` is reached or
+ * OpenAlex returns no next_cursor. Supports fetching thousands of records.
  *
- * Uses the same title_and_abstract.search scope as countPrimaryStudies to
- * keep results consistent with the displayed primary_study_count.
+ * Uses title_and_abstract.search scope (same as countPrimaryStudies) to keep
+ * results consistent with the displayed primary_study_count.
  *
  * @param query  Boolean search string (same query used in the search)
- * @param limit  Max records to fetch (capped at 200 — Gemini screening cap is 100)
+ * @param limit  Max records to fetch (default 500; no hard ceiling)
  * @returns      Array of ExistingReview-shaped objects with source = "OpenAlex"
  */
 export async function fetchPrimaryStudiesForScreening(
   query: string,
-  limit = 100,
+  limit = 500,
 ): Promise<ExistingReview[]> {
-  const data = await searchOpenAlex(query, "primary", Math.min(limit, 200), undefined, "title_abstract");
+  const PAGE_SIZE = 200; // OpenAlex max per-page
+  const results: ExistingReview[] = [];
+  let cursor: string | null = "*"; // OpenAlex cursor pagination — start with "*"
 
-  return data.results
-    .filter((w) => w.title)
-    .map((w) => {
+  while (results.length < limit && cursor) {
+    const remaining = limit - results.length;
+    const pageSize = Math.min(PAGE_SIZE, remaining);
+
+    const url = new URL(`${BASE}/works`);
+    url.searchParams.set(
+      "filter",
+      `type:article,title_and_abstract.search:${query}`,
+    );
+    url.searchParams.set("per-page", String(pageSize));
+    url.searchParams.set("cursor", cursor);
+    url.searchParams.set(
+      "select",
+      "title,publication_year,primary_location,abstract_inverted_index,doi,ids",
+    );
+    if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
+
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) break; // graceful degradation on rate-limit or error
+
+    const data = (await res.json()) as {
+      results: Array<OpenAlexWork & { ids?: { pmid?: string | null } }>;
+      meta: { count: number; next_cursor?: string | null };
+    };
+
+    const page = data.results.filter((w) => w.title).map((w) => {
       const abstract = invertedIndexToAbstract(w.abstract_inverted_index);
       return {
         title: w.title!,
@@ -211,7 +236,17 @@ export async function fetchPrimaryStudiesForScreening(
         journal: w.primary_location?.source?.display_name ?? "Unknown journal",
         abstract_snippet: abstract.slice(0, 400) + (abstract.length > 400 ? "…" : ""),
         doi: w.doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").toLowerCase() ?? undefined,
+        pmid: w.ids?.pmid?.replace(/^https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\//i, "") || undefined,
         source: "OpenAlex",
-      };
+      } satisfies ExistingReview;
     });
+
+    results.push(...page);
+
+    // Stop if no more pages or we got fewer than requested
+    cursor = data.meta.next_cursor ?? null;
+    if (page.length < pageSize) break;
+  }
+
+  return results;
 }

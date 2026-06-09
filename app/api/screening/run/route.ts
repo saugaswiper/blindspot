@@ -5,8 +5,8 @@
  * inclusion/exclusion criteria.
  *
  * screenType controls which records are screened:
- *   "primary"  (default) — fetches primary studies fresh from OpenAlex
- *                           using the search query (title+abstract scope, up to 100)
+ *   "primary"  (default) — fetches primary studies fresh from PubMed, OpenAlex & Scopus
+ *                           using the search query (up to 500/source, 1000 total)
  *   "reviews"            — uses existing_reviews stored on the result row
  *
  * Persists the ScreeningResult to search_results.screening_result so the
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       }
 
       console.log(`[screening/run] Fetching primary studies from PubMed + OpenAlex + Scopus for query: "${query}"`);
-      records = await fetchAllPrimaryStudiesForScreening(query, 100, 250);
+      records = await fetchAllPrimaryStudiesForScreening(query, 500, 1000);
 
       if (records.length === 0) {
         return Response.json({ error: "No primary studies found for this search query." }, { status: 400 });

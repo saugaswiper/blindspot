@@ -212,19 +212,29 @@ export async function checkMeshTerms(pubmedQuery: string): Promise<boolean> {
 /**
  * Fetch primary study records (title + abstract) from PubMed for AI screening.
  *
- * Uses ESearch to get up to `limit` PMIDs for primary studies, then EFetch to
- * retrieve full records (title, abstract, year, journal, PMID).
+ * ESearch retrieves up to `limit` PMIDs in a single call (PubMed supports up
+ * to 10 000 via retmax). EFetch is then called in batches of 200 — the PubMed
+ * per-request ID limit — so any `limit` value works without extra pagination.
  *
  * @param query  Boolean search string
- * @param limit  Max articles to fetch (capped at 200 — PubMed EFetch limit)
+ * @param limit  Max articles to fetch (default 500; ESearch supports up to 10 000)
  */
 export async function fetchPrimaryStudiesForScreening(
   query: string,
-  limit = 100,
+  limit = 500,
 ): Promise<ExistingReview[]> {
-  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]`, Math.min(limit, 200));
+  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]`, Math.min(limit, 10000));
   if (ids.length === 0) return [];
-  return efetch(ids);
+
+  // EFetch supports up to 200 IDs per call — batch as needed
+  const EFETCH_BATCH = 200;
+  const results: ExistingReview[] = [];
+  for (let i = 0; i < ids.length; i += EFETCH_BATCH) {
+    const batch = ids.slice(i, i + EFETCH_BATCH);
+    const records = await efetch(batch);
+    results.push(...records);
+  }
+  return results;
 }
 
 /**
