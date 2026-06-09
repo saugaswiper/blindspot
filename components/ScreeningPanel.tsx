@@ -22,7 +22,7 @@
  */
 
 import { useState } from "react";
-import type { ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
+import type { ExistingReview, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
 import { downloadTextFile } from "@/lib/citation-export";
 
 // ---------------------------------------------------------------------------
@@ -450,6 +450,8 @@ export function ScreeningPanel({
   const [criteria, setCriteria] = useState<ScreeningCriteria | null>(null);
   const [screeningResult, setScreeningResult] = useState<ScreeningResult | null>(initialResult);
   const [error, setError] = useState<string | null>(null);
+  // Real progress for the chunked screening pipeline. null until the total is known.
+  const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   const recordLabel = screenType === "primary" ? "primary studies" : "reviews";
 
   // ---------------------------------------------------------------------------
@@ -479,29 +481,99 @@ export function ScreeningPanel({
   }
 
   // ---------------------------------------------------------------------------
-  // Step 2: Run screening with approved criteria
+  // Step 2: Run screening with approved criteria.
+  //
+  // Chunked pipeline so an unlimited number of articles can be screened without
+  // hitting a serverless timeout:
+  //   1. /api/screening/fetch → gather ALL records (paginated across sources)
+  //   2. /api/screening/run   → screen one CHUNK_SIZE slice at a time (looped)
+  //   3. /api/screening/save  → persist the assembled result once at the end
   // ---------------------------------------------------------------------------
+  const CHUNK_SIZE = 300;
+
   async function handleRun() {
     if (!criteria) return;
     setStep("running");
     setError(null);
+    setProgress(null);
+
     try {
-      const res = await fetch("/api/screening/run", {
+      // ── Phase 1: fetch every available record ──────────────────────────────
+      const fetchRes = await fetch("/api/screening/fetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resultId, criteria, screenType }),
+        body: JSON.stringify({ resultId, screenType }),
       });
-      const data = (await res.json()) as ScreeningResult & { error?: string };
-      if (!res.ok || data.error) {
-        setError(data.error ?? "Screening failed. Please try again.");
+      const fetchData = (await fetchRes.json()) as {
+        records?: ExistingReview[];
+        total?: number;
+        error?: string;
+      };
+      if (!fetchRes.ok || fetchData.error || !fetchData.records) {
+        setError(fetchData.error ?? `No ${recordLabel} found to screen.`);
         setStep("approve");
         return;
       }
-      setScreeningResult(data);
+
+      const records = fetchData.records;
+      const total = records.length;
+      if (total === 0) {
+        setError(`No ${recordLabel} found to screen.`);
+        setStep("approve");
+        return;
+      }
+
+      // ── Phase 2: screen in chunks, accumulating decisions ──────────────────
+      setProgress({ processed: 0, total });
+      const allDecisions: ScreeningDecision[] = [];
+
+      for (let start = 0; start < total; start += CHUNK_SIZE) {
+        const chunk = records.slice(start, start + CHUNK_SIZE);
+        const runRes = await fetch("/api/screening/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ criteria, records: chunk }),
+        });
+        const runData = (await runRes.json()) as { decisions?: ScreeningDecision[]; error?: string };
+        if (!runRes.ok || runData.error || !runData.decisions) {
+          setError(runData.error ?? "Screening failed partway through. Please try again.");
+          setStep("approve");
+          setProgress(null);
+          return;
+        }
+        allDecisions.push(...runData.decisions);
+        setProgress({ processed: Math.min(start + CHUNK_SIZE, total), total });
+      }
+
+      // ── Phase 3: assemble + persist the final result ───────────────────────
+      const assembled: ScreeningResult = {
+        criteria,
+        decisions: allDecisions,
+        included_count: allDecisions.filter((d) => d.decision === "include").length,
+        excluded_count: allDecisions.filter((d) => d.decision === "exclude").length,
+        uncertain_count: allDecisions.filter((d) => d.decision === "uncertain").length,
+        screen_type: screenType,
+        run_at: new Date().toISOString(),
+      };
+
+      // Persist (best-effort — results still display even if the save fails).
+      try {
+        await fetch("/api/screening/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resultId, screeningResult: assembled }),
+        });
+      } catch {
+        // Non-fatal: the user still sees the results for this session.
+      }
+
+      setScreeningResult(assembled);
+      setProgress(null);
       setStep("results");
     } catch {
       setError("Network error. Please try again.");
       setStep("approve");
+      setProgress(null);
     }
   }
 
@@ -612,8 +684,12 @@ export function ScreeningPanel({
     );
   }
 
-  // ── Running: loading state ────────────────────────────────────────────────
+  // ── Running: loading state with real chunked progress ─────────────────────
   if (step === "running") {
+    const pct = progress && progress.total > 0
+      ? Math.round((progress.processed / progress.total) * 100)
+      : null;
+
     return (
       <div
         className="mt-3 rounded-lg p-4 space-y-3"
@@ -624,18 +700,30 @@ export function ScreeningPanel({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          Screening {recordCount.toLocaleString()} {recordLabel}…
+          {progress
+            ? `Screening ${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} ${recordLabel}…`
+            : `Gathering all available ${recordLabel}…`}
         </div>
         <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--surface)" }}>
-          <div
-            className="h-full rounded-full"
-            style={{
-              background: "var(--accent)",
-              animation: "progress-fill 25s cubic-bezier(0.1, 0, 0.4, 1) forwards",
-            }}
-          />
+          {pct !== null ? (
+            // Real, data-driven progress once the total is known.
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out"
+              style={{ background: "var(--accent)", width: `${pct}%` }}
+            />
+          ) : (
+            // Indeterminate sweep during the fetch phase (total not yet known).
+            <div
+              className="h-full rounded-full"
+              style={{ background: "var(--accent)", width: "35%", animation: "progress-fill 2s ease-in-out infinite" }}
+            />
+          )}
         </div>
-        <p className="text-xs" style={{ color: "var(--muted)" }}>Fetching from PubMed, OpenAlex &amp; Scopus then screening — ~30–45 seconds</p>
+        <p className="text-xs" style={{ color: "var(--muted)" }}>
+          {progress
+            ? `${pct}% — screening in batches; large evidence bases may take a few minutes.`
+            : "Paginating every match from PubMed, OpenAlex & Scopus — this can take a moment."}
+        </p>
       </div>
     );
   }

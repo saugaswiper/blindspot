@@ -22,6 +22,20 @@ import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision
 // ---------------------------------------------------------------------------
 
 /**
+ * Upper bound on how many articles we attempt to pull from the literature
+ * sources for a single screening job. This is intentionally very high — it
+ * represents "all available articles" rather than a product limitation.
+ *
+ * Each source still paginates to its own provider ceiling (PubMed ESearch
+ * tops out near 10 000 in one pass, Scopus offset pagination near 5 000), so
+ * the real total is the deduplicated union of whatever the sources can return.
+ *
+ * Override with the SCREEN_MAX_RECORDS env var if you need to cap fetch volume
+ * for cost or rate-limit reasons.
+ */
+const SCREEN_MAX_RECORDS = Number(process.env.SCREEN_MAX_RECORDS) || 10000;
+
+/**
  * Fetch primary study records from PubMed, OpenAlex, and Scopus in parallel,
  * then deduplicate by PMID and DOI so Gemini sees each article only once.
  *
@@ -34,14 +48,17 @@ import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision
  * the remaining sources still contribute their records.
  *
  * @param query          Original search query (same string used in /api/search)
- * @param limitPerSource Max records per source (default 500; each source paginates to this ceiling)
- * @param maxTotal       Hard cap on the combined deduped list (default 1000)
- *                       Increase freely — batching in runTitleAbstractScreening handles any size.
+ * @param limitPerSource Max records per source (default SCREEN_MAX_RECORDS; each source paginates to this ceiling)
+ * @param maxTotal       Hard cap on the combined deduped list (default SCREEN_MAX_RECORDS)
+ *                       This is effectively "all available articles": each source paginates to its own
+ *                       API ceiling (PubMed ~10 000, OpenAlex unbounded via cursor, Scopus ~5 000) and the
+ *                       deduped union is returned. Screening then runs in chunks, so there is no
+ *                       practical limit on how many of these get screened.
  */
 export async function fetchAllPrimaryStudiesForScreening(
   query: string,
-  limitPerSource = 500,
-  maxTotal = 1000,
+  limitPerSource = SCREEN_MAX_RECORDS,
+  maxTotal = SCREEN_MAX_RECORDS,
 ): Promise<ExistingReview[]> {
   const [pubmed, openalex, scopus] = await Promise.allSettled([
     pubmedFetch(query, limitPerSource),
@@ -150,7 +167,11 @@ async function callGemini(userPrompt: string): Promise<string> {
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 16384, // Increased: 250 decisions with criterion_results need ~10k tokens
+        // Gemini 2.5 Flash maximum. A full batch of SCREENING_BATCH_SIZE
+        // decisions with per-criterion criterion_results can run ~30–45k
+        // output tokens, so we request the ceiling to avoid mid-array
+        // truncation (which would fail JSON parsing for the whole batch).
+        maxOutputTokens: 65536,
         responseMimeType: "application/json",
       },
     }),

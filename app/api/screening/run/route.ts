@@ -1,25 +1,44 @@
 /**
  * POST /api/screening/run
  *
- * Runs title + abstract screening against a user-approved set of
- * inclusion/exclusion criteria.
+ * Screens a chunk of records against user-approved inclusion/exclusion criteria.
  *
- * screenType controls which records are screened:
- *   "primary"  (default) — fetches primary studies fresh from PubMed, OpenAlex & Scopus
- *                           using the search query (up to 500/source, 1000 total)
- *   "reviews"            — uses existing_reviews stored on the result row
+ * This endpoint is part of a chunked pipeline that supports screening an
+ * unlimited number of articles without hitting serverless timeouts:
  *
- * Persists the ScreeningResult to search_results.screening_result so the
- * user can re-open the results page later without re-running screening.
+ *   1. /api/screening/fetch  → gathers ALL records (paginated across sources)
+ *   2. /api/screening/run    → screens ONE chunk of those records (this route),
+ *                              called repeatedly by the client
+ *   3. /api/screening/save   → persists the assembled ScreeningResult
  *
- * Body: { resultId: string; criteria: ScreeningCriteria; screenType?: "primary" | "reviews" }
- * Returns: ScreeningResult
+ * Two request shapes are accepted:
+ *
+ *   CHUNK MODE (preferred):
+ *     Body: { criteria: ScreeningCriteria; records: ExistingReview[] }
+ *     Returns: { decisions: ScreeningDecision[] }
+ *     Screens exactly the provided records and returns the decisions. The
+ *     client accumulates decisions across chunks and saves once at the end.
+ *
+ *   LEGACY MODE (single-shot, kept for backward compatibility):
+ *     Body: { resultId: string; criteria: ScreeningCriteria; screenType?: "primary" | "reviews" }
+ *     Returns: ScreeningResult
+ *     Fetches + screens + persists in one request. Only safe for small record
+ *     sets; large jobs should use the chunked pipeline above.
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { runTitleAbstractScreening, fetchAllPrimaryStudiesForScreening } from "@/lib/screening";
+import {
+  runTitleAbstractScreening,
+  fetchAllPrimaryStudiesForScreening,
+} from "@/lib/screening";
 import { toApiError } from "@/lib/errors";
 import type { ExistingReview, ScreeningCriteria, ScreeningResult } from "@/types";
+
+export const maxDuration = 300;
+
+// Upper bound on records accepted in a single chunk request — keeps each
+// Gemini round-trip well within the function timeout and bounds per-call cost.
+const MAX_CHUNK_RECORDS = 500;
 
 export async function POST(request: Request) {
   try {
@@ -33,21 +52,45 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       resultId?: string;
       criteria?: ScreeningCriteria;
+      records?: ExistingReview[];
       screenType?: "primary" | "reviews";
     };
 
-    if (!body.resultId || !body.criteria) {
-      return Response.json({ error: "resultId and criteria are required." }, { status: 400 });
+    if (!body.criteria) {
+      return Response.json({ error: "criteria is required." }, { status: 400 });
     }
 
-    const { criteria, screenType = "primary" } = body;
+    const { criteria } = body;
 
     // Basic criteria validation
     if (!Array.isArray(criteria.inclusion) || !Array.isArray(criteria.exclusion)) {
       return Response.json({ error: "criteria must have inclusion and exclusion arrays." }, { status: 400 });
     }
 
-    // Fetch the result (RLS ensures ownership)
+    // ── CHUNK MODE ──────────────────────────────────────────────────────────
+    if (Array.isArray(body.records)) {
+      const records = body.records;
+      if (records.length === 0) {
+        return Response.json({ decisions: [] });
+      }
+      if (records.length > MAX_CHUNK_RECORDS) {
+        return Response.json(
+          { error: `Too many records in one chunk (max ${MAX_CHUNK_RECORDS}).` },
+          { status: 400 },
+        );
+      }
+
+      const decisions = await runTitleAbstractScreening(records, criteria);
+      return Response.json({ decisions });
+    }
+
+    // ── LEGACY MODE (single-shot) ───────────────────────────────────────────
+    if (!body.resultId) {
+      return Response.json({ error: "resultId or records is required." }, { status: 400 });
+    }
+
+    const screenType = body.screenType ?? "primary";
+
     const { data: result, error: fetchError } = await supabase
       .from("search_results")
       .select("id, existing_reviews, searches(query_text)")
@@ -61,27 +104,20 @@ export async function POST(request: Request) {
     let records: ExistingReview[];
 
     if (screenType === "primary") {
-      // Fetch primary study records fresh from OpenAlex (title + abstract)
       const query = (result.searches as unknown as { query_text: string } | null)?.query_text ?? "";
       if (!query) {
         return Response.json({ error: "Search query not found — cannot fetch primary studies." }, { status: 400 });
       }
-
-      console.log(`[screening/run] Fetching primary studies from PubMed + OpenAlex + Scopus for query: "${query}"`);
-      records = await fetchAllPrimaryStudiesForScreening(query, 500, 1000);
-
+      records = await fetchAllPrimaryStudiesForScreening(query);
       if (records.length === 0) {
         return Response.json({ error: "No primary studies found for this search query." }, { status: 400 });
       }
     } else {
-      // Use stored existing reviews (systematic reviews)
       records = (result.existing_reviews ?? []) as ExistingReview[];
       if (records.length === 0) {
         return Response.json({ error: "No existing reviews to screen." }, { status: 400 });
       }
     }
-
-    console.log(`[screening/run] Screening ${records.length} ${screenType === "primary" ? "primary studies" : "reviews"} for resultId=${body.resultId}`);
 
     const decisions = await runTitleAbstractScreening(records, criteria);
 
@@ -99,7 +135,6 @@ export async function POST(request: Request) {
       run_at: new Date().toISOString(),
     };
 
-    // Persist to database
     const { error: updateError } = await supabase
       .from("search_results")
       .update({ screening_result: screeningResult })
@@ -108,10 +143,6 @@ export async function POST(request: Request) {
     if (updateError) {
       console.error("[screening/run] Failed to save screening result:", updateError.message);
     }
-
-    console.log(
-      `[screening/run] Done — included: ${included}, excluded: ${excluded}, uncertain: ${uncertain}`
-    );
 
     return Response.json(screeningResult);
   } catch (error) {
