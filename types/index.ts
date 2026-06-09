@@ -324,11 +324,19 @@ export interface ScreeningDecision {
 export interface ScreeningResult {
   /** The approved criteria used for this screening run. */
   criteria: ScreeningCriteria;
-  /** Per-review decision list (same order as screened reviews). */
+  /** Per-record decision list (same order as screened records). */
   decisions: ScreeningDecision[];
   included_count: number;
   excluded_count: number;
   uncertain_count: number;
+  /**
+   * What was screened:
+   *   "primary" — primary studies fetched from OpenAlex at run time
+   *   "reviews" — existing systematic reviews stored on the result row
+   * Defaults to "primary" for results generated after 2026-06-09.
+   * Absent on results saved before this field was added.
+   */
+  screen_type?: "primary" | "reviews";
   /** ISO timestamp of when the screening ran. */
   run_at: string;
 }

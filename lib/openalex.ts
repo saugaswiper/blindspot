@@ -180,3 +180,38 @@ export async function fetchPrimaryStudyIds(
     pmid: w.ids?.pmid?.replace(/^https?:\/\/pubmed\.ncbi\.nlm\.nih\.gov\//i, "") || undefined,
   }));
 }
+
+/**
+ * Fetches primary study records (title + abstract) for AI screening.
+ *
+ * Unlike fetchPrimaryStudyIds (which returns only PMIDs/DOIs for deduplication),
+ * this function retrieves the full metadata needed to screen each record:
+ * title, year, journal, and abstract.
+ *
+ * Uses the same title_and_abstract.search scope as countPrimaryStudies to
+ * keep results consistent with the displayed primary_study_count.
+ *
+ * @param query  Boolean search string (same query used in the search)
+ * @param limit  Max records to fetch (capped at 200 — Gemini screening cap is 100)
+ * @returns      Array of ExistingReview-shaped objects with source = "OpenAlex"
+ */
+export async function fetchPrimaryStudiesForScreening(
+  query: string,
+  limit = 100,
+): Promise<ExistingReview[]> {
+  const data = await searchOpenAlex(query, "primary", Math.min(limit, 200), undefined, "title_abstract");
+
+  return data.results
+    .filter((w) => w.title)
+    .map((w) => {
+      const abstract = invertedIndexToAbstract(w.abstract_inverted_index);
+      return {
+        title: w.title!,
+        year: w.publication_year ?? 0,
+        journal: w.primary_location?.source?.display_name ?? "Unknown journal",
+        abstract_snippet: abstract.slice(0, 400) + (abstract.length > 400 ? "…" : ""),
+        doi: w.doi?.replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").toLowerCase() ?? undefined,
+        source: "OpenAlex",
+      };
+    });
+}

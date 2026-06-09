@@ -424,10 +424,10 @@ function ExistingReviewsScreeningSection({ result }: { result: ScreeningResult }
       {/* Header */}
       <div>
         <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-          Existing Reviews Screened
+          {result.screen_type === "reviews" ? "Existing Reviews" : "Primary Studies"} Screened
         </p>
         <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-          AI screening run against gap: <span style={{ color: "var(--foreground)" }}>{criteria.topic_title}</span>
+          AI screening · Gap: <span style={{ color: "var(--foreground)" }}>{criteria.topic_title}</span>
           {" · "}{runDate}
         </p>
       </div>
@@ -436,7 +436,7 @@ function ExistingReviewsScreeningSection({ result }: { result: ScreeningResult }
       <div className="flex flex-col items-center gap-1 max-w-xs mx-auto">
         {/* Identified */}
         <div className="w-full rounded-lg px-4 py-2.5 text-sm text-center" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--foreground)" }}>
-          <span className="font-bold">{total}</span> existing reviews identified
+          <span className="font-bold">{total}</span> {result.screen_type === "reviews" ? "existing reviews" : "primary studies"} identified
         </div>
         <VerticalArrow />
         {/* Screened */}

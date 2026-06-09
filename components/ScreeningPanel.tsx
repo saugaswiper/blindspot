@@ -428,7 +428,10 @@ interface Props {
   resultId: string;
   topicIndex: number;
   topicTitle: string;
-  reviewCount: number;
+  /** Count shown in the button label. Pass primaryStudyCount for primary screening. */
+  recordCount: number;
+  /** What to screen: "primary" = primary studies from OpenAlex; "reviews" = stored existing reviews. */
+  screenType?: "primary" | "reviews";
   /** Pre-loaded result from the database (if any). Shows results directly. */
   initialResult?: ScreeningResult | null;
   isOwner: boolean;
@@ -438,7 +441,8 @@ export function ScreeningPanel({
   resultId,
   topicIndex,
   topicTitle,
-  reviewCount,
+  recordCount,
+  screenType = "primary",
   initialResult = null,
   isOwner,
 }: Props) {
@@ -446,6 +450,7 @@ export function ScreeningPanel({
   const [criteria, setCriteria] = useState<ScreeningCriteria | null>(null);
   const [screeningResult, setScreeningResult] = useState<ScreeningResult | null>(initialResult);
   const [error, setError] = useState<string | null>(null);
+  const recordLabel = screenType === "primary" ? "primary studies" : "reviews";
 
   // ---------------------------------------------------------------------------
   // Step 1: Suggest criteria
@@ -484,7 +489,7 @@ export function ScreeningPanel({
       const res = await fetch("/api/screening/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resultId, criteria }),
+        body: JSON.stringify({ resultId, criteria, screenType }),
       });
       const data = (await res.json()) as ScreeningResult & { error?: string };
       if (!res.ok || data.error) {
@@ -520,7 +525,7 @@ export function ScreeningPanel({
           <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591L15.75 12.75V21a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1-.75-.75V12.75L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
           </svg>
-          Screen {reviewCount} review{reviewCount !== 1 ? "s" : ""} for this gap
+          Screen {recordCount.toLocaleString()} {recordLabel} for this gap
         </button>
         {error && (
           <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
@@ -597,7 +602,7 @@ export function ScreeningPanel({
             className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
           >
-            Approve & Screen {reviewCount} review{reviewCount !== 1 ? "s" : ""}
+            Approve & Screen {recordCount.toLocaleString()} {recordLabel}
           </button>
           <p className="text-[11px]" style={{ color: "var(--muted)" }}>
             Edit criteria above before screening
@@ -619,7 +624,7 @@ export function ScreeningPanel({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          Screening {reviewCount} title{reviewCount !== 1 ? "s" : ""} and abstract{reviewCount !== 1 ? "s" : ""}…
+          Screening {recordCount.toLocaleString()} {recordLabel}…
         </div>
         <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "var(--surface)" }}>
           <div
@@ -648,7 +653,7 @@ export function ScreeningPanel({
               Screening results
             </p>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-              Gap: {screeningResult.criteria.topic_title}
+              {screeningResult.screen_type === "reviews" ? "Existing reviews" : "Primary studies"} · Gap: {screeningResult.criteria.topic_title}
               {" · "}
               {new Date(screeningResult.run_at).toLocaleDateString("en-US", {
                 year: "numeric", month: "short", day: "numeric",

@@ -1421,7 +1421,7 @@ export function ResultsDashboard({
             <ReviewsTab resultId={resultId} reviews={existingReviews} />
           )}
           {activeTab === "gaps" && (
-            <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} reviewCount={existingReviews.length} savedScreeningResult={screeningResult} />
+            <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} screeningRecordCount={primaryStudyCount} savedScreeningResult={screeningResult} />
           )}
           {activeTab === "design" && (
             <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} primaryStudyCount={primaryStudyCount} query={query} />
@@ -2299,7 +2299,7 @@ function EvidenceGapMapTab({
 /* Gaps tab                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query, reviewCount, savedScreeningResult }: {
+function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query, screeningRecordCount, savedScreeningResult }: {
   gapAnalysis: GapAnalysis | null;
   gapAnalysisGeneratedAt?: string | null;
   isPending: boolean;
@@ -2312,8 +2312,8 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
   feasibilityScore: FeasibilityScore | null;
   /** ACC-2: Original query text — passed to InsufficientEvidencePanel for alternatives fetch */
   query?: string;
-  /** Number of existing_reviews to show in the screening button label */
-  reviewCount?: number;
+  /** Count shown in the screening button label (primaryStudyCount for primary study screening) */
+  screeningRecordCount?: number;
   /** Pre-loaded ScreeningResult from the DB (if any), scoped to one topic by topic_title match */
   savedScreeningResult?: ScreeningResult | null;
 }) {
@@ -2672,7 +2672,8 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
                     resultId={resultId}
                     topicIndex={gapAnalysis.suggested_topics.indexOf(topic)}
                     topicTitle={topic.title}
-                    reviewCount={reviewCount ?? 0}
+                    recordCount={screeningRecordCount ?? primaryStudyCount}
+                    screenType="primary"
                     isOwner={isOwner}
                     initialResult={
                       savedScreeningResult?.criteria?.topic_title === topic.title
