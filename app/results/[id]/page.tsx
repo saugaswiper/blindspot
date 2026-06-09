@@ -7,6 +7,7 @@ import type {
   FeasibilityScore,
   GapAnalysis,
   StudyDesignRecommendation,
+  ScreeningResult,
 } from "@/types";
 import { deriveStudyTrend } from "@/types";
 
@@ -37,6 +38,7 @@ async function getResult(id: string) {
       gap_analysis_generated_at,
       study_design_recommendation,
       protocol_draft,
+      screening_result,
       is_public,
       created_at,
       searches (id, query_text, user_id, pico_population, pico_intervention, pico_comparison, pico_outcome)
@@ -162,6 +164,7 @@ export default async function ResultsPage({
         isOwner={isOwner}
         isPublic={isPublic}
         protocolDraft={(result.protocol_draft as string | null | undefined) ?? null}
+        screeningResult={(result.screening_result as ScreeningResult | null | undefined) ?? null}
         isAlertSubscribed={isAlertSubscribed}
         createdAt={(result.created_at as string | null | undefined) ?? undefined}
         picoFields={picoFields}

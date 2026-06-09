@@ -8,7 +8,9 @@ import type {
   StudyDesignRecommendation,
   GapDimension,
   StudyTrend,
+  ScreeningResult,
 } from "@/types";
+import { ScreeningPanel } from "@/components/ScreeningPanel";
 import { PrintableReport } from "@/components/PrintableReport";
 import { AlertSubscription } from "@/components/AlertSubscription";
 import { toRis, toBibtex, downloadTextFile } from "@/lib/citation-export";
@@ -481,6 +483,12 @@ interface Props {
    * stored draft immediately. Null means no protocol has been generated yet.
    */
   protocolDraft?: string | null;
+  /**
+   * Previously-saved screening result (from `search_results.screening_result`).
+   * When non-null, the ScreeningPanel renders the saved results immediately
+   * without re-running AI screening. Null means no screening has been run yet.
+   */
+  screeningResult?: ScreeningResult | null;
   /** Whether the owner is subscribed to email alerts for this search. */
   isAlertSubscribed?: boolean;
   /**
@@ -580,6 +588,7 @@ export function ResultsDashboard({
   isOwner = false,
   isPublic = false,
   protocolDraft = null,
+  screeningResult = null,
   isAlertSubscribed = false,
   createdAt,
   picoFields = null,
@@ -1412,7 +1421,7 @@ export function ResultsDashboard({
             <ReviewsTab resultId={resultId} reviews={existingReviews} />
           )}
           {activeTab === "gaps" && (
-            <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} />
+            <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} reviewCount={existingReviews.length} savedScreeningResult={screeningResult} />
           )}
           {activeTab === "design" && (
             <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} primaryStudyCount={primaryStudyCount} query={query} />
@@ -2290,7 +2299,7 @@ function EvidenceGapMapTab({
 /* Gaps tab                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query }: {
+function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query, reviewCount, savedScreeningResult }: {
   gapAnalysis: GapAnalysis | null;
   gapAnalysisGeneratedAt?: string | null;
   isPending: boolean;
@@ -2303,6 +2312,10 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
   feasibilityScore: FeasibilityScore | null;
   /** ACC-2: Original query text — passed to InsufficientEvidencePanel for alternatives fetch */
   query?: string;
+  /** Number of existing_reviews to show in the screening button label */
+  reviewCount?: number;
+  /** Pre-loaded ScreeningResult from the DB (if any), scoped to one topic by topic_title match */
+  savedScreeningResult?: ScreeningResult | null;
 }) {
   const [activeDimensions, setActiveDimensions] = useState<Set<GapDimension>>(resetFilter);
 
@@ -2654,6 +2667,19 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
                       Search this topic →
                     </a>
                   )}
+                  {/* Screening panel — match savedScreeningResult to this topic by title */}
+                  <ScreeningPanel
+                    resultId={resultId}
+                    topicIndex={gapAnalysis.suggested_topics.indexOf(topic)}
+                    topicTitle={topic.title}
+                    reviewCount={reviewCount ?? 0}
+                    isOwner={isOwner}
+                    initialResult={
+                      savedScreeningResult?.criteria?.topic_title === topic.title
+                        ? savedScreeningResult
+                        : null
+                    }
+                  />
                 </div>
               );
             })}
