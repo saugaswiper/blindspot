@@ -15,6 +15,14 @@
   --accent: #a67c2e;
   --accent-hover: #8a6424;
   --muted: #6b6560;
+  /* Semantic status colors — warm-leaning to sit with the editorial palette.
+     Use for include/exclude/uncertain verdicts, confidence, and validation. */
+  --success: #2f6e4f;
+  --success-bg: #e9f0ea;
+  --danger: #a93f2e;
+  --danger-bg: #f5e7e2;
+  --warning: #8f6a1d;
+  --warning-bg: #f2ecda;
 }
 
 html.dark {
@@ -28,6 +36,12 @@ html.dark {
   --accent: #c49a2e;
   --accent-hover: #d4aa3e;
   --muted: #8b8690;
+  --success: #8cc4a0;
+  --success-bg: #1c2a21;
+  --danger: #e09181;
+  --danger-bg: #33201c;
+  --warning: #d6b260;
+  --warning-bg: #2d2718;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -42,6 +56,12 @@ html.dark {
     --accent: #c49a2e;
     --accent-hover: #d4aa3e;
     --muted: #8b8690;
+    --success: #8cc4a0;
+    --success-bg: #1c2a21;
+    --danger: #e09181;
+    --danger-bg: #33201c;
+    --warning: #d6b260;
+    --warning-bg: #2d2718;
   }
 }
 

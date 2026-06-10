@@ -55,28 +55,22 @@ function needsReview(d: ScreeningDecision): boolean {
 
 // ---------------------------------------------------------------------------
 // Decision badge helpers
+//
+// All status styling flows through the semantic design tokens (--success,
+// --danger, --warning + their -bg pairs) defined in globals.css, so the panel
+// follows the editorial palette and stays readable in both themes.
 // ---------------------------------------------------------------------------
 
-const DECISION_STYLES = {
-  include: {
-    badge: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-600",
-    row: "border-l-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20",
-    icon: "✓",
-    label: "Include",
-  },
-  exclude: {
-    badge: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600",
-    row: "border-l-2 border-red-400 dark:border-red-600 bg-red-50/40 dark:bg-red-950/20",
-    icon: "✕",
-    label: "Exclude",
-  },
-  uncertain: {
-    badge: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600",
-    row: "border-l-2 border-amber-400 dark:border-amber-600 bg-amber-50/40 dark:bg-amber-950/20",
-    icon: "?",
-    label: "Uncertain",
-  },
-};
+const DECISION_TONES = {
+  include:   { color: "var(--success)", bg: "var(--success-bg)", icon: "✓", label: "Include" },
+  exclude:   { color: "var(--danger)",  bg: "var(--danger-bg)",  icon: "✕", label: "Exclude" },
+  uncertain: { color: "var(--warning)", bg: "var(--warning-bg)", icon: "?", label: "Uncertain" },
+} as const;
+
+function toneBadgeStyle(v: keyof typeof DECISION_TONES): React.CSSProperties {
+  const t = DECISION_TONES[v];
+  return { color: t.color, background: t.bg, border: `1px solid ${t.color}` };
+}
 
 // ---------------------------------------------------------------------------
 // Reason code display
@@ -97,11 +91,11 @@ const REASON_CODE_LABELS: Record<ScreeningReasonCode, string> = {
 function ReasonCodeBadge({ code }: { code: ScreeningReasonCode }) {
   return (
     <span
-      className="inline-block text-[9px] font-medium px-1.5 py-0.5 rounded-full border shrink-0"
+      className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
       style={{
-        background: "rgba(239,68,68,0.08)",
-        color: "#b91c1c",
-        border: "1px solid rgba(239,68,68,0.25)",
+        background: "var(--danger-bg)",
+        color: "var(--danger)",
+        border: "1px solid var(--danger)",
       }}
     >
       {REASON_CODE_LABELS[code]}
@@ -114,9 +108,9 @@ function ReasonCodeBadge({ code }: { code: ScreeningReasonCode }) {
 // ---------------------------------------------------------------------------
 
 const CONFIDENCE_CONFIG = {
-  high:   { dot: "#10b981", label: "High confidence" },
-  medium: { dot: "#f59e0b", label: "Medium confidence" },
-  low:    { dot: "#ef4444", label: "Low confidence — review recommended" },
+  high:   { dot: "var(--success)", label: "High confidence" },
+  medium: { dot: "var(--warning)", label: "Medium confidence" },
+  low:    { dot: "var(--danger)",  label: "Low confidence — review recommended" },
 };
 
 function ConfidenceDot({ level }: { level: "high" | "medium" | "low" }) {
@@ -171,12 +165,12 @@ function buildCsv(decisions: ScreeningDecision[], criteria: ScreeningResult["cri
 function CriteriaList({
   title,
   items,
-  colorClass,
+  tone,
   onChange,
 }: {
   title: string;
   items: string[];
-  colorClass: string;
+  tone: "include" | "exclude";
   onChange: (next: string[]) => void;
 }) {
   function handleEdit(idx: number, value: string) {
@@ -199,7 +193,10 @@ function CriteriaList({
       <div className="space-y-1.5">
         {items.map((item, idx) => (
           <div key={idx} className="flex items-start gap-2">
-            <span className={`mt-2 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border shrink-0 ${colorClass}`}>
+            <span
+              className="mt-2 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0"
+              style={toneBadgeStyle(tone)}
+            >
               {title === "Inclusion" ? "I" : "E"}{idx + 1}
             </span>
             <input
@@ -298,20 +295,29 @@ function ScreeningResultsTable({
       <div className="flex flex-wrap items-center gap-3">
         {(
           [
-            { key: "all",       label: `All (${total})`,                 cls: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700" },
-            { key: "include",   label: `✓ Include (${included_count})`,   cls: DECISION_STYLES.include.badge },
-            { key: "exclude",   label: `✕ Exclude (${excluded_count})`,   cls: DECISION_STYLES.exclude.badge },
-            { key: "uncertain", label: `? Uncertain (${uncertain_count})`, cls: DECISION_STYLES.uncertain.badge },
+            {
+              key: "all" as FilterMode,
+              label: `All (${total})`,
+              style: { color: "var(--foreground)", background: "var(--surface-2)", border: "1px solid var(--border)" },
+            },
+            { key: "include" as FilterMode,   label: `✓ Include (${included_count})`,    style: toneBadgeStyle("include") },
+            { key: "exclude" as FilterMode,   label: `✕ Exclude (${excluded_count})`,    style: toneBadgeStyle("exclude") },
+            { key: "uncertain" as FilterMode, label: `? Uncertain (${uncertain_count})`, style: toneBadgeStyle("uncertain") },
             ...(needsReviewCount > 0
-              ? [{ key: "needs_review" as FilterMode, label: `⚠ Needs review (${needsReviewCount})`, cls: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border-amber-400 dark:border-amber-500" }]
+              ? [{
+                  key: "needs_review" as FilterMode,
+                  label: `Needs review (${needsReviewCount})`,
+                  style: { color: "var(--warning)", background: "var(--warning-bg)", border: "2px solid var(--warning)" },
+                }]
               : []),
-          ] as { key: FilterMode; label: string; cls: string }[]
-        ).map(({ key, label, cls }) => (
+          ] as { key: FilterMode; label: string; style: React.CSSProperties }[]
+        ).map(({ key, label, style }) => (
           <button
             key={key}
             type="button"
             onClick={() => setFilter(key)}
-            className={`px-3 py-1 rounded-full text-xs font-medium border transition-opacity ${cls} ${filter === key ? "ring-2 ring-offset-1 ring-current" : "hover:opacity-80"}`}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-opacity ${filter === key ? "ring-2 ring-offset-1 ring-current" : "hover:opacity-80"}`}
+            style={style}
           >
             {label}
           </button>
@@ -342,12 +348,12 @@ function ScreeningResultsTable({
       {/* Human-review progress */}
       {needsReviewCount > 0 ? (
         <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+          <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--warning)" }} />
           {needsReviewCount} decision{needsReviewCount !== 1 ? "s" : ""} need{needsReviewCount === 1 ? "s" : ""} a human verdict (uncertain or low-confidence). Use the &ldquo;Needs review&rdquo; filter to work through them.
         </p>
       ) : humanVerifiedCount > 0 ? (
         <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--success)" }} />
           All flagged decisions reviewed — {humanVerifiedCount} human verdict{humanVerifiedCount !== 1 ? "s" : ""} recorded.
         </p>
       ) : null}
@@ -360,13 +366,13 @@ function ScreeningResultsTable({
         <div className="mt-2 p-3 rounded-md space-y-2" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
           <p className="font-medium" style={{ color: "var(--foreground)" }}>Gap focus: {criteria.focus_gap}</p>
           <div>
-            <p className="font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">Inclusion</p>
+            <p className="font-semibold mb-0.5" style={{ color: "var(--success)" }}>Inclusion</p>
             <ul className="list-disc list-inside space-y-0.5">
               {criteria.inclusion.map((c, i) => <li key={i}>{c}</li>)}
             </ul>
           </div>
           <div>
-            <p className="font-semibold text-red-600 dark:text-red-400 mb-0.5">Exclusion</p>
+            <p className="font-semibold mb-0.5" style={{ color: "var(--danger)" }}>Exclusion</p>
             <ul className="list-disc list-inside space-y-0.5">
               {criteria.exclusion.map((c, i) => <li key={i}>{c}</li>)}
             </ul>
@@ -378,12 +384,12 @@ function ScreeningResultsTable({
       <div className="space-y-2">
         {filtered.length === 0 ? (
           <p className="text-sm text-center py-4" style={{ color: "var(--muted)" }}>
-            No reviews match this filter.
+            No {result.screen_type === "reviews" ? "reviews" : "studies"} match this filter.
           </p>
         ) : (
           filtered.map(({ d, idx }) => {
             const verdict = effectiveDecision(d);
-            const style = DECISION_STYLES[verdict];
+            const tone = DECISION_TONES[verdict];
             const isExpanded = expandedIndex === idx;
             const linkUrl = d.pmid
               ? `https://pubmed.ncbi.nlm.nih.gov/${d.pmid}/`
@@ -394,16 +400,17 @@ function ScreeningResultsTable({
             return (
               <div
                 key={idx}
-                className={`rounded-md px-3 py-2.5 ${style.row}`}
-                style={{ background: "var(--surface)" }}
+                className="rounded-md px-3 py-2.5"
+                style={{ background: "var(--surface)", borderLeft: `2px solid ${tone.color}` }}
               >
                 <div className="flex items-start gap-2">
                   {/* Decision badge */}
                   <span
-                    className={`shrink-0 mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold border ${style.badge}`}
-                    aria-label={style.label}
+                    className="shrink-0 mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold"
+                    style={toneBadgeStyle(verdict)}
+                    aria-label={tone.label}
                   >
-                    {style.icon}
+                    {tone.icon}
                   </span>
 
                   <div className="flex-1 min-w-0">
@@ -432,46 +439,46 @@ function ScreeningResultsTable({
                       {d.reason_code && <ReasonCodeBadge code={d.reason_code} />}
                     </div>
 
-                    {/* Reason — toggle on click */}
-                    <button
-                      type="button"
-                      onClick={() => setExpandedIndex(isExpanded ? null : idx)}
-                      className="text-[11px] mt-1 transition-opacity hover:opacity-70 text-left"
-                      style={{ color: "var(--accent)" }}
-                    >
-                      {isExpanded ? "Hide reasoning ↑" : "Why? ↓"}
-                    </button>
+                    {/* Reasoning toggle + one-click human verdict (RAISE: every
+                        AI decision stays reviewable — without expanding the row) */}
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedIndex(isExpanded ? null : idx)}
+                        className="text-[11px] transition-opacity hover:opacity-70 text-left"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        {isExpanded ? "Hide reasoning ↑" : "Why? ↓"}
+                      </button>
+                      <div className="inline-flex items-center gap-1" role="group" aria-label="Your verdict">
+                        {(["include", "exclude", "uncertain"] as Verdict[]).map((v) => {
+                          const isActive = d.human_decision === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => onOverride(idx, isActive ? null : v)}
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold transition-opacity ${isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-50 hover:opacity-100"}`}
+                              style={toneBadgeStyle(v)}
+                              title={isActive ? "Click to revert to the AI decision" : `Set your verdict: ${DECISION_TONES[v].label}`}
+                              aria-pressed={isActive}
+                            >
+                              {DECISION_TONES[v].icon}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {d.human_decision && (
+                        <span className="text-[10px]" style={{ color: "var(--muted)" }}>
+                          AI said: {d.decision}
+                        </span>
+                      )}
+                    </div>
                     {isExpanded && (
                       <div className="mt-1.5 space-y-2">
                         <p className="text-xs leading-relaxed italic" style={{ color: "var(--muted)" }}>
                           {d.reason}
                         </p>
-
-                        {/* Human override — RAISE: every AI decision stays reviewable */}
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--muted)" }}>
-                            Your verdict:
-                          </span>
-                          {(["include", "exclude", "uncertain"] as Verdict[]).map((v) => {
-                            const isActive = d.human_decision === v;
-                            return (
-                              <button
-                                key={v}
-                                type="button"
-                                onClick={() => onOverride(idx, isActive ? null : v)}
-                                className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition-opacity ${DECISION_STYLES[v].badge} ${isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-60 hover:opacity-100"}`}
-                                title={isActive ? "Click to revert to the AI decision" : `Override AI verdict to "${v}"`}
-                              >
-                                {DECISION_STYLES[v].icon} {DECISION_STYLES[v].label}
-                              </button>
-                            );
-                          })}
-                          {d.human_decision && (
-                            <span className="text-[10px]" style={{ color: "var(--muted)" }}>
-                              (AI said: {d.decision})
-                            </span>
-                          )}
-                        </div>
                         {d.criterion_results && d.criterion_results.length > 0 && (
                           <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--border)" }}>
                             <table className="text-[10px] w-full border-collapse">
@@ -488,12 +495,19 @@ function ScreeningResultsTable({
                                   <tr key={ci} style={{ borderTop: "1px solid var(--border)" }}>
                                     <td className="px-2 py-1 align-top" style={{ color: "var(--foreground)" }}>{cr.criterion}</td>
                                     <td className="px-2 py-1 align-top">
-                                      <span className={`px-1 py-0.5 rounded text-[9px] font-medium ${cr.type === "inclusion" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400"}`}>
+                                      <span
+                                        className="px-1 py-0.5 rounded text-[10px] font-medium"
+                                        style={
+                                          cr.type === "inclusion"
+                                            ? { color: "var(--success)", background: "var(--success-bg)" }
+                                            : { color: "var(--danger)", background: "var(--danger-bg)" }
+                                        }
+                                      >
                                         {cr.type}
                                       </span>
                                     </td>
                                     <td className="px-2 py-1 text-center align-top font-bold">
-                                      <span className={cr.met ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
+                                      <span style={{ color: cr.met ? "var(--success)" : "var(--danger)" }}>
                                         {cr.met ? "✓" : "✕"}
                                       </span>
                                     </td>
@@ -511,12 +525,12 @@ function ScreeningResultsTable({
                   {/* Confidence dot + decision label */}
                   <div className="shrink-0 flex flex-col items-center gap-1">
                     {d.confidence && <ConfidenceDot level={d.confidence} />}
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
-                      {style.label}
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={toneBadgeStyle(verdict)}>
+                      {tone.label}
                     </span>
                     {d.human_decision && (
                       <span
-                        className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border"
+                        className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
                         style={{ color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface-2)" }}
                         title={`Human verdict (AI said: ${d.decision})`}
                       >
@@ -752,7 +766,7 @@ export function ScreeningPanel({
           <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591L15.75 12.75V21a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1-.75-.75V12.75L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
           </svg>
-          Screen {recordCount.toLocaleString()} {recordLabel} for this gap
+          Screen ~{recordCount.toLocaleString()} {recordLabel} for this gap
         </button>
         {error && (
           <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
@@ -784,7 +798,7 @@ export function ScreeningPanel({
         style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+          <p className="font-serif text-base" style={{ color: "var(--foreground)" }}>
             Screening criteria for: <span style={{ color: "var(--accent)" }}>{topicTitle}</span>
           </p>
           <button
@@ -810,14 +824,14 @@ export function ScreeningPanel({
         <CriteriaList
           title="Inclusion"
           items={criteria.inclusion}
-          colorClass="bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-600"
+          tone="include"
           onChange={(next) => setCriteria({ ...criteria, inclusion: next })}
         />
 
         <CriteriaList
           title="Exclusion"
           items={criteria.exclusion}
-          colorClass="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600"
+          tone="exclude"
           onChange={(next) => setCriteria({ ...criteria, exclusion: next })}
         />
 
@@ -833,7 +847,7 @@ export function ScreeningPanel({
             className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
           >
-            Approve & Screen {recordCount.toLocaleString()} {recordLabel}
+            Approve & Screen ~{recordCount.toLocaleString()} {recordLabel}
           </button>
           <p className="text-[11px]" style={{ color: "var(--muted)" }}>
             Edit criteria above before screening
@@ -896,7 +910,7 @@ export function ScreeningPanel({
       >
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
-            <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+            <p className="font-serif text-base" style={{ color: "var(--foreground)" }}>
               Screening results
             </p>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>

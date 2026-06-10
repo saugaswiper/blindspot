@@ -157,6 +157,24 @@
 
 ## 6. Improvement Log
 
+### 2026-06-10 — Design-system alignment + one-click verdict UX (design critique pass)
+
+- Added semantic status tokens to `app/globals.css` (`--success`, `--danger`, `--warning`
+  + `-bg` pairs, light/dark variants tuned to the warm editorial palette). The screening
+  panel previously used ~30 hardcoded Tailwind palette classes and raw hexes; the
+  ReasonCodeBadge had no dark-mode variant at all (contrast failure on dark surfaces).
+  All decision badges, filter chips, criteria chips, confidence dots, and the criterion
+  table now style through tokens.
+- Fixed a latent bug: decision-tinted row backgrounds (`bg-emerald-50/40` etc.) were
+  always overridden by an inline `background: var(--surface)` and never rendered; rows
+  now intentionally use a colored left border on the clean surface.
+- One-click verdicts: Include/Exclude/Uncertain override buttons moved from inside the
+  expanded "Why?" view to row level (24px targets, `aria-pressed`), halving the cost of
+  working the needs-review queue (Covidence speed-mode insight).
+- Copy honesty: "Screen ~N" (counts are estimates), filter empty-state no longer says
+  "reviews" when screening primary studies; 9px text bumped to 10px; panel headings now
+  use the DM Serif editorial face.
+
 ### 2026-06-10 — Human-in-the-loop overrides, needs-review triage, RIS export, re-screen flow
 
 Goal: move from "AI screening report" to "automated systematic review workflow" per RAISE
