@@ -132,8 +132,14 @@ const SCREENING_BATCH_SIZE = 150;
 // Gemini plumbing (reuses same model / key as gemini.ts)
 // ---------------------------------------------------------------------------
 
+/**
+ * Screening model — overridable via GEMINI_SCREENING_MODEL.
+ * gemini-2.5-flash is the cost/speed default; set GEMINI_SCREENING_MODEL to
+ * "gemini-2.5-pro" for higher reasoning quality on complex criteria sets.
+ */
+const GEMINI_MODEL = process.env.GEMINI_SCREENING_MODEL ?? "gemini-2.5-flash";
 const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 interface GeminiResponse {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
@@ -324,6 +330,10 @@ Decision rules:
 - "include"   → meets all inclusion criteria AND fails no exclusion criteria
 - "exclude"   → fails at least one exclusion criterion OR fails a key inclusion criterion
 - "uncertain" → title/abstract lacks enough information to decide reliably
+
+SENSITIVITY RULE (title/abstract stage): when genuinely in doubt, prefer "uncertain" over
+"exclude" — missing a relevant study is worse than carrying a borderline one to full-text
+review. Reserve "exclude" for records that clearly fail a criterion.
 
 reason_code (ONLY for "exclude" decisions — pick the single best-fitting code):
   "wrong_population"       – participants do not match target population

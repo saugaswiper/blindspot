@@ -23,7 +23,35 @@
 
 import { useState } from "react";
 import type { ExistingReview, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
-import { downloadTextFile } from "@/lib/citation-export";
+import { downloadTextFile, toRis } from "@/lib/citation-export";
+
+// ---------------------------------------------------------------------------
+// Effective decision helpers
+//
+// RAISE guidance: every AI decision remains subject to human review. A human
+// override (`human_decision`) supersedes the AI verdict everywhere — counts,
+// filters, exports — while the original AI decision is kept for audit.
+// ---------------------------------------------------------------------------
+
+type Verdict = "include" | "exclude" | "uncertain";
+
+function effectiveDecision(d: ScreeningDecision): Verdict {
+  return d.human_decision ?? d.decision;
+}
+
+function computeCounts(decisions: ScreeningDecision[]) {
+  return {
+    included_count: decisions.filter((d) => effectiveDecision(d) === "include").length,
+    excluded_count: decisions.filter((d) => effectiveDecision(d) === "exclude").length,
+    uncertain_count: decisions.filter((d) => effectiveDecision(d) === "uncertain").length,
+  };
+}
+
+/** A record the human should look at: AI was uncertain, or low-confidence and not yet human-verified. */
+function needsReview(d: ScreeningDecision): boolean {
+  if (d.human_decision) return false; // already human-verified
+  return d.decision === "uncertain" || d.confidence === "low";
+}
 
 // ---------------------------------------------------------------------------
 // Decision badge helpers
@@ -108,7 +136,7 @@ function ConfidenceDot({ level }: { level: "high" | "medium" | "low" }) {
 // ---------------------------------------------------------------------------
 
 function buildCsv(decisions: ScreeningDecision[], criteria: ScreeningResult["criteria"]): string {
-  const header = ["Title", "Year", "Journal", "Decision", "Confidence", "Reason Code", "Reason"].join(",");
+  const header = ["Title", "Year", "Journal", "AI Decision", "Human Override", "Final Decision", "Confidence", "Reason Code", "Reason", "DOI", "PMID"].join(",");
   const escape = (s: string | number | undefined) => {
     const str = String(s ?? "");
     return `"${str.replace(/"/g, '""')}"`;
@@ -119,9 +147,13 @@ function buildCsv(decisions: ScreeningDecision[], criteria: ScreeningResult["cri
       escape(d.year),
       escape(d.journal),
       escape(d.decision),
+      escape(d.human_decision ?? ""),
+      escape(effectiveDecision(d)),
       escape(d.confidence ?? ""),
       escape(d.reason_code ?? ""),
       escape(d.reason),
+      escape(d.doi ?? ""),
+      escape(d.pmid ?? ""),
     ].join(",")
   );
   const meta = [
@@ -210,17 +242,31 @@ function CriteriaList({
 // Results table
 // ---------------------------------------------------------------------------
 
-type FilterMode = "all" | "include" | "exclude" | "uncertain";
+type FilterMode = "all" | "include" | "exclude" | "uncertain" | "needs_review";
 
-function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
+function ScreeningResultsTable({
+  result,
+  onOverride,
+}: {
+  result: ScreeningResult;
+  /** Set or clear the human override for the decision at this index in result.decisions. */
+  onOverride: (index: number, verdict: Verdict | null) => void;
+}) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
-  const { decisions, included_count, excluded_count, uncertain_count, criteria } = result;
+  const { decisions, criteria } = result;
   const total = decisions.length;
-  const lowConfidenceCount = decisions.filter((d) => d.confidence === "low").length;
+  const { included_count, excluded_count, uncertain_count } = computeCounts(decisions);
+  const needsReviewCount = decisions.filter(needsReview).length;
+  const humanVerifiedCount = decisions.filter((d) => d.human_decision).length;
 
-  const filtered = filter === "all" ? decisions : decisions.filter((d) => d.decision === filter);
+  // Carry the original index through filtering so overrides land on the right record.
+  const indexed = decisions.map((d, idx) => ({ d, idx }));
+  const filtered =
+    filter === "all" ? indexed
+    : filter === "needs_review" ? indexed.filter(({ d }) => needsReview(d))
+    : indexed.filter(({ d }) => effectiveDecision(d) === filter);
 
   function handleDownloadCsv() {
     const csv = buildCsv(decisions, criteria);
@@ -228,9 +274,27 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
     downloadTextFile(csv, `screening-${slug}.csv`, "text/csv");
   }
 
+  function handleDownloadRis() {
+    // Export final-included studies in RIS for reference managers (Zotero,
+    // EndNote) — the input to the full-text review stage.
+    const included: ExistingReview[] = decisions
+      .filter((d) => effectiveDecision(d) === "include")
+      .map((d) => ({
+        title: d.title,
+        year: d.year,
+        journal: d.journal,
+        abstract_snippet: "",
+        doi: d.doi,
+        pmid: d.pmid,
+      }));
+    if (included.length === 0) return;
+    const slug = criteria.topic_title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+    downloadTextFile(toRis(included), `included-${slug}.ris`, "application/x-research-info-systems");
+  }
+
   return (
     <div className="space-y-4">
-      {/* Summary counts + CSV download */}
+      {/* Summary counts + exports */}
       <div className="flex flex-wrap items-center gap-3">
         {(
           [
@@ -238,6 +302,9 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
             { key: "include",   label: `✓ Include (${included_count})`,   cls: DECISION_STYLES.include.badge },
             { key: "exclude",   label: `✕ Exclude (${excluded_count})`,   cls: DECISION_STYLES.exclude.badge },
             { key: "uncertain", label: `? Uncertain (${uncertain_count})`, cls: DECISION_STYLES.uncertain.badge },
+            ...(needsReviewCount > 0
+              ? [{ key: "needs_review" as FilterMode, label: `⚠ Needs review (${needsReviewCount})`, cls: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border-amber-400 dark:border-amber-500" }]
+              : []),
           ] as { key: FilterMode; label: string; cls: string }[]
         ).map(({ key, label, cls }) => (
           <button
@@ -249,24 +316,41 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
             {label}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={handleDownloadCsv}
-          className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-opacity hover:opacity-80"
-          style={{ color: "var(--foreground)", border: "1px solid var(--border)", background: "var(--surface-2)" }}
-          title="Download decisions as CSV"
-        >
-          ↓ CSV
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDownloadRis}
+            disabled={included_count === 0}
+            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-opacity hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ color: "var(--foreground)", border: "1px solid var(--border)", background: "var(--surface-2)" }}
+            title="Download included studies as RIS for Zotero / EndNote (full-text stage)"
+          >
+            ↓ RIS (included)
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadCsv}
+            className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-opacity hover:opacity-80"
+            style={{ color: "var(--foreground)", border: "1px solid var(--border)", background: "var(--surface-2)" }}
+            title="Download all decisions as CSV (audit trail)"
+          >
+            ↓ CSV
+          </button>
+        </div>
       </div>
 
-      {/* Low-confidence warning */}
-      {lowConfidenceCount > 0 && (
+      {/* Human-review progress */}
+      {needsReviewCount > 0 ? (
         <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
-          <span className="inline-block w-2 h-2 rounded-full bg-red-500 shrink-0" />
-          {lowConfidenceCount} decision{lowConfidenceCount !== 1 ? "s" : ""} flagged as low confidence — verify these with full-text review.
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+          {needsReviewCount} decision{needsReviewCount !== 1 ? "s" : ""} need{needsReviewCount === 1 ? "s" : ""} a human verdict (uncertain or low-confidence). Use the &ldquo;Needs review&rdquo; filter to work through them.
         </p>
-      )}
+      ) : humanVerifiedCount > 0 ? (
+        <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          All flagged decisions reviewed — {humanVerifiedCount} human verdict{humanVerifiedCount !== 1 ? "s" : ""} recorded.
+        </p>
+      ) : null}
 
       {/* Criteria reminder */}
       <details className="text-xs" style={{ color: "var(--muted)" }}>
@@ -297,9 +381,10 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
             No reviews match this filter.
           </p>
         ) : (
-          filtered.map((d, i) => {
-            const style = DECISION_STYLES[d.decision];
-            const isExpanded = expandedIndex === i;
+          filtered.map(({ d, idx }) => {
+            const verdict = effectiveDecision(d);
+            const style = DECISION_STYLES[verdict];
+            const isExpanded = expandedIndex === idx;
             const linkUrl = d.pmid
               ? `https://pubmed.ncbi.nlm.nih.gov/${d.pmid}/`
               : d.doi
@@ -308,7 +393,7 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
 
             return (
               <div
-                key={i}
+                key={idx}
                 className={`rounded-md px-3 py-2.5 ${style.row}`}
                 style={{ background: "var(--surface)" }}
               >
@@ -350,7 +435,7 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
                     {/* Reason — toggle on click */}
                     <button
                       type="button"
-                      onClick={() => setExpandedIndex(isExpanded ? null : i)}
+                      onClick={() => setExpandedIndex(isExpanded ? null : idx)}
                       className="text-[11px] mt-1 transition-opacity hover:opacity-70 text-left"
                       style={{ color: "var(--accent)" }}
                     >
@@ -361,6 +446,32 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
                         <p className="text-xs leading-relaxed italic" style={{ color: "var(--muted)" }}>
                           {d.reason}
                         </p>
+
+                        {/* Human override — RAISE: every AI decision stays reviewable */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+                            Your verdict:
+                          </span>
+                          {(["include", "exclude", "uncertain"] as Verdict[]).map((v) => {
+                            const isActive = d.human_decision === v;
+                            return (
+                              <button
+                                key={v}
+                                type="button"
+                                onClick={() => onOverride(idx, isActive ? null : v)}
+                                className={`text-[10px] font-medium px-2 py-0.5 rounded-full border transition-opacity ${DECISION_STYLES[v].badge} ${isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-60 hover:opacity-100"}`}
+                                title={isActive ? "Click to revert to the AI decision" : `Override AI verdict to "${v}"`}
+                              >
+                                {DECISION_STYLES[v].icon} {DECISION_STYLES[v].label}
+                              </button>
+                            );
+                          })}
+                          {d.human_decision && (
+                            <span className="text-[10px]" style={{ color: "var(--muted)" }}>
+                              (AI said: {d.decision})
+                            </span>
+                          )}
+                        </div>
                         {d.criterion_results && d.criterion_results.length > 0 && (
                           <div className="overflow-x-auto rounded-md" style={{ border: "1px solid var(--border)" }}>
                             <table className="text-[10px] w-full border-collapse">
@@ -403,6 +514,15 @@ function ScreeningResultsTable({ result }: { result: ScreeningResult }) {
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
                       {style.label}
                     </span>
+                    {d.human_decision && (
+                      <span
+                        className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border"
+                        style={{ color: "var(--accent)", border: "1px solid var(--border)", background: "var(--surface-2)" }}
+                        title={`Human verdict (AI said: ${d.decision})`}
+                      >
+                        ✓ Human
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -578,6 +698,41 @@ export function ScreeningPanel({
   }
 
   // ---------------------------------------------------------------------------
+  // Human override: supersede the AI verdict on one decision, recompute counts,
+  // and persist the updated result (best-effort, fire-and-forget).
+  // ---------------------------------------------------------------------------
+  function handleOverride(index: number, verdict: Verdict | null) {
+    setScreeningResult((prev) => {
+      if (!prev || !prev.decisions[index]) return prev;
+
+      const decisions = prev.decisions.map((d, i) => {
+        if (i !== index) return d;
+        const next = { ...d };
+        if (verdict === null) {
+          delete next.human_decision;
+          delete next.human_decided_at;
+        } else {
+          next.human_decision = verdict;
+          next.human_decided_at = new Date().toISOString();
+        }
+        return next;
+      });
+
+      const updated: ScreeningResult = { ...prev, decisions, ...computeCounts(decisions) };
+
+      fetch("/api/screening/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resultId, screeningResult: updated }),
+      }).catch(() => {
+        // Non-fatal: the override still applies in this session.
+      });
+
+      return updated;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
@@ -634,7 +789,11 @@ export function ScreeningPanel({
           </p>
           <button
             type="button"
-            onClick={() => { setStep("idle"); setCriteria(null); }}
+            onClick={() => {
+              // Return to previous results if a run exists; otherwise back to idle.
+              setCriteria(null);
+              setStep(screeningResult ? "results" : "idle");
+            }}
             className="text-xs transition-opacity hover:opacity-70"
             style={{ color: "var(--muted)" }}
           >
@@ -751,18 +910,20 @@ export function ScreeningPanel({
           <button
             type="button"
             onClick={() => {
-              setStep("idle");
-              setScreeningResult(null);
-              setCriteria(null);
+              // Pre-fill the criteria editor with the last run's criteria so
+              // the user can tweak and re-screen instead of starting over.
+              // screeningResult stays loaded so Cancel can return to it.
+              setCriteria(screeningResult.criteria);
+              setStep("approve");
             }}
             className="text-xs transition-opacity hover:opacity-70"
             style={{ color: "var(--muted)" }}
           >
-            Re-screen ↺
+            Adjust criteria & re-screen ↺
           </button>
         </div>
 
-        <ScreeningResultsTable result={screeningResult} />
+        <ScreeningResultsTable result={screeningResult} onOverride={handleOverride} />
       </div>
     );
   }

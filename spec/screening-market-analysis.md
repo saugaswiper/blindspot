@@ -157,6 +157,37 @@
 
 ## 6. Improvement Log
 
+### 2026-06-10 — Human-in-the-loop overrides, needs-review triage, RIS export, re-screen flow
+
+Goal: move from "AI screening report" to "automated systematic review workflow" per RAISE
+guidance (all AI decisions remain subject to human review) and the Rayyan co-reviewer model.
+
+- **Human override per decision** (`components/ScreeningPanel.tsx`, `types/index.ts`):
+  every decision row now has Include / Exclude / Uncertain verdict buttons in the expanded
+  view. An override sets `human_decision` + `human_decided_at` on the `ScreeningDecision`;
+  the AI's original `decision` is preserved as the audit trail and shown as "(AI said: …)".
+  Counts, filters, CSV, and RIS all use the effective verdict (`human_decision ?? decision`).
+  Overrides persist immediately via `/api/screening/save`.
+- **Needs-review triage queue** (Tier 2 #6): a "⚠ Needs review" filter chip surfaces
+  records that are uncertain or low-confidence and not yet human-verified — the human only
+  works the queue that matters. A progress note tracks remaining items and flips to
+  "all flagged decisions reviewed" when the queue is cleared.
+- **RIS export of included studies**: "↓ RIS (included)" button exports final-included
+  records via the existing `toRis` helper for Zotero/EndNote — feeds the full-text stage.
+  CSV export now includes AI Decision / Human Override / Final Decision / DOI / PMID columns.
+- **Re-screen with pre-filled criteria** (Tier 2 #8): "Adjust criteria & re-screen" now
+  pre-populates the criteria editor with the last run's criteria; Cancel returns to the
+  previous results instead of discarding them.
+- **RAISE sensitivity rule** (`lib/screening.ts`): screening prompt now instructs the model
+  to prefer "uncertain" over "exclude" when in doubt at title/abstract stage.
+- **Model upgrade path** (Tier 2 #7): screening model is now configurable via the
+  `GEMINI_SCREENING_MODEL` env var (default `gemini-2.5-flash`; set `gemini-2.5-pro` for
+  harder criteria sets).
+
+Remaining from backlog: stop criterion / sufficiency indicator (Tier 3 #9), calibration
+round + inter-rater agreement (Tier 3 #10), active-learning re-ranking (Tier 2, needs
+seed-label loop), keyboard shortcuts for fast screening.
+
 ### 2026-06-09 — Chain-of-thought per criterion
 
 Updated `buildScreeningPrompt` in `lib/screening.ts` to instruct Gemini to evaluate every inclusion and exclusion criterion individually before rendering a final verdict. The JSON response schema now includes a `criterion_results` array on each decision object, with fields `criterion` (verbatim criterion text), `type` ("inclusion"|"exclusion"), `met` (bool), and `note` (one-sentence explanation). Added the matching optional field `criterion_results` to `ScreeningDecision` in `types/index.ts` (optional for backward compatibility with existing saved results). Updated `ScreeningPanel.tsx` to render a compact per-criterion breakdown table inside the expanded "Why?" view — each row shows criterion text, type badge (green/red), a ✓/✕ met indicator, and the note. This brings Blindspot's screening reasoning quality on par with Rayyan's ResearchPilot feature and implements the RAISE-recommended chain-of-thought approach shown to improve screening accuracy.

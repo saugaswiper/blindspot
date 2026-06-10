@@ -318,6 +318,15 @@ export interface ScreeningDecision {
     met: boolean;
     note: string;
   }>;
+  /**
+   * Human override of the AI verdict (RAISE guidance: all AI screening
+   * decisions must remain subject to human review). When set, this — not
+   * `decision` — is the effective verdict used for counts, filters, and
+   * exports. The original AI `decision` is preserved as the audit trail.
+   */
+  human_decision?: "include" | "exclude" | "uncertain";
+  /** ISO timestamp of when the human override was made. */
+  human_decided_at?: string;
 }
 
 /** Full screening run result stored on the search_result row. */
