@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // Don't pick up stale copies of the suite inside agent worktrees.
+    exclude: ["**/node_modules/**", "**/.claude/**"],
   },
   resolve: {
     alias: {

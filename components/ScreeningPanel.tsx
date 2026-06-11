@@ -24,34 +24,16 @@
 import { useEffect, useState } from "react";
 import type { CalibrationExample, ExistingReview, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
 import { downloadTextFile, toRis } from "@/lib/citation-export";
-
-// ---------------------------------------------------------------------------
-// Effective decision helpers
-//
-// RAISE guidance: every AI decision remains subject to human review. A human
-// override (`human_decision`) supersedes the AI verdict everywhere — counts,
-// filters, exports — while the original AI decision is kept for audit.
-// ---------------------------------------------------------------------------
-
-type Verdict = "include" | "exclude" | "uncertain";
-
-function effectiveDecision(d: ScreeningDecision): Verdict {
-  return d.human_decision ?? d.decision;
-}
-
-function computeCounts(decisions: ScreeningDecision[]) {
-  return {
-    included_count: decisions.filter((d) => effectiveDecision(d) === "include").length,
-    excluded_count: decisions.filter((d) => effectiveDecision(d) === "exclude").length,
-    uncertain_count: decisions.filter((d) => effectiveDecision(d) === "uncertain").length,
-  };
-}
-
-/** A record the human should look at: AI was uncertain, or low-confidence and not yet human-verified. */
-function needsReview(d: ScreeningDecision): boolean {
-  if (d.human_decision) return false; // already human-verified
-  return d.decision === "uncertain" || d.confidence === "low";
-}
+import {
+  buildCsv,
+  carryOverHumanVerdicts,
+  computeCounts,
+  effectiveDecision,
+  needsReview,
+  sortDecisions,
+  type SortMode,
+  type Verdict,
+} from "@/lib/screening-utils";
 
 // ---------------------------------------------------------------------------
 // Decision badge helpers
@@ -129,34 +111,7 @@ function ConfidenceDot({ level }: { level: "high" | "medium" | "low" }) {
 // CSV export
 // ---------------------------------------------------------------------------
 
-function buildCsv(decisions: ScreeningDecision[], criteria: ScreeningResult["criteria"]): string {
-  const header = ["Title", "Year", "Journal", "AI Decision", "Human Override", "Final Decision", "Confidence", "Reason Code", "Reason", "DOI", "PMID"].join(",");
-  const escape = (s: string | number | undefined) => {
-    const str = String(s ?? "");
-    return `"${str.replace(/"/g, '""')}"`;
-  };
-  const rows = decisions.map((d) =>
-    [
-      escape(d.title),
-      escape(d.year),
-      escape(d.journal),
-      escape(d.decision),
-      escape(d.human_decision ?? ""),
-      escape(effectiveDecision(d)),
-      escape(d.confidence ?? ""),
-      escape(d.reason_code ?? ""),
-      escape(d.reason),
-      escape(d.doi ?? ""),
-      escape(d.pmid ?? ""),
-    ].join(",")
-  );
-  const meta = [
-    `# Screening results for gap: ${criteria.topic_title}`,
-    `# Gap focus: ${criteria.focus_gap}`,
-    `# Exported from Blindspot`,
-  ].join("\n");
-  return [meta, header, ...rows].join("\n");
-}
+// buildCsv (audit-trail CSV) lives in lib/screening-utils.ts.
 
 // ---------------------------------------------------------------------------
 // Criteria editor helpers
@@ -241,35 +196,8 @@ function CriteriaList({
 
 type FilterMode = "all" | "include" | "exclude" | "uncertain" | "needs_review";
 
-type SortMode = "default" | "needs_review" | "confidence" | "year";
-
 /** Rows rendered before the "Show more" button — keeps the DOM light for 1 000+ records. */
 const PAGE_SIZE = 100;
-
-const CONFIDENCE_RANK = { low: 0, medium: 1, high: 2 } as const;
-
-function sortDecisions(
-  list: Array<{ d: ScreeningDecision; idx: number }>,
-  mode: SortMode,
-): Array<{ d: ScreeningDecision; idx: number }> {
-  if (mode === "default") return list;
-  const copy = [...list];
-  if (mode === "needs_review") {
-    // Work-priority order: unreviewed flagged items first, lowest confidence first.
-    copy.sort((a, b) => {
-      const na = needsReview(a.d) ? 0 : 1;
-      const nb = needsReview(b.d) ? 0 : 1;
-      if (na !== nb) return na - nb;
-      return (CONFIDENCE_RANK[a.d.confidence ?? "high"]) - (CONFIDENCE_RANK[b.d.confidence ?? "high"]);
-    });
-  } else if (mode === "confidence") {
-    copy.sort((a, b) =>
-      (CONFIDENCE_RANK[a.d.confidence ?? "high"]) - (CONFIDENCE_RANK[b.d.confidence ?? "high"]));
-  } else if (mode === "year") {
-    copy.sort((a, b) => (b.d.year || 0) - (a.d.year || 0));
-  }
-  return copy;
-}
 
 function ScreeningResultsTable({
   result,
@@ -897,12 +825,17 @@ export function ScreeningPanel({
       }
 
       // ── Phase 3: assemble + persist the final result ───────────────────────
+      // Re-screens iterate on the same records, so verdicts the reviewer
+      // already recorded carry over (matched by PMID → DOI → title) instead
+      // of being silently discarded with the old result.
+      const finalDecisions = screeningResult
+        ? carryOverHumanVerdicts(screeningResult.decisions, allDecisions)
+        : allDecisions;
+
       const assembled: ScreeningResult = {
         criteria: activeCriteria,
-        decisions: allDecisions,
-        included_count: allDecisions.filter((d) => d.decision === "include").length,
-        excluded_count: allDecisions.filter((d) => d.decision === "exclude").length,
-        uncertain_count: allDecisions.filter((d) => d.decision === "uncertain").length,
+        decisions: finalDecisions,
+        ...computeCounts(finalDecisions),
         screen_type: screenType,
         run_at: new Date().toISOString(),
       };

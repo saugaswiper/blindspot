@@ -157,6 +157,24 @@
 
 ## 6. Improvement Log
 
+### 2026-06-11 — Verdict carry-over on re-screen (data-loss fix) + test coverage
+
+- **Bug fix**: "Adjust criteria & re-screen" replaced the saved result wholesale,
+  silently discarding every human verdict the reviewer had recorded. New
+  `carryOverHumanVerdicts(previous, next)` matches records across runs by
+  PMID → DOI (URL-prefix/case-insensitive) → normalized title and copies
+  `human_decision` + `human_decided_at` onto the new run's decisions.
+  Re-screen counts now use effective verdicts.
+- **Extraction**: pure helpers (`effectiveDecision`, `computeCounts`,
+  `needsReview`, `sortDecisions`, `buildCsv`, `carryOverHumanVerdicts`) moved
+  from `ScreeningPanel.tsx` to `lib/screening-utils.ts`.
+- **Tests** (28, all passing): `lib/screening-utils.test.ts` covers the
+  override-supersedes-AI invariant, sort modes, CSV audit columns/escaping,
+  and carry-over matching; `lib/screening.test.ts` covers multi-source dedup
+  (PMID/DOI precedence, source priority, maxTotal cap, graceful degradation
+  when sources fail) with all three sources mocked.
+- vitest now excludes `.claude/worktrees/` so stale suite copies don't run.
+
 ### 2026-06-11 — Active-learning refine loop (ASReview insight)
 
 The last Tier-2 differentiator: the AI now learns from the reviewer's verdicts.
