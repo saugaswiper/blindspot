@@ -282,6 +282,21 @@ export type ScreeningReasonCode =
   | "insufficient_data"     // too little information in title/abstract to assess
   | "off_topic";            // topic does not address the identified gap
 
+/**
+ * A human-verified decision used to calibrate AI re-screening.
+ * Sent with refine requests so the model can learn how this reviewer
+ * interprets the criteria (active-learning loop).
+ */
+export interface CalibrationExample {
+  title: string;
+  year?: number;
+  abstract_snippet?: string;
+  /** The reviewer's final verdict for this record. */
+  human_decision: "include" | "exclude" | "uncertain";
+  /** What the AI originally said — a mismatch marks a correction. */
+  ai_decision?: "include" | "exclude" | "uncertain";
+}
+
 /** AI screening verdict for a single existing review. */
 export interface ScreeningDecision {
   title: string;
@@ -289,6 +304,13 @@ export interface ScreeningDecision {
   journal: string;
   pmid?: string;
   doi?: string;
+  /**
+   * Abstract snippet captured at screening time. Stored so refine runs
+   * (re-screening with reviewer feedback) can re-evaluate the record without
+   * refetching from the literature sources. Absent on results saved before
+   * this field was added — those refine on title alone.
+   */
+  abstract_snippet?: string;
   /**
    * include  → meets all inclusion criteria and no exclusion criteria
    * exclude  → violates at least one exclusion criterion or fails inclusion
@@ -327,6 +349,12 @@ export interface ScreeningDecision {
   human_decision?: "include" | "exclude" | "uncertain";
   /** ISO timestamp of when the human override was made. */
   human_decided_at?: string;
+  /**
+   * True when this decision was produced by a refine pass — a re-screen of
+   * flagged records using the reviewer's verified decisions as calibration
+   * examples (active-learning loop).
+   */
+  refined?: boolean;
 }
 
 /** Full screening run result stored on the search_result row. */

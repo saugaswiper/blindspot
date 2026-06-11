@@ -32,7 +32,7 @@ import {
   fetchAllPrimaryStudiesForScreening,
 } from "@/lib/screening";
 import { toApiError } from "@/lib/errors";
-import type { ExistingReview, ScreeningCriteria, ScreeningResult } from "@/types";
+import type { CalibrationExample, ExistingReview, ScreeningCriteria, ScreeningResult } from "@/types";
 
 export const maxDuration = 300;
 
@@ -54,6 +54,8 @@ export async function POST(request: Request) {
       criteria?: ScreeningCriteria;
       records?: ExistingReview[];
       screenType?: "primary" | "reviews";
+      /** Reviewer-verified decisions for calibrated re-screening (refine pass). */
+      examples?: CalibrationExample[];
     };
 
     if (!body.criteria) {
@@ -80,7 +82,10 @@ export async function POST(request: Request) {
         );
       }
 
-      const decisions = await runTitleAbstractScreening(records, criteria);
+      // Cap calibration examples to keep the prompt bounded.
+      const examples = Array.isArray(body.examples) ? body.examples.slice(0, 25) : undefined;
+
+      const decisions = await runTitleAbstractScreening(records, criteria, examples);
       return Response.json({ decisions });
     }
 

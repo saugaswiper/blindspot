@@ -15,7 +15,7 @@ import { SYSTEM_PROMPT } from "@/lib/prompts";
 import { fetchPrimaryStudiesForScreening as pubmedFetch } from "@/lib/pubmed";
 import { fetchPrimaryStudiesForScreening as openalexFetch } from "@/lib/openalex";
 import { fetchPrimaryStudiesForScreening as scopusFetch } from "@/lib/scopus";
-import type { ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode } from "@/types";
+import type { CalibrationExample, ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Multi-source primary study fetch with deduplication
@@ -298,7 +298,8 @@ export async function suggestScreeningCriteria(
 
 function buildScreeningPrompt(
   reviews: ExistingReview[],
-  criteria: ScreeningCriteria
+  criteria: ScreeningCriteria,
+  examples?: CalibrationExample[]
 ): string {
   const inclusionList = criteria.inclusion.map((c, i) => `I${i + 1}. ${c}`).join("\n");
   const exclusionList = criteria.exclusion.map((c, i) => `E${i + 1}. ${c}`).join("\n");
@@ -312,6 +313,24 @@ function buildScreeningPrompt(
     )
     .join("\n");
 
+  // Active-learning calibration: reviewer-verified decisions teach the model
+  // how THIS reviewer interprets the criteria. Corrections (AI ≠ human) are
+  // the strongest signal.
+  const examplesSection = examples && examples.length > 0
+    ? `
+REVIEWER-VERIFIED EXAMPLES:
+The human reviewer has verified the following decisions for this same review. Calibrate your interpretation of the criteria to match the reviewer's judgement — pay special attention to records where the reviewer corrected the AI:
+${examples
+  .map((e, i) => {
+    const corrected = e.ai_decision && e.ai_decision !== e.human_decision;
+    return `${i + 1}. "${e.title}" (${e.year || "n/a"}) → reviewer verdict: ${e.human_decision.toUpperCase()}${
+      corrected ? ` [corrected — AI had said: ${e.ai_decision}]` : " [confirmed AI decision]"
+    }`;
+  })
+  .join("\n")}
+`
+    : "";
+
   return `Screen the following systematic reviews against the provided inclusion and exclusion criteria.
 
 GAP FOCUS: ${criteria.focus_gap}
@@ -321,7 +340,7 @@ ${inclusionList}
 
 EXCLUSION CRITERIA (review fails if ANY of these apply):
 ${exclusionList}
-
+${examplesSection}
 REVIEWS TO SCREEN (${reviews.length} total):
 ${reviewsText}
 
@@ -419,9 +438,10 @@ function validateDecisions(arr: unknown, expectedLength: number): arr is Decisio
 /** Screen a single batch (≤ SCREENING_BATCH_SIZE records) against criteria. */
 async function screenBatch(
   batch: ExistingReview[],
-  criteria: ScreeningCriteria
+  criteria: ScreeningCriteria,
+  examples?: CalibrationExample[]
 ): Promise<ScreeningDecision[]> {
-  const prompt = buildScreeningPrompt(batch, criteria);
+  const prompt = buildScreeningPrompt(batch, criteria, examples);
   const raw = await callGemini(prompt);
   const json = extractJson(raw);
 
@@ -468,6 +488,8 @@ function mapDecision(d: DecisionRaw, record: ExistingReview): ScreeningDecision 
     journal: record.journal,
     pmid: record.pmid,
     doi: record.doi,
+    // Persisted so refine passes can re-screen without refetching sources.
+    abstract_snippet: record.abstract_snippet ? record.abstract_snippet.slice(0, 400) : undefined,
     decision: d.decision,
     reason: d.reason,
     reason_code: parseReasonCode(d.reason_code, d.decision),
@@ -488,13 +510,14 @@ function mapDecision(d: DecisionRaw, record: ExistingReview): ScreeningDecision 
  */
 export async function runTitleAbstractScreening(
   reviews: ExistingReview[],
-  criteria: ScreeningCriteria
+  criteria: ScreeningCriteria,
+  examples?: CalibrationExample[]
 ): Promise<ScreeningDecision[]> {
   if (reviews.length === 0) return [];
 
   // If the list fits in one batch, skip the overhead
   if (reviews.length <= SCREENING_BATCH_SIZE) {
-    return screenBatch(reviews, criteria);
+    return screenBatch(reviews, criteria, examples);
   }
 
   // Split into batches and process sequentially
@@ -504,7 +527,7 @@ export async function runTitleAbstractScreening(
     console.log(
       `[screening] Batch ${Math.floor(start / SCREENING_BATCH_SIZE) + 1}/${Math.ceil(reviews.length / SCREENING_BATCH_SIZE)} — ${batch.length} records`
     );
-    const decisions = await screenBatch(batch, criteria);
+    const decisions = await screenBatch(batch, criteria, examples);
     allDecisions.push(...decisions);
   }
 

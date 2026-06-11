@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { ExistingReview, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
+import type { CalibrationExample, ExistingReview, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
 import { downloadTextFile, toRis } from "@/lib/citation-export";
 
 // ---------------------------------------------------------------------------
@@ -274,10 +274,15 @@ function sortDecisions(
 function ScreeningResultsTable({
   result,
   onOverride,
+  onRefine,
+  refining,
 }: {
   result: ScreeningResult;
   /** Set or clear the human override for the decision at this index in result.decisions. */
   onOverride: (index: number, verdict: Verdict | null) => void;
+  /** Re-screen flagged records using the reviewer's verified decisions as calibration. */
+  onRefine: () => void;
+  refining: boolean;
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
@@ -465,12 +470,28 @@ function ScreeningResultsTable({
         Keyboard: <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>y</kbd> include · <kbd>n</kbd> exclude · <kbd>u</kbd> uncertain · <kbd>r</kbd> reasoning
       </p>
 
-      {/* Human-review progress */}
+      {/* Human-review progress + active-learning refine */}
       {needsReviewCount > 0 ? (
-        <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
-          <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--warning)" }} />
-          {needsReviewCount} decision{needsReviewCount !== 1 ? "s" : ""} need{needsReviewCount === 1 ? "s" : ""} a human verdict (uncertain or low-confidence). Use the &ldquo;Needs review&rdquo; filter to work through them.
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
+            <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--warning)" }} />
+            {needsReviewCount} decision{needsReviewCount !== 1 ? "s" : ""} need{needsReviewCount === 1 ? "s" : ""} a human verdict (uncertain or low-confidence). Use the &ldquo;Needs review&rdquo; filter to work through them.
+          </p>
+          {humanVerifiedCount >= 3 && (
+            <button
+              type="button"
+              onClick={onRefine}
+              disabled={refining}
+              className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-md transition-opacity hover:opacity-80 disabled:opacity-50 disabled:cursor-wait"
+              style={{ color: "var(--accent)", border: "1px solid var(--accent)", background: "var(--surface)" }}
+              title="Re-screen the flagged records using your verified decisions as calibration examples"
+            >
+              {refining
+                ? "Re-screening with your feedback…"
+                : `↻ Re-screen ${needsReviewCount} with your feedback (${humanVerifiedCount} verdicts learned)`}
+            </button>
+          )}
+        </div>
       ) : humanVerifiedCount > 0 ? (
         <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
           <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: "var(--success)" }} />
@@ -567,6 +588,15 @@ function ScreeningResultsTable({
                         {d.journal && <>{d.journal} · </>}{d.year || "Year unknown"}
                       </p>
                       {d.reason_code && <ReasonCodeBadge code={d.reason_code} />}
+                      {d.refined && (
+                        <span
+                          className="text-[10px] shrink-0"
+                          style={{ color: "var(--accent)" }}
+                          title="Re-screened with your verified decisions as calibration"
+                        >
+                          ↻ re-screened
+                        </span>
+                      )}
                     </div>
 
                     {/* Reasoning toggle + one-click human verdict (RAISE: every
@@ -741,6 +771,8 @@ export function ScreeningPanel({
     decisions: ScreeningDecision[];
     criteria: ScreeningCriteria;
   } | null>(null);
+  // True while a refine pass (calibrated re-screen) is in flight.
+  const [refining, setRefining] = useState(false);
   const recordLabel = screenType === "primary" ? "primary studies" : "reviews";
 
   // ---------------------------------------------------------------------------
@@ -895,6 +927,99 @@ export function ScreeningPanel({
       setStep("approve");
       setProgress(null);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Refine: re-screen the still-flagged records (uncertain / low-confidence,
+  // not yet human-verified) using the reviewer's verified decisions as
+  // calibration examples — the active-learning loop. Verified decisions are
+  // never touched; refined records keep appearing in "Needs review" if the
+  // calibrated AI still can't decide.
+  // ---------------------------------------------------------------------------
+  async function handleRefine() {
+    if (!screeningResult || refining) return;
+    const sr = screeningResult;
+
+    const targets = sr.decisions
+      .map((d, i) => ({ d, i }))
+      .filter(({ d }) => needsReview(d));
+    const verified = sr.decisions.filter((d) => d.human_decision);
+    if (targets.length === 0 || verified.length === 0) return;
+
+    // Corrections (human ≠ AI) are the strongest calibration signal — put
+    // them first, then confirmations, capped to keep the prompt bounded.
+    const examples: CalibrationExample[] = [...verified]
+      .sort(
+        (a, b) =>
+          Number(b.human_decision !== b.decision) - Number(a.human_decision !== a.decision)
+      )
+      .slice(0, 25)
+      .map((d) => ({
+        title: d.title,
+        year: d.year,
+        human_decision: d.human_decision!,
+        ai_decision: d.decision,
+      }));
+
+    setRefining(true);
+    setError(null);
+
+    const newDecisions = [...sr.decisions];
+    let refineError: string | null = null;
+
+    try {
+      for (let start = 0; start < targets.length; start += CHUNK_SIZE) {
+        const chunk = targets.slice(start, start + CHUNK_SIZE);
+        const records: ExistingReview[] = chunk.map(({ d }) => ({
+          title: d.title,
+          year: d.year,
+          journal: d.journal,
+          abstract_snippet: d.abstract_snippet ?? "",
+          pmid: d.pmid,
+          doi: d.doi,
+        }));
+
+        const res = await fetch("/api/screening/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ criteria: sr.criteria, records, examples }),
+        });
+        const data = (await res.json()) as { decisions?: ScreeningDecision[]; error?: string };
+        if (!res.ok || data.error || !data.decisions) {
+          refineError = data.error ?? "Re-screening failed partway — earlier batches were kept.";
+          break;
+        }
+
+        data.decisions.forEach((nd, j) => {
+          const orig = chunk[j].i;
+          newDecisions[orig] = {
+            ...nd,
+            abstract_snippet: newDecisions[orig].abstract_snippet ?? nd.abstract_snippet,
+            refined: true,
+          };
+        });
+      }
+    } catch {
+      refineError = "Network error during re-screening — earlier batches were kept.";
+    }
+
+    const updated: ScreeningResult = {
+      ...sr,
+      decisions: newDecisions,
+      ...computeCounts(newDecisions),
+    };
+    setScreeningResult(updated);
+    if (refineError) setError(refineError);
+
+    fetch("/api/screening/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resultId, screeningResult: updated }),
+    }).catch(() => {
+      // Non-fatal: refreshed decisions still apply in this session.
+    });
+
+    setRefining(false);
   }
 
   // ---------------------------------------------------------------------------
@@ -1135,7 +1260,16 @@ export function ScreeningPanel({
           </button>
         </div>
 
-        <ScreeningResultsTable result={screeningResult} onOverride={handleOverride} />
+        {error && (
+          <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+        )}
+
+        <ScreeningResultsTable
+          result={screeningResult}
+          onOverride={handleOverride}
+          onRefine={handleRefine}
+          refining={refining}
+        />
       </div>
     );
   }

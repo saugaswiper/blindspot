@@ -157,6 +157,31 @@
 
 ## 6. Improvement Log
 
+### 2026-06-11 — Active-learning refine loop (ASReview insight)
+
+The last Tier-2 differentiator: the AI now learns from the reviewer's verdicts.
+
+- **CalibrationExample** type (`types/index.ts`): a human-verified decision
+  (title, year, human verdict, original AI verdict) sent with refine requests.
+- **Calibrated prompt** (`lib/screening.ts`): `buildScreeningPrompt` accepts
+  examples and renders a "REVIEWER-VERIFIED EXAMPLES" section instructing the
+  model to match this reviewer's interpretation — corrections (human ≠ AI)
+  flagged as the strongest signal. Threaded through `screenBatch` and
+  `runTitleAbstractScreening`; `/api/screening/run` accepts `examples`
+  (capped at 25) in chunk mode.
+- **Refine flow** (`ScreeningPanel.tsx`): once ≥ 3 human verdicts exist and
+  flagged records remain, a "↻ Re-screen N with your feedback" button re-runs
+  ONLY the unverified uncertain/low-confidence records with the calibration
+  examples. Human-verified decisions are never touched. Refined records are
+  badged "↻ re-screened" and re-enter "Needs review" if still undecidable.
+  Partial failures keep completed batches.
+- **abstract_snippet persisted on ScreeningDecision** so refine can re-evaluate
+  records without refetching the literature sources (older saved results
+  refine on title alone).
+
+Backlog now: stop criterion / sufficiency indicator (Tier 3 #9), calibration
+round + inter-rater agreement (Tier 3 #10, needs multi-reviewer accounts).
+
 ### 2026-06-11 — Screening workbench: search, sort, speed mode, resume, paging
 
 Workflow improvements driven by the 1 000+-article reality of the chunked pipeline:
