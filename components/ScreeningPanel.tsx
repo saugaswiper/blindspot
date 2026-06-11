@@ -21,7 +21,7 @@
  *   initialResult – previously saved ScreeningResult (if any) from the DB
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ExistingReview, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
 import { downloadTextFile, toRis } from "@/lib/citation-export";
 
@@ -241,6 +241,36 @@ function CriteriaList({
 
 type FilterMode = "all" | "include" | "exclude" | "uncertain" | "needs_review";
 
+type SortMode = "default" | "needs_review" | "confidence" | "year";
+
+/** Rows rendered before the "Show more" button — keeps the DOM light for 1 000+ records. */
+const PAGE_SIZE = 100;
+
+const CONFIDENCE_RANK = { low: 0, medium: 1, high: 2 } as const;
+
+function sortDecisions(
+  list: Array<{ d: ScreeningDecision; idx: number }>,
+  mode: SortMode,
+): Array<{ d: ScreeningDecision; idx: number }> {
+  if (mode === "default") return list;
+  const copy = [...list];
+  if (mode === "needs_review") {
+    // Work-priority order: unreviewed flagged items first, lowest confidence first.
+    copy.sort((a, b) => {
+      const na = needsReview(a.d) ? 0 : 1;
+      const nb = needsReview(b.d) ? 0 : 1;
+      if (na !== nb) return na - nb;
+      return (CONFIDENCE_RANK[a.d.confidence ?? "high"]) - (CONFIDENCE_RANK[b.d.confidence ?? "high"]);
+    });
+  } else if (mode === "confidence") {
+    copy.sort((a, b) =>
+      (CONFIDENCE_RANK[a.d.confidence ?? "high"]) - (CONFIDENCE_RANK[b.d.confidence ?? "high"]));
+  } else if (mode === "year") {
+    copy.sort((a, b) => (b.d.year || 0) - (a.d.year || 0));
+  }
+  return copy;
+}
+
 function ScreeningResultsTable({
   result,
   onOverride,
@@ -251,6 +281,12 @@ function ScreeningResultsTable({
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("default");
+  // Incremental rendering: with 1 000+ decisions a full render is sluggish.
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Keyboard speed mode: position of the active row within the visible list.
+  const [activeIdx, setActiveIdx] = useState(-1);
 
   const { decisions, criteria } = result;
   const total = decisions.length;
@@ -258,12 +294,66 @@ function ScreeningResultsTable({
   const needsReviewCount = decisions.filter(needsReview).length;
   const humanVerifiedCount = decisions.filter((d) => d.human_decision).length;
 
-  // Carry the original index through filtering so overrides land on the right record.
+  // Pipeline: index → search → filter → sort → visible slice.
+  // The original index travels with each record so overrides land correctly.
   const indexed = decisions.map((d, idx) => ({ d, idx }));
+  const q = query.trim().toLowerCase();
+  const searched = q
+    ? indexed.filter(({ d }) =>
+        d.title.toLowerCase().includes(q) || (d.journal ?? "").toLowerCase().includes(q))
+    : indexed;
   const filtered =
-    filter === "all" ? indexed
-    : filter === "needs_review" ? indexed.filter(({ d }) => needsReview(d))
-    : indexed.filter(({ d }) => effectiveDecision(d) === filter);
+    filter === "all" ? searched
+    : filter === "needs_review" ? searched.filter(({ d }) => needsReview(d))
+    : searched.filter(({ d }) => effectiveDecision(d) === filter);
+  const sorted = sortDecisions(filtered, sortMode);
+  const visible = sorted.slice(0, visibleCount);
+
+  // Reset paging + active row whenever the working set changes shape.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+    setActiveIdx(-1);
+  }, [filter, q, sortMode]);
+
+  // Clamp the active row if an override removed it from the current filter.
+  useEffect(() => {
+    if (activeIdx >= visible.length) setActiveIdx(visible.length - 1);
+  }, [activeIdx, visible.length]);
+
+  // Keyboard speed mode (Covidence-style): j/k navigate, y/n/u verdict, r reasoning.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      // Never hijack typing in form fields.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.min(i + 1, visible.length - 1));
+      } else if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveIdx((i) => Math.max(i - 1, 0));
+      } else if (activeIdx >= 0 && activeIdx < visible.length) {
+        const { d, idx } = visible[activeIdx];
+        if (e.key === "y") onOverride(idx, d.human_decision === "include" ? null : "include");
+        else if (e.key === "n") onOverride(idx, d.human_decision === "exclude" ? null : "exclude");
+        else if (e.key === "u") onOverride(idx, d.human_decision === "uncertain" ? null : "uncertain");
+        else if (e.key === "r") setExpandedIndex((cur) => (cur === idx ? null : idx));
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [visible, activeIdx, onOverride]);
+
+  // Keep the active row in view while navigating with the keyboard.
+  useEffect(() => {
+    if (activeIdx < 0 || activeIdx >= visible.length) return;
+    document
+      .getElementById(`screening-row-${visible[activeIdx].idx}`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx]);
 
   function handleDownloadCsv() {
     const csv = buildCsv(decisions, criteria);
@@ -345,6 +435,36 @@ function ScreeningResultsTable({
         </div>
       </div>
 
+      {/* Search + sort toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`Search ${total.toLocaleString()} records by title or journal…`}
+          className="flex-1 min-w-[180px] text-xs px-2.5 py-1.5 rounded-md focus:outline-none focus:ring-1"
+          style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--foreground)" }}
+          aria-label="Search screened records"
+        />
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value as SortMode)}
+          className="text-xs px-2 py-1.5 rounded-md focus:outline-none"
+          style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--foreground)" }}
+          aria-label="Sort records"
+        >
+          <option value="default">Screening order</option>
+          <option value="needs_review">Needs review first</option>
+          <option value="confidence">Lowest confidence first</option>
+          <option value="year">Newest first</option>
+        </select>
+      </div>
+
+      {/* Keyboard speed mode hint */}
+      <p className="hidden sm:block text-[10px]" style={{ color: "var(--muted)" }}>
+        Keyboard: <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>y</kbd> include · <kbd>n</kbd> exclude · <kbd>u</kbd> uncertain · <kbd>r</kbd> reasoning
+      </p>
+
       {/* Human-review progress */}
       {needsReviewCount > 0 ? (
         <p className="text-[11px] flex items-center gap-1.5" style={{ color: "var(--muted)" }}>
@@ -382,15 +502,18 @@ function ScreeningResultsTable({
 
       {/* Results list */}
       <div className="space-y-2">
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <p className="text-sm text-center py-4" style={{ color: "var(--muted)" }}>
-            No {result.screen_type === "reviews" ? "reviews" : "studies"} match this filter.
+            {q
+              ? `No records match “${query.trim()}”${filter !== "all" ? " in this filter" : ""}.`
+              : `No ${result.screen_type === "reviews" ? "reviews" : "studies"} match this filter.`}
           </p>
         ) : (
-          filtered.map(({ d, idx }) => {
+          visible.map(({ d, idx }, pos) => {
             const verdict = effectiveDecision(d);
             const tone = DECISION_TONES[verdict];
             const isExpanded = expandedIndex === idx;
+            const isActive = pos === activeIdx;
             const linkUrl = d.pmid
               ? `https://pubmed.ncbi.nlm.nih.gov/${d.pmid}/`
               : d.doi
@@ -400,8 +523,15 @@ function ScreeningResultsTable({
             return (
               <div
                 key={idx}
+                id={`screening-row-${idx}`}
+                onClick={() => setActiveIdx(pos)}
                 className="rounded-md px-3 py-2.5"
-                style={{ background: "var(--surface)", borderLeft: `2px solid ${tone.color}` }}
+                style={{
+                  background: "var(--surface)",
+                  borderLeft: `2px solid ${tone.color}`,
+                  outline: isActive ? "2px solid var(--accent)" : "none",
+                  outlineOffset: "1px",
+                }}
               >
                 <div className="flex items-start gap-2">
                   {/* Decision badge */}
@@ -543,6 +673,18 @@ function ScreeningResultsTable({
             );
           })
         )}
+
+        {/* Incremental rendering: load the next page of rows */}
+        {sorted.length > visibleCount && (
+          <button
+            type="button"
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            className="w-full text-xs py-2 rounded-md transition-opacity hover:opacity-80"
+            style={{ color: "var(--accent)", border: "1px dashed var(--border)", background: "var(--surface)" }}
+          >
+            Show {Math.min(PAGE_SIZE, sorted.length - visibleCount).toLocaleString()} more of {(sorted.length - visibleCount).toLocaleString()} remaining ↓
+          </button>
+        )}
       </div>
 
       <p className="text-[10px]" style={{ color: "var(--muted)" }}>
@@ -586,6 +728,19 @@ export function ScreeningPanel({
   const [error, setError] = useState<string | null>(null);
   // Real progress for the chunked screening pipeline. null until the total is known.
   const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
+  /**
+   * Partial-run checkpoint for resume-on-failure. When a chunk fails (network
+   * blip, AI hiccup) we keep the fetched records and the decisions completed
+   * so far; "Resume" continues from the next chunk instead of refetching and
+   * re-screening everything. Cleared on success or when a fresh run starts.
+   * Criteria are snapshotted so a mid-failure edit can't mix criteria across
+   * chunks of one run.
+   */
+  const [checkpoint, setCheckpoint] = useState<{
+    records: ExistingReview[];
+    decisions: ScreeningDecision[];
+    criteria: ScreeningCriteria;
+  } | null>(null);
   const recordLabel = screenType === "primary" ? "primary studies" : "reviews";
 
   // ---------------------------------------------------------------------------
@@ -625,63 +780,93 @@ export function ScreeningPanel({
   // ---------------------------------------------------------------------------
   const CHUNK_SIZE = 300;
 
-  async function handleRun() {
-    if (!criteria) return;
+  async function handleRun(opts?: { resume?: boolean }) {
+    const cp = opts?.resume ? checkpoint : null;
+    const activeCriteria = cp?.criteria ?? criteria;
+    if (!activeCriteria) return;
+
     setStep("running");
     setError(null);
-    setProgress(null);
 
     try {
-      // ── Phase 1: fetch every available record ──────────────────────────────
-      const fetchRes = await fetch("/api/screening/fetch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resultId, screenType }),
-      });
-      const fetchData = (await fetchRes.json()) as {
-        records?: ExistingReview[];
-        total?: number;
-        error?: string;
-      };
-      if (!fetchRes.ok || fetchData.error || !fetchData.records) {
-        setError(fetchData.error ?? `No ${recordLabel} found to screen.`);
-        setStep("approve");
-        return;
-      }
+      let records: ExistingReview[];
+      let allDecisions: ScreeningDecision[];
 
-      const records = fetchData.records;
-      const total = records.length;
-      if (total === 0) {
-        setError(`No ${recordLabel} found to screen.`);
-        setStep("approve");
-        return;
-      }
+      if (cp) {
+        // ── Resume: reuse fetched records + completed decisions ──────────────
+        records = cp.records;
+        allDecisions = [...cp.decisions];
+      } else {
+        // ── Phase 1: fetch every available record ────────────────────────────
+        setCheckpoint(null);
+        setProgress(null);
 
-      // ── Phase 2: screen in chunks, accumulating decisions ──────────────────
-      setProgress({ processed: 0, total });
-      const allDecisions: ScreeningDecision[] = [];
-
-      for (let start = 0; start < total; start += CHUNK_SIZE) {
-        const chunk = records.slice(start, start + CHUNK_SIZE);
-        const runRes = await fetch("/api/screening/run", {
+        const fetchRes = await fetch("/api/screening/fetch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ criteria, records: chunk }),
+          body: JSON.stringify({ resultId, screenType }),
         });
-        const runData = (await runRes.json()) as { decisions?: ScreeningDecision[]; error?: string };
-        if (!runRes.ok || runData.error || !runData.decisions) {
-          setError(runData.error ?? "Screening failed partway through. Please try again.");
+        const fetchData = (await fetchRes.json()) as {
+          records?: ExistingReview[];
+          total?: number;
+          error?: string;
+        };
+        if (!fetchRes.ok || fetchData.error || !fetchData.records) {
+          setError(fetchData.error ?? `No ${recordLabel} found to screen.`);
+          setStep("approve");
+          return;
+        }
+
+        records = fetchData.records;
+        if (records.length === 0) {
+          setError(`No ${recordLabel} found to screen.`);
+          setStep("approve");
+          return;
+        }
+        allDecisions = [];
+      }
+
+      const total = records.length;
+
+      // ── Phase 2: screen in chunks, accumulating decisions ──────────────────
+      setProgress({ processed: allDecisions.length, total });
+
+      for (let start = allDecisions.length; start < total; start += CHUNK_SIZE) {
+        const chunk = records.slice(start, start + CHUNK_SIZE);
+        let failureMessage: string | null = null;
+
+        try {
+          const runRes = await fetch("/api/screening/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ criteria: activeCriteria, records: chunk }),
+          });
+          const runData = (await runRes.json()) as { decisions?: ScreeningDecision[]; error?: string };
+          if (!runRes.ok || runData.error || !runData.decisions) {
+            failureMessage = runData.error ?? "AI screening failed on a batch.";
+          } else {
+            allDecisions.push(...runData.decisions);
+            setProgress({ processed: Math.min(start + CHUNK_SIZE, total), total });
+          }
+        } catch {
+          failureMessage = "Network error during screening.";
+        }
+
+        if (failureMessage) {
+          // Checkpoint the partial run so the user can resume without losing progress.
+          setCheckpoint({ records, decisions: allDecisions, criteria: activeCriteria });
+          setError(
+            `${failureMessage} Stopped at ${allDecisions.length.toLocaleString()} of ${total.toLocaleString()} — your progress is saved, use Resume below.`
+          );
           setStep("approve");
           setProgress(null);
           return;
         }
-        allDecisions.push(...runData.decisions);
-        setProgress({ processed: Math.min(start + CHUNK_SIZE, total), total });
       }
 
       // ── Phase 3: assemble + persist the final result ───────────────────────
       const assembled: ScreeningResult = {
-        criteria,
+        criteria: activeCriteria,
         decisions: allDecisions,
         included_count: allDecisions.filter((d) => d.decision === "include").length,
         excluded_count: allDecisions.filter((d) => d.decision === "exclude").length,
@@ -701,6 +886,7 @@ export function ScreeningPanel({
         // Non-fatal: the user still sees the results for this session.
       }
 
+      setCheckpoint(null);
       setScreeningResult(assembled);
       setProgress(null);
       setStep("results");
@@ -769,7 +955,7 @@ export function ScreeningPanel({
           Screen ~{recordCount.toLocaleString()} {recordLabel} for this gap
         </button>
         {error && (
-          <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-1.5 text-xs" style={{ color: "var(--danger)" }}>{error}</p>
         )}
       </div>
     );
@@ -836,21 +1022,33 @@ export function ScreeningPanel({
         />
 
         {error && (
-          <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+          <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
         )}
 
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          {checkpoint && (
+            <button
+              type="button"
+              onClick={() => handleRun({ resume: true })}
+              className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md transition-all"
+              style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+            >
+              Resume screening ({checkpoint.decisions.length.toLocaleString()}/{checkpoint.records.length.toLocaleString()} done)
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleRun}
+            onClick={() => handleRun()}
             disabled={criteria.inclusion.filter(Boolean).length === 0}
             className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+            style={checkpoint
+              ? { background: "var(--surface)", color: "var(--foreground)", border: "1px solid var(--border)" }
+              : { background: "var(--brand-surface)", color: "#f4f1ea" }}
           >
-            Approve & Screen ~{recordCount.toLocaleString()} {recordLabel}
+            {checkpoint ? "Restart from scratch" : `Approve & Screen ~${recordCount.toLocaleString()} ${recordLabel}`}
           </button>
           <p className="text-[11px]" style={{ color: "var(--muted)" }}>
-            Edit criteria above before screening
+            {checkpoint ? "Editing criteria requires a full restart" : "Edit criteria above before screening"}
           </p>
         </div>
       </div>

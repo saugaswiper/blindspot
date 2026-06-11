@@ -157,6 +157,27 @@
 
 ## 6. Improvement Log
 
+### 2026-06-11 — Screening workbench: search, sort, speed mode, resume, paging
+
+Workflow improvements driven by the 1 000+-article reality of the chunked pipeline:
+
+- **Search within results**: text filter over title + journal, live count-aware
+  placeholder; combines with the decision filters.
+- **Sort modes**: screening order / needs-review first (work-priority: unreviewed
+  flagged items, lowest confidence first — DistillerSR prioritization insight) /
+  lowest confidence first / newest first.
+- **Keyboard speed mode** (Covidence y/n/m insight): j/k or arrows navigate rows,
+  y = include, n = exclude, u = uncertain, r = toggle reasoning. Active row gets an
+  accent outline and scrolls into view; typing in form fields is never hijacked.
+  Hint line shown above the list (hidden on mobile).
+- **Resume-on-failure**: chunked runs checkpoint fetched records + completed
+  decisions in component state. If a chunk fails (network/AI), the user gets
+  "Resume screening (N/M done)" instead of losing the whole run; criteria are
+  snapshotted at run start so a mid-failure edit can't mix criteria across chunks.
+  "Restart from scratch" stays available as a secondary action.
+- **Incremental rendering**: rows render 100 at a time with a "Show more" button —
+  keeps the DOM responsive at 1 000+ decisions.
+
 ### 2026-06-10 — Design-system alignment + one-click verdict UX (design critique pass)
 
 - Added semantic status tokens to `app/globals.css` (`--success`, `--danger`, `--warning`
