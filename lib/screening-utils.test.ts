@@ -152,6 +152,14 @@ describe("carryOverHumanVerdicts", () => {
     expect(carryOverHumanVerdicts(prev, next)[0].human_decision).toBe("include");
   });
 
+  it("matches a whitespace-padded URL DOI against a bare DOI (F3 regression)", () => {
+    // The old strip-then-trim normalizeDoi left the prefix on a padded URL DOI,
+    // splitting one study into two. The canonical trim-then-strip primitive fixes it.
+    const prev = [decision({ doi: "\thttps://doi.org/10.1000/ABC\n", human_decision: "exclude" })];
+    const next = [decision({ doi: "10.1000/abc" })];
+    expect(carryOverHumanVerdicts(prev, next)[0].human_decision).toBe("exclude");
+  });
+
   it("falls back to normalized title matching", () => {
     const prev = [decision({ title: "CBT for Insomnia: a Trial!", human_decision: "uncertain" })];
     const next = [decision({ title: "cbt for insomnia   a trial" })];

@@ -7,6 +7,7 @@
  * filters, exports — while the original AI decision is kept for audit.
  */
 
+import { normalizeDoi } from "@/lib/study-id";
 import type { ScreeningDecision, ScreeningResult } from "@/types";
 
 export type Verdict = "include" | "exclude" | "uncertain";
@@ -107,11 +108,8 @@ function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function normalizeDoi(doi: string | undefined): string | undefined {
-  if (!doi) return undefined;
-  const bare = doi.toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim();
-  return bare || undefined;
-}
+// normalizeDoi is the canonical primitive from lib/study-id.ts (trim-then-strip);
+// using it here keeps screening dedup/carry-over consistent with search dedup.
 
 /**
  * Copy human verdicts from a previous screening run onto the decisions of a

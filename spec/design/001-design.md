@@ -156,15 +156,25 @@ These are introduced by P1 fixes and should be documented with light + dark valu
 1. ✅ **002 — Auth (login/signup)** (`app/login`, `app/signup`): DONE. Self-contained,
    reachable; lands F2 (button), F3 (ring), F5 (chrome), F7, and **introduces the three
    new tokens** (`--ring`, `--brand-border`, `--on-brand`) on a small surface first.
-2. **003 — Screening workbench** (`ScreeningPanel.tsx`): most recently changed, most new
-   interaction (speed mode, needs-review triage, refine loop); a11y + verdict-color
-   tokenization. Now walkable live (F0 resolved).
-3. **004 — Results dashboard** (`ResultsDashboard.tsx`): highest off-token density
-   (F1/F2/F4 concentrate here). Now walkable live (F0 resolved).
-4. **005 — Status components** (`InsufficientEvidencePanel`, `PrismaFlowDiagram`,
-   `FieldExplorer`): lands F4 + the semantic-token cleanup.
-5. **006 — Landing page** (`app/page.tsx`, `HeroSourceLogos`): F1/F7 + hero polish +
-   migrate the favicon chips to `--on-brand`.
+2. ✅ **003 — Screening workbench** (`ScreeningPanel.tsx`): DONE (code-grounded; live
+   pixel-walk pending seeded owned data — panel is `isOwner`-gated + no saved results in
+   DB). Findings: verdict target size/hierarchy, color-only confidence, retraction-badge
+   tokenization, ring-offset halo, brand-surface buttons.
+3. ✅ **004 — Results dashboard** (`ResultsDashboard.tsx`): DONE (code-grounded; live
+   tab sweep [live-pending] — rows are RLS-private). Core finding: 9 off-token rainbow
+   constant maps → split ordinal (→ existing semantic tokens) vs categorical (design-
+   system decision: go neutral [rec] or add `--cat-1..6`). Plus brand-surface buttons.
+4. ✅ **005 — Status components** (`InsufficientEvidencePanel`, `PrismaFlowDiagram`,
+   `FieldExplorer`): DONE. Lands F4 (light-only status surfaces → semantic tokens) + two
+   verified contrast bugs in FieldExplorer (white-on-accent AA fail → new `--on-accent`;
+   `--brand` misused as a button bg). FieldExplorer verified live; IE/PRISMA [live-pending].
+5. ✅ **006 — Landing page** (`app/page.tsx`, `TopicInput`, `HeroSourceLogos`,
+   `OnboardingTour`): DONE. Verified live. Hero "always-navy island" literals → `--on-brand`;
+   TopicInput primary button (F2) + errors + missing focus rings (F3); folds in the
+   FieldExplorer button bugs. No new tokens.
+
+**Program complete** — all 6 specs written. See 006 for the consolidated new-token table
+and recommended DEV implementation order.
 
 > The three new tokens from 002 are reused by 003–006 — landing them in the auth pass
 > first is intentional so the dense surfaces can just consume them.

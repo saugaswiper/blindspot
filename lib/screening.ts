@@ -15,6 +15,7 @@ import { SYSTEM_PROMPT } from "@/lib/prompts";
 import { fetchPrimaryStudiesForScreening as pubmedFetch } from "@/lib/pubmed";
 import { fetchPrimaryStudiesForScreening as openalexFetch } from "@/lib/openalex";
 import { fetchPrimaryStudiesForScreening as scopusFetch } from "@/lib/scopus";
+import { normalizeDoi } from "@/lib/study-id";
 import type { CalibrationExample, ExistingReview, GapDimension, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -69,11 +70,6 @@ export async function fetchAllPrimaryStudiesForScreening(
   const allRecords: ExistingReview[] = [];
   const seenPmids = new Set<string>();
   const seenDois  = new Set<string>();
-
-  function normalizeDoi(doi: string | undefined): string | undefined {
-    if (!doi) return undefined;
-    return doi.toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim();
-  }
 
   function addRecords(records: ExistingReview[]) {
     for (const r of records) {

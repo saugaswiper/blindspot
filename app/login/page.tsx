@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Mode = "password" | "magic-link";
 
@@ -54,18 +55,26 @@ export default function LoginPage() {
   }
 
   const inputClass =
-    "w-full px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:border-transparent placeholder:opacity-40";
+    "w-full px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)] placeholder:opacity-40";
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
+      className="relative min-h-screen flex items-center justify-center px-4"
       style={{ background: "var(--background)" }}
     >
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold font-serif" style={{ color: "var(--brand)" }}>
-            Blindspot
-          </h1>
+          <Link
+            href="/"
+            className="inline-block rounded focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)] focus:ring-offset-2 [--tw-ring-offset-color:var(--background)]"
+          >
+            <h1 className="text-2xl font-bold font-serif" style={{ color: "var(--brand)" }}>
+              Blindspot
+            </h1>
+          </Link>
           <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
             Sign in to your account
           </p>
@@ -88,11 +97,11 @@ export default function LoginPage() {
                 key={m}
                 type="button"
                 onClick={() => { setMode(m); setError(null); }}
-                className="flex-1 text-sm py-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-1"
+                className="flex-1 text-sm py-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)] focus:ring-offset-1 [--tw-ring-offset-color:var(--surface)]"
                 style={
                   mode === m
-                    ? { background: "var(--brand-surface)", color: "#fff" }
-                    : { color: "var(--muted)" }
+                    ? { background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }
+                    : { color: "var(--muted)", border: "1px solid transparent" }
                 }
               >
                 {m === "password" ? "Password" : "Magic Link"}
@@ -101,13 +110,30 @@ export default function LoginPage() {
           </div>
 
           {magicLinkSent ? (
-            <div className="text-center py-4">
+            <div className="text-center py-4" role="status" aria-live="polite">
+              <div
+                className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full"
+                style={{ background: "var(--success-bg)", color: "var(--success)" }}
+              >
+                <span className="text-lg" aria-hidden="true">✓</span>
+              </div>
               <p className="font-medium" style={{ color: "var(--foreground)" }}>
                 Check your email
               </p>
               <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
                 We sent a sign-in link to <span className="font-medium">{email}</span>
               </p>
+              <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
+                It expires in 1 hour.
+              </p>
+              <button
+                type="button"
+                onClick={() => setMagicLinkSent(false)}
+                className="mt-4 text-sm underline underline-offset-2 hover:opacity-70 transition-opacity focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)] focus:ring-offset-2 [--tw-ring-offset-color:var(--surface)] rounded"
+                style={{ color: "var(--brand)" }}
+              >
+                Didn&apos;t get it? Back to sign in
+              </button>
             </div>
           ) : (
             <form
@@ -165,7 +191,11 @@ export default function LoginPage() {
               )}
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800">
+                <p
+                  role="alert"
+                  className="text-sm rounded px-3 py-2"
+                  style={{ color: "var(--danger)", background: "var(--danger-bg)", border: "1px solid var(--danger)" }}
+                >
                   {error}
                 </p>
               )}
@@ -173,8 +203,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 px-4 text-white text-sm font-medium rounded-md transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: "var(--brand-surface)" }}
+                className="w-full py-2 px-4 text-sm font-medium rounded-md transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)] focus:ring-offset-2 [--tw-ring-offset-color:var(--surface)] disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }}
               >
                 {loading
                   ? "Signing in..."
@@ -190,7 +220,7 @@ export default function LoginPage() {
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"
-            className="underline underline-offset-2 font-medium hover:opacity-70 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-1 rounded"
+            className="underline underline-offset-2 font-medium hover:opacity-70 transition-opacity focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)] focus:ring-offset-1 [--tw-ring-offset-color:var(--background)] rounded"
             style={{ color: "var(--brand)" }}
           >
             Sign up free

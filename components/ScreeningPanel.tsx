@@ -94,9 +94,9 @@ function RetractionBadge({ retraction }: { retraction: { type: string; label: st
     <span
       className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
       style={{
-        background: "rgba(239, 68, 68, 0.15)",
-        color: "#dc2626",
-        border: "1px solid rgba(239, 68, 68, 0.3)",
+        background: "var(--danger-bg)",
+        color: "var(--danger)",
+        border: "2px solid var(--danger)",
       }}
       title={`Study status: ${retraction.label}. ${retraction.noticeDoi ? "Notice: " + retraction.noticeDoi : "Consider impact on your review."}`}
     >
