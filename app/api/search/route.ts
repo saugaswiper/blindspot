@@ -19,6 +19,9 @@ import { toApiError } from "@/lib/errors";
 import { expandConcept } from "@/lib/synonyms";
 import { isUserBooleanQuery } from "@/lib/boolean-search";
 import { isLivingReview } from "@/lib/living-review-detection";
+import { dedupeStudyIds, normalizeDoi } from "@/lib/study-id";
+import { dedupeReviewsWithProvenance } from "@/lib/provenance";
+import { checkRetractions, retractionMap } from "@/lib/retractions";
 import type { ExistingReview } from "@/types";
 
 /**
@@ -110,20 +113,6 @@ function buildReviewQuery(body: SearchBody): string {
 }
 
 /**
- * Normalize a DOI to a bare identifier (strip URL prefix if present).
- * OpenAlex returns DOIs as "https://doi.org/10.xxx/..." while Europe PMC
- * and Semantic Scholar return bare DOIs ("10.xxx/..."). Normalising before
- * comparison prevents the same paper from appearing twice in results.
- */
-function normalizeDoi(doi: string | undefined): string | undefined {
-  if (!doi) return undefined;
-  return doi
-    .toLowerCase()
-    .trim()
-    .replace(/^https?:\/\/(dx\.)?doi\.org\//i, "");
-}
-
-/**
  * Extracts the AND-separated concept phrases from a boolean review query.
  * e.g. `"psilocybin" AND "adolescents"` → ["psilocybin", "adolescents"]
  */
@@ -172,47 +161,8 @@ function filterByRelevance(reviews: ExistingReview[], reviewQuery: string): Exis
   });
 }
 
-interface DedupeResult {
-  /** All deduplicated reviews (uncapped — caller applies the display cap after relevance filtering). */
-  reviews: ExistingReview[];
-  /** Sum of all records across every source before deduplication. */
-  totalIdentified: number;
-  /** Number of duplicate records removed (totalIdentified - unique count). */
-  deduplicationCount: number;
-}
-
-function dedupeReviews(...sources: ExistingReview[][]): DedupeResult {
-  const totalIdentified = sources.reduce((sum, src) => sum + src.length, 0);
-
-  const seenTitles = new Set<string>();
-  const seenDois = new Set<string>();
-  const seenPmids = new Set<string>();
-  const unique: ExistingReview[] = [];
-
-  for (const source of sources) {
-    for (const review of source) {
-      const titleKey = review.title.toLowerCase().trim();
-      const doiKey = normalizeDoi(review.doi);
-      const pmidKey = review.pmid?.trim();
-
-      // Skip if we've seen this review by any identifier
-      if (seenTitles.has(titleKey)) continue;
-      if (doiKey && seenDois.has(doiKey)) continue;
-      if (pmidKey && seenPmids.has(pmidKey)) continue;
-
-      seenTitles.add(titleKey);
-      if (doiKey) seenDois.add(doiKey);
-      if (pmidKey) seenPmids.add(pmidKey);
-      unique.push(review);
-    }
-  }
-
-  return {
-    reviews: unique,
-    totalIdentified,
-    deduplicationCount: totalIdentified - unique.length,
-  };
-}
+// Cross-source review deduplication now lives in lib/provenance.ts
+// (dedupeReviewsWithProvenance), which also records per-record provenance.
 
 /**
  * Deduplicate primary study IDs fetched from multiple databases.
@@ -232,28 +182,9 @@ function dedupeReviews(...sources: ExistingReview[][]): DedupeResult {
 function computeDedupFraction(
   sources: Array<Array<{ pmid?: string; doi?: string }>>,
 ): number {
-  const seenPmids = new Set<string>();
-  const seenDois = new Set<string>();
-  let uniqueCount = 0;
-  let totalCount = 0;
-
-  for (const source of sources) {
-    for (const id of source) {
-      totalCount++;
-      const pmid = id.pmid?.trim();
-      const doi = id.doi
-        ? id.doi.toLowerCase().replace(/^https?:\/\/(dx\.)?doi\.org\//i, "").trim()
-        : undefined;
-
-      if (pmid && seenPmids.has(pmid)) continue;
-      if (doi && seenDois.has(doi)) continue;
-
-      // New record — mark as seen
-      uniqueCount++;
-      if (pmid) seenPmids.add(pmid);
-      if (doi) seenDois.add(doi);
-    }
-  }
+  // Counting/normalization is shared with the recall benchmark (lib/study-id.ts)
+  // so production and the benchmark can never silently diverge.
+  const { totalCount, uniqueCount } = dedupeStudyIds(sources);
 
   if (totalCount === 0) return 0.75; // no sample — fall back to legacy estimate
   // Clamp between 0.30 and 0.95 to guard against extreme sampling artefacts
@@ -534,14 +465,14 @@ export async function POST(request: Request) {
     const {
       reviews: dedupedReviews,
       deduplicationCount,
-    } = dedupeReviews(
-      pubmedReviews,
-      openalexReviews,
-      europepmcReviews,
-      scopusReviews,
-      semanticScholarReviews,
-      cochraneReviews,
-    );
+    } = dedupeReviewsWithProvenance([
+      { name: "PubMed", reviews: pubmedReviews },
+      { name: "OpenAlex", reviews: openalexReviews },
+      { name: "Europe PMC", reviews: europepmcReviews },
+      { name: "Scopus", reviews: scopusReviews },
+      { name: "Semantic Scholar", reviews: semanticScholarReviews },
+      { name: "Cochrane", reviews: cochraneReviews },
+    ]);
 
     // Keep only reviews that mention all key concepts in title or abstract.
     // Applied after dedup so PRISMA duplicate counts remain accurate.
@@ -553,6 +484,27 @@ export async function POST(request: Request) {
       }))
       .sort((a, b) => (b.year || 0) - (a.year || 0))
       .slice(0, 50);
+
+    // Retraction/withdrawal awareness — flag the displayed records (bounded ≤50
+    // DOIs). checkRetractions always resolves (never throws), so a Crossref
+    // outage cannot block the search; flags are advisory, records are never removed.
+    try {
+      const flags = await checkRetractions(
+        existingReviews.map(r => ({ pmid: r.pmid, doi: r.doi })),
+      );
+      if (flags.length > 0) {
+        const byDoi = retractionMap(flags);
+        for (const r of existingReviews) {
+          const doi = r.doi ? normalizeDoi(r.doi) : undefined;
+          const flag = doi ? byDoi.get(doi) : undefined;
+          if (flag) {
+            r.retraction = { type: flag.type, label: flag.label, noticeDoi: flag.noticeDoi };
+          }
+        }
+      }
+    } catch {
+      // Defensive: never let retraction checking break search.
+    }
 
     // NEW-8 Enhancement: Extract actual living reviews (not just count).
     // These are continuously-updated reviews that researchers should know about

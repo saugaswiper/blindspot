@@ -210,7 +210,7 @@ export default function AboutPage() {
 
           <SubHeading>Living Systematic Reviews</SubHeading>
           <Prose>
-            Blindspot identifies "living systematic reviews" (LSRs) — continuously updated reviews that incorporate new evidence as it emerges. If one or more LSRs are found on your topic, an informational banner is displayed indicating that the research area may already be under active review. This is particularly relevant for rapidly-evolving clinical topics where an LSR program may already be addressing the gaps you identified.
+            Blindspot identifies &ldquo;living systematic reviews&rdquo; (LSRs) — continuously updated reviews that incorporate new evidence as it emerges. If one or more LSRs are found on your topic, an informational banner is displayed indicating that the research area may already be under active review. This is particularly relevant for rapidly-evolving clinical topics where an LSR program may already be addressing the gaps you identified.
           </Prose>
 
           <SubHeading>OpenAlex Coverage Limitation</SubHeading>

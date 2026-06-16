@@ -58,6 +58,18 @@ export interface ExistingReview {
   doi?: string;
   source?: string;
   /**
+   * Per-record provenance: every source that returned this record after
+   * cross-source deduplication (e.g. ["PubMed", "Europe PMC"]). `source` is the
+   * first/canonical source; `sources` is the full auditable set. Populated by
+   * lib/provenance.ts; absent on records saved before provenance was added.
+   */
+  sources?: string[];
+  /**
+   * Retraction/withdrawal status when flagged by lib/retractions.ts. Advisory,
+   * for display/export only — never auto-removes the record.
+   */
+  retraction?: { type: string; label: string; noticeDoi?: string };
+  /**
    * NEW-7: Whether this review is a living systematic review (continuously updated).
    * Set when title or abstract mentions "living systematic review" or "living review".
    * Helps researchers prioritize continuously-updated reviews over one-time snapshots.
@@ -324,6 +336,13 @@ export interface ScreeningDecision {
    * Undefined for "include" and "uncertain" decisions.
    */
   reason_code?: ScreeningReasonCode;
+  /**
+   * Retraction/withdrawal status when flagged by lib/retractions.ts (via search route).
+   * Advisory, for display/export only — never auto-removes the record.
+   * Helps researchers identify studies that have been withdrawn or retracted after
+   * initial publication. Important for systematic review integrity.
+   */
+  retraction?: { type: string; label: string; noticeDoi?: string };
   /**
    * AI confidence in the decision. High = clear-cut; low = borderline.
    * Used to flag which decisions most need human review.

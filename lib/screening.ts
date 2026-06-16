@@ -495,6 +495,8 @@ function mapDecision(d: DecisionRaw, record: ExistingReview): ScreeningDecision 
     reason_code: parseReasonCode(d.reason_code, d.decision),
     confidence: parseConfidence(d.confidence),
     criterion_results: d.criterion_results,
+    // DESIGNER: Retraction/withdrawal status for systematic review integrity
+    retraction: record.retraction,
   };
 }
 

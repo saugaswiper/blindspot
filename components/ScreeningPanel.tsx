@@ -86,6 +86,26 @@ function ReasonCodeBadge({ code }: { code: ScreeningReasonCode }) {
 }
 
 // ---------------------------------------------------------------------------
+// Retraction status badge
+// ---------------------------------------------------------------------------
+
+function RetractionBadge({ retraction }: { retraction: { type: string; label: string; noticeDoi?: string } }) {
+  return (
+    <span
+      className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0"
+      style={{
+        background: "rgba(239, 68, 68, 0.15)",
+        color: "#dc2626",
+        border: "1px solid rgba(239, 68, 68, 0.3)",
+      }}
+      title={`Study status: ${retraction.label}. ${retraction.noticeDoi ? "Notice: " + retraction.noticeDoi : "Consider impact on your review."}`}
+    >
+      ⚠ {retraction.type === "retracted" ? "Retracted" : "Withdrawn"}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Confidence indicator
 // ---------------------------------------------------------------------------
 
@@ -510,11 +530,12 @@ function ScreeningResultsTable({
                       </p>
                     )}
 
-                    {/* Year · Journal · Reason code */}
+                    {/* Year · Journal · Reason code · Retraction status */}
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                       <p className="text-[11px]" style={{ color: "var(--muted)" }}>
                         {d.journal && <>{d.journal} · </>}{d.year || "Year unknown"}
                       </p>
+                      {d.retraction && <RetractionBadge retraction={d.retraction} />}
                       {d.reason_code && <ReasonCodeBadge code={d.reason_code} />}
                       {d.refined && (
                         <span

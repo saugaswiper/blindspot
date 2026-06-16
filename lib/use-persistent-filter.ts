@@ -16,11 +16,10 @@ export function usePersistentSourceFilter(resultId: string): [string | null, (so
   const [activeSource, setActiveSource] = useState<string | null>(null);
   const isInitializedRef = useRef(false);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount.
   // We use a ref to ensure we only load once, preventing double-initialization
   // in React 18+ strict mode. This is the recommended pattern for hydrating
-  // from external storage like localStorage.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  // from external storage like localStorage. The setState in the effect is intentional.
   useEffect(() => {
     if (isInitializedRef.current || typeof window === "undefined") return;
 
@@ -28,6 +27,7 @@ export function usePersistentSourceFilter(resultId: string): [string | null, (so
       const storageKey = `blindspot-reviews-filter-${resultId}`;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setActiveSource(saved === "null" ? null : saved);
       }
     } catch (e) {

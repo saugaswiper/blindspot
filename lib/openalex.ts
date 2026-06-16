@@ -10,6 +10,36 @@ const OPENALEX_API_KEY =
   process.env.OPENALEX_API_KEY ?? process.env.OPENALEX_EMAIL ?? "";
 const BASE = "https://api.openalex.org";
 
+/**
+ * Logs a diagnostic message about OpenAlex API key status.
+ * Called once at module initialization to help diagnose CRIT-1 issues in production.
+ * In development/staging, logs are visible in console. In production, visible in Vercel logs.
+ */
+function logApiKeyStatus(): void {
+  const hasKey = !!OPENALEX_API_KEY;
+  const isApiKey = process.env.OPENALEX_API_KEY ? true : false;
+  const isEmail = process.env.OPENALEX_EMAIL ? true : false;
+
+  if (!hasKey) {
+    console.warn(
+      "[openAlex] ⚠ WARNING: Neither OPENALEX_API_KEY nor OPENALEX_EMAIL is set. " +
+      "Get a free API key at https://openalex.org/settings/api and add OPENALEX_API_KEY to environment variables. " +
+      "Requests will fail when free test credits are exhausted."
+    );
+  } else if (isEmail && !isApiKey) {
+    console.info(
+      "[openAlex] Using legacy OPENALEX_EMAIL (deprecated). " +
+      "Please migrate to OPENALEX_API_KEY: https://openalex.org/settings/api"
+    );
+  }
+}
+
+// Log once at module load time (not on every request)
+if (typeof window === "undefined") {
+  // Server-side only (avoid logging in browsers during Next.js static generation)
+  logApiKeyStatus();
+}
+
 interface OpenAlexWork {
   title: string | null;
   publication_year: number | null;
@@ -77,7 +107,20 @@ async function searchOpenAlex(
   if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
 
   const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`OpenAlex search failed: ${res.status}`, 502);
+  if (!res.ok) {
+    // Provide helpful context for rate-limit errors (409/429)
+    if (res.status === 409 || res.status === 429) {
+      const hint = !OPENALEX_API_KEY
+        ? "Tip: Add OPENALEX_API_KEY to your environment variables for higher rate limits. Get a free key at https://openalex.org/settings/api"
+        : "Rate limit reached. Please try again in a few moments.";
+      console.warn(`[openAlex] ${res.status} error: ${hint}`);
+    }
+    throw new ApiError(
+      `OpenAlex search failed: ${res.status}`,
+      502,
+      "Academic databases are temporarily unavailable. Please try again in a few minutes."
+    );
+  }
 
   return (await res.json()) as OpenAlexResponse;
 }
@@ -167,7 +210,14 @@ export async function fetchPrimaryStudyIds(
   if (OPENALEX_API_KEY) url.searchParams.set("api_key", OPENALEX_API_KEY);
 
   const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`OpenAlex ID fetch failed: ${res.status}`, 502);
+  if (!res.ok) {
+    if (res.status === 409 || res.status === 429) {
+      console.warn(
+        `[openAlex] ${res.status} rate-limit during ID fetch. ${!OPENALEX_API_KEY ? "Consider setting OPENALEX_API_KEY env var." : ""}`
+      );
+    }
+    throw new ApiError(`OpenAlex ID fetch failed: ${res.status}`, 502);
+  }
 
   const data = (await res.json()) as {
     results: Array<{ doi?: string | null; ids?: { pmid?: string | null } }>;

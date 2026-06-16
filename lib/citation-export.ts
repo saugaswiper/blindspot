@@ -64,8 +64,18 @@ function reviewToRisRecord(review: ExistingReview): string {
     lines.push(`AB  - ${sanitiseRisValue(review.abstract_snippet)}`);
   }
 
-  if (review.source) {
-    lines.push(`DB  - ${sanitiseRisValue(review.source)}`);
+  // Provenance: prefer the full source set (auditable) over the single source.
+  const dbValue = review.sources?.length ? review.sources.join("; ") : review.source;
+  if (dbValue) {
+    lines.push(`DB  - ${sanitiseRisValue(dbValue)}`);
+  }
+
+  // Retraction status — advisory note (N1) so it travels into Zotero/EndNote.
+  if (review.retraction) {
+    const notice = review.retraction.noticeDoi
+      ? ` (notice: https://doi.org/${review.retraction.noticeDoi})`
+      : "";
+    lines.push(`N1  - ${sanitiseRisValue(`${review.retraction.label}${notice}`)}`);
   }
 
   // End-of-record marker (required by RIS spec)

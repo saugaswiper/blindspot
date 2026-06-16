@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 
 // ---------------------------------------------------------------------------
 // Source definitions — two render strategies:
@@ -79,7 +78,7 @@ function FaviconChip({
       className="flex items-center gap-1.5 transition-opacity hover:opacity-90"
       style={{ color: "rgba(244,241,234,0.5)" }}
     >
-      <Image
+      <img
         src={src}
         alt=""
         width={14}

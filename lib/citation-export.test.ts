@@ -43,6 +43,29 @@ const reviewWithSpecialChars: ExistingReview = {
 // toRis — general shape
 // ---------------------------------------------------------------------------
 
+describe("toRis — provenance & retraction", () => {
+  it("writes the full source set to DB when sources[] is present", () => {
+    const ris = toRis([{ ...fullReview, source: "PubMed", sources: ["PubMed", "Europe PMC"] }]);
+    expect(ris).toContain("DB  - PubMed; Europe PMC");
+  });
+
+  it("falls back to single source when sources[] is absent", () => {
+    const ris = toRis([{ ...fullReview, source: "Scopus", sources: undefined }]);
+    expect(ris).toContain("DB  - Scopus");
+  });
+
+  it("adds an N1 note for a retracted record, including the notice DOI", () => {
+    const ris = toRis([
+      { ...fullReview, retraction: { type: "retraction", label: "Retracted", noticeDoi: "10.1/notice" } },
+    ]);
+    expect(ris).toContain("N1  - Retracted (notice: https://doi.org/10.1/notice)");
+  });
+
+  it("omits the N1 note when there is no retraction", () => {
+    expect(toRis([fullReview])).not.toContain("N1  - ");
+  });
+});
+
 describe("toRis", () => {
   it("returns empty string for empty array", () => {
     expect(toRis([])).toBe("");

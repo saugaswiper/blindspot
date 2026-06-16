@@ -86,7 +86,7 @@ describe("usePersistentYearFilter", () => {
       const { result } = renderHook(() => usePersistentYearFilter());
 
       act(() => {
-        result.current[1](null as any);
+        result.current[1](null as unknown as number | undefined);
       });
 
       expect(localStorage.getItem("blindspot-preferred-minYear")).toBeNull();
@@ -143,7 +143,6 @@ describe("usePersistentYearFilter", () => {
 
   describe("React 18+ Strict Mode", () => {
     it("should initialize only once despite effect double-invocation in strict mode", () => {
-      const getItemSpy = jest.spyOn(Storage.prototype, "getItem");
       localStorage.setItem("blindspot-preferred-minYear", "2020");
 
       const { result } = renderHook(() => usePersistentYearFilter());
