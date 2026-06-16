@@ -109,21 +109,47 @@ function RetractionBadge({ retraction }: { retraction: { type: string; label: st
 // Confidence indicator
 // ---------------------------------------------------------------------------
 
+// Confidence is encoded by SHAPE (filled segments), not hue, and in a neutral
+// --brand tone so it never clashes with the verdict palette (S8/S9). Filled
+// segments: high = 3, medium = 2, low = 1.
 const CONFIDENCE_CONFIG = {
-  high:   { dot: "var(--success)", label: "High confidence" },
-  medium: { dot: "var(--warning)", label: "Medium confidence" },
-  low:    { dot: "var(--danger)",  label: "Low confidence — review recommended" },
+  high:   { filled: 3, label: "High confidence" },
+  medium: { filled: 2, label: "Medium confidence" },
+  low:    { filled: 1, label: "Low confidence — review recommended" },
 };
 
-function ConfidenceDot({ level }: { level: "high" | "medium" | "low" }) {
+function ConfidenceBar({ level }: { level: "high" | "medium" | "low" }) {
   const cfg = CONFIDENCE_CONFIG[level];
   return (
     <span
-      className="inline-block w-2 h-2 rounded-full shrink-0 mt-1"
-      style={{ background: cfg.dot }}
+      className="inline-flex items-end gap-0.5 shrink-0 mt-1"
       title={cfg.label}
       aria-label={cfg.label}
-    />
+      role="img"
+    >
+      {[1, 2, 3].map((seg) => (
+        <span
+          key={seg}
+          className="inline-block w-1 rounded-[1px]"
+          style={{
+            height: `${3 + seg * 2}px`,
+            background: seg <= cfg.filled ? "var(--brand)" : "var(--border)",
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// Token-based keyboard key-cap (S7).
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd
+      className="inline-block min-w-[1.1em] text-center px-1 py-0.5 rounded text-[10px] font-medium leading-none"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--muted)" }}
+    >
+      {children}
+    </kbd>
   );
 }
 
@@ -359,7 +385,7 @@ function ScreeningResultsTable({
             key={key}
             type="button"
             onClick={() => setFilter(key)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-opacity ${filter === key ? "ring-2 ring-offset-1 ring-current" : "hover:opacity-80"}`}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-opacity [--tw-ring-offset-color:var(--surface-2)] ${filter === key ? "ring-2 ring-offset-1 ring-current" : "hover:opacity-80"}`}
             style={style}
           >
             {label}
@@ -414,8 +440,14 @@ function ScreeningResultsTable({
       </div>
 
       {/* Keyboard speed mode hint */}
-      <p className="hidden sm:block text-[10px]" style={{ color: "var(--muted)" }}>
-        Keyboard: <kbd>j</kbd>/<kbd>k</kbd> navigate · <kbd>y</kbd> include · <kbd>n</kbd> exclude · <kbd>u</kbd> uncertain · <kbd>r</kbd> reasoning
+      <p className="hidden sm:flex items-center flex-wrap gap-x-1 gap-y-1 text-[10px]" style={{ color: "var(--muted)" }}>
+        <span
+          className="font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded mr-1"
+          style={{ color: "var(--accent)", background: "var(--surface-2)", border: "1px solid var(--border)" }}
+        >
+          Speed mode
+        </span>
+        <Kbd>j</Kbd>/<Kbd>k</Kbd> navigate · <Kbd>y</Kbd> include · <Kbd>n</Kbd> exclude · <Kbd>u</Kbd> uncertain · <Kbd>r</Kbd> reasoning
       </p>
 
       {/* Human-review progress + active-learning refine */}
@@ -494,7 +526,7 @@ function ScreeningResultsTable({
                 key={idx}
                 id={`screening-row-${idx}`}
                 onClick={() => setActiveIdx(pos)}
-                className="rounded-md px-3 py-2.5"
+                className="rounded-md px-3 py-2.5 cursor-pointer"
                 style={{
                   background: "var(--surface)",
                   borderLeft: `2px solid ${tone.color}`,
@@ -559,7 +591,7 @@ function ScreeningResultsTable({
                       >
                         {isExpanded ? "Hide reasoning ↑" : "Why? ↓"}
                       </button>
-                      <div className="inline-flex items-center gap-1" role="group" aria-label="Your verdict">
+                      <div className="inline-flex items-center gap-1.5" role="group" aria-label="Your verdict">
                         {(["include", "exclude", "uncertain"] as Verdict[]).map((v) => {
                           const isActive = d.human_decision === v;
                           return (
@@ -567,7 +599,7 @@ function ScreeningResultsTable({
                               key={v}
                               type="button"
                               onClick={() => onOverride(idx, isActive ? null : v)}
-                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold transition-opacity ${isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-50 hover:opacity-100"}`}
+                              className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold transition-opacity [--tw-ring-offset-color:var(--surface)] ${isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-70 hover:opacity-100"}`}
                               style={toneBadgeStyle(v)}
                               title={isActive ? "Click to revert to the AI decision" : `Set your verdict: ${DECISION_TONES[v].label}`}
                               aria-pressed={isActive}
@@ -633,7 +665,7 @@ function ScreeningResultsTable({
 
                   {/* Confidence dot + decision label */}
                   <div className="shrink-0 flex flex-col items-center gap-1">
-                    {d.confidence && <ConfidenceDot level={d.confidence} />}
+                    {d.confidence && <ConfidenceBar level={d.confidence} />}
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={toneBadgeStyle(verdict)}>
                       {tone.label}
                     </span>
@@ -1034,7 +1066,7 @@ export function ScreeningPanel({
           Screen ~{recordCount.toLocaleString()} {recordLabel} for this gap
         </button>
         {error && (
-          <p className="mt-1.5 text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+          <p role="alert" className="mt-1.5 text-xs rounded px-3 py-2" style={{ color: "var(--danger)", background: "var(--danger-bg)", border: "1px solid var(--danger)" }}>{error}</p>
         )}
       </div>
     );
@@ -1101,7 +1133,7 @@ export function ScreeningPanel({
         />
 
         {error && (
-          <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+          <p role="alert" className="text-xs rounded px-3 py-2" style={{ color: "var(--danger)", background: "var(--danger-bg)", border: "1px solid var(--danger)" }}>{error}</p>
         )}
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -1110,7 +1142,7 @@ export function ScreeningPanel({
               type="button"
               onClick={() => handleRun({ resume: true })}
               className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md transition-all"
-              style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+              style={{ background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }}
             >
               Resume screening ({checkpoint.decisions.length.toLocaleString()}/{checkpoint.records.length.toLocaleString()} done)
             </button>
@@ -1122,7 +1154,7 @@ export function ScreeningPanel({
             className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={checkpoint
               ? { background: "var(--surface)", color: "var(--foreground)", border: "1px solid var(--border)" }
-              : { background: "var(--brand-surface)", color: "#f4f1ea" }}
+              : { background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }}
           >
             {checkpoint ? "Restart from scratch" : `Approve & Screen ~${recordCount.toLocaleString()} ${recordLabel}`}
           </button>
@@ -1144,6 +1176,8 @@ export function ScreeningPanel({
       <div
         className="mt-3 rounded-lg p-4 space-y-3"
         style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+        role="status"
+        aria-live="polite"
       >
         <div className="flex items-center gap-2 text-sm" style={{ color: "var(--foreground)" }}>
           <svg className="w-4 h-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -1215,7 +1249,7 @@ export function ScreeningPanel({
         </div>
 
         {error && (
-          <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+          <p role="alert" className="text-xs rounded px-3 py-2" style={{ color: "var(--danger)", background: "var(--danger-bg)", border: "1px solid var(--danger)" }}>{error}</p>
         )}
 
         <ScreeningResultsTable
