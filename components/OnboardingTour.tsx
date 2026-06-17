@@ -71,14 +71,14 @@ function ModalHeader({
       <div className="flex items-center justify-between">
         <span
           className="text-xs font-medium tracking-wide uppercase"
-          style={{ color: "rgba(255,255,255,0.65)" }}
+          style={{ color: "var(--on-brand)", opacity: 0.65 }}
         >
           How Blindspot works
         </span>
         <button
           onClick={onClose}
-          className="text-xl leading-none focus:outline-none focus:ring-2 focus:ring-white rounded transition-opacity hover:opacity-100"
-          style={{ color: "rgba(255,255,255,0.65)" }}
+          className="text-xl leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] rounded transition-opacity hover:opacity-100"
+          style={{ color: "var(--on-brand)", opacity: 0.65 }}
           aria-label="Close tour"
         >
           ×
@@ -87,7 +87,7 @@ function ModalHeader({
       <div className="mt-3 text-3xl" aria-hidden="true">
         {icon}
       </div>
-      <h2 className="mt-2 text-lg font-semibold leading-snug font-serif text-white">
+      <h2 className="mt-2 text-lg font-semibold leading-snug font-serif" style={{ color: "var(--on-brand)" }}>
         {title}
       </h2>
     </div>
@@ -150,7 +150,7 @@ function ModalFooter({
           <button
             type="button"
             onClick={onBack}
-            className="px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-[#4a90d9] transition-opacity hover:opacity-70"
+            className="px-3 py-1.5 text-sm rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] transition-opacity hover:opacity-70"
             style={{ color: "var(--muted)" }}
           >
             Back
@@ -160,7 +160,7 @@ function ModalFooter({
           <button
             type="button"
             onClick={onSkipOrClose}
-            className="px-3 py-1.5 text-sm rounded focus:outline-none focus:ring-2 focus:ring-[#4a90d9] transition-opacity hover:opacity-70"
+            className="px-3 py-1.5 text-sm rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] transition-opacity hover:opacity-70"
             style={{ color: "var(--muted)" }}
           >
             {skipLabel}
@@ -170,8 +170,8 @@ function ModalFooter({
           ref={primaryRef}
           type="button"
           onClick={onAdvance}
-          className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4a90d9] focus:ring-offset-2"
-          style={{ background: "var(--brand-surface)" }}
+          className="px-4 py-2 text-sm font-medium rounded-lg transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:[--tw-ring-offset-color:var(--surface)]"
+          style={{ background: "var(--brand-surface)", color: "var(--on-brand)" }}
         >
           {isLast ? doneLabel : "Next →"}
         </button>
@@ -369,7 +369,7 @@ export function NavHelpButton() {
       <button
         type="button"
         onClick={() => { setStep(0); setOpen(true); }}
-        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[#4a90d9]"
+        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
         style={{ border: "1px solid var(--border)", color: "var(--muted)" }}
         aria-label="Open onboarding tour"
         title="How Blindspot works"

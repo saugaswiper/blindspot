@@ -16,22 +16,23 @@ interface InsufficientEvidencePanelProps {
 // between a client component and the feasibility module)
 // ---------------------------------------------------------------------------
 
+// design 005 IE2: ordinal feasibility → semantic tokens (real dark values, no hardcodes).
 const FEASIBILITY_BADGE: Record<FeasibilityScore, { label: string; colorStyle: React.CSSProperties }> = {
   High: {
     label: "High",
-    colorStyle: { background: "#d1fae5", color: "#065f46", border: "1px solid #6ee7b7" },
+    colorStyle: { background: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" },
   },
   Moderate: {
     label: "Moderate",
-    colorStyle: { background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d" },
+    colorStyle: { background: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" },
   },
   Low: {
     label: "Low",
-    colorStyle: { background: "#ffedd5", color: "#9a3412", border: "1px solid #fdba74" },
+    colorStyle: { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" },
   },
   Insufficient: {
     label: "Insufficient",
-    colorStyle: { background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" },
+    colorStyle: { background: "var(--surface-2)", color: "var(--muted)", border: "1px solid var(--border)" },
   },
 };
 
@@ -187,26 +188,26 @@ export function InsufficientEvidencePanel({
       className="rounded-lg overflow-hidden"
       style={{ border: "1px solid var(--border)" }}
     >
-      {/* Header band */}
+      {/* Header band — design 005 IE1: danger tokens (real dark values) */}
       <div
         className="px-6 py-5 flex gap-4"
-        style={{ background: "#fef2f2", borderBottom: "1px solid #fecaca" }}
+        style={{ background: "var(--danger-bg)", borderBottom: "1px solid var(--danger)" }}
       >
         <div
           className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold mt-0.5"
-          style={{ background: "#fee2e2", color: "#991b1b" }}
+          style={{ background: "var(--danger)", color: "var(--danger-bg)" }}
         >
           !
         </div>
         <div>
           {/* Unified label — consistent with the "Insufficient" feasibility badge */}
-          <h3 className="font-semibold text-base mb-1" style={{ color: "#7f1d1d" }}>
+          <h3 className="font-semibold text-base mb-1" style={{ color: "var(--danger)" }}>
             Insufficient Evidence
           </h3>
-          <p className="text-sm leading-relaxed" style={{ color: "#991b1b" }}>
+          <p className="text-sm leading-relaxed" style={{ color: "var(--danger)" }}>
             {studyText}. A systematic review is not feasible on this exact topic.
           </p>
-          <p className="text-xs mt-2 leading-relaxed" style={{ color: "#b91c1c", opacity: 0.8 }}>
+          <p className="text-xs mt-2 leading-relaxed" style={{ color: "var(--danger)", opacity: 0.85 }}>
             Per the Cochrane Handbook, gap analysis from fewer than 3 primary studies
             is methodologically invalid — AI analysis has been disabled to prevent
             speculative recommendations.
@@ -257,7 +258,7 @@ export function InsufficientEvidencePanel({
               type="submit"
               disabled={!broaderQuery.trim()}
               className="text-xs font-medium px-3 py-2 rounded transition-opacity disabled:opacity-40"
-              style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+              style={{ background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }}
             >
               Search
             </button>

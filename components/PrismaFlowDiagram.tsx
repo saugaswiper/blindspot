@@ -36,14 +36,14 @@ function FlowBox({
       className="rounded-lg px-4 py-3 text-sm"
       style={{
         background: highlighted
-          ? "var(--brand-surface, #1e3a5f)"
+          ? "var(--brand-surface)"
           : dimmed
           ? "var(--surface)"
           : "var(--surface)",
         border: highlighted
-          ? "1px solid var(--brand, #1e3a5f)"
+          ? "1px solid var(--brand)"
           : "1px solid var(--border)",
-        color: highlighted ? "var(--background, #f4f1ea)" : "var(--foreground)",
+        color: highlighted ? "var(--on-brand)" : "var(--foreground)",
         opacity: dimmed ? 0.65 : 1,
       }}
     >
@@ -58,9 +58,9 @@ function EstimatedBadge() {
     <span
       className="ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded"
       style={{
-        background: "rgba(251,191,36,0.15)",
-        color: "#92400e",
-        border: "1px solid rgba(251,191,36,0.4)",
+        background: "var(--warning-bg)",
+        color: "var(--warning)",
+        border: "1px solid var(--warning)",
       }}
     >
       est.
@@ -273,8 +273,9 @@ function IdentificationPhase({
                 rel="noopener noreferrer"
                 className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs font-medium transition-opacity hover:opacity-75"
                 style={{
-                  background: "rgba(99,102,241,0.1)",
-                  color: "var(--brand, #1e3a5f)",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  color: "var(--accent)",
                   textDecoration: "none",
                 }}
                 title={`Search Embase: ${embaseString}`}
@@ -289,8 +290,9 @@ function IdentificationPhase({
                 rel="noopener noreferrer"
                 className="flex items-center justify-between gap-2 px-2 py-1.5 rounded text-xs font-medium transition-opacity hover:opacity-75"
                 style={{
-                  background: "rgba(34,197,94,0.1)",
-                  color: "var(--brand, #1e3a5f)",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border)",
+                  color: "var(--accent)",
                   textDecoration: "none",
                 }}
                 title={`Search CINAHL: ${centralString}`}
@@ -332,7 +334,7 @@ function CriteriaSection({ data }: { data: PrimaryStudyPrismaData }) {
           className="px-3 py-1 rounded-full font-medium transition-colors"
           style={
             showInclusion
-              ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)" }
+              ? { background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }
               : { background: "var(--surface)", color: "var(--muted)", border: "1px solid var(--border)" }
           }
         >
@@ -343,7 +345,7 @@ function CriteriaSection({ data }: { data: PrimaryStudyPrismaData }) {
           className="px-3 py-1 rounded-full font-medium transition-colors"
           style={
             !showInclusion
-              ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)" }
+              ? { background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }
               : { background: "var(--surface)", color: "var(--muted)", border: "1px solid var(--border)" }
           }
         >
@@ -358,8 +360,8 @@ function CriteriaSection({ data }: { data: PrimaryStudyPrismaData }) {
               className="shrink-0 mt-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
               style={
                 showInclusion
-                  ? { background: "rgba(16,185,129,0.15)", color: "#065f46", border: "1px solid rgba(16,185,129,0.3)" }
-                  : { background: "rgba(239,68,68,0.12)", color: "#7f1d1d", border: "1px solid rgba(239,68,68,0.25)" }
+                  ? { background: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" }
+                  : { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" }
               }
             >
               {showInclusion ? "+" : "−"}
@@ -445,20 +447,20 @@ function ExistingReviewsScreeningSection({ result }: { result: ScreeningResult }
         </div>
         {/* Branch row */}
         <div className="grid grid-cols-3 gap-2 w-full mt-1">
-          {/* Include */}
-          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)" }}>
-            <p className="text-lg font-bold" style={{ color: "#059669" }}>{included_count}</p>
-            <p className="text-[10px]" style={{ color: "#059669" }}>Included</p>
+          {/* Include — design 005 PR1: semantic tokens (match screening panel counts) */}
+          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "var(--success-bg)", border: "1px solid var(--success)" }}>
+            <p className="text-lg font-bold" style={{ color: "var(--success)" }}>{included_count}</p>
+            <p className="text-[10px]" style={{ color: "var(--success)" }}>Included</p>
           </div>
           {/* Uncertain */}
-          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)" }}>
-            <p className="text-lg font-bold" style={{ color: "#d97706" }}>{uncertain_count}</p>
-            <p className="text-[10px]" style={{ color: "#d97706" }}>Uncertain</p>
+          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "var(--warning-bg)", border: "1px solid var(--warning)" }}>
+            <p className="text-lg font-bold" style={{ color: "var(--warning)" }}>{uncertain_count}</p>
+            <p className="text-[10px]" style={{ color: "var(--warning)" }}>Uncertain</p>
           </div>
           {/* Exclude */}
-          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
-            <p className="text-lg font-bold" style={{ color: "#dc2626" }}>{excluded_count}</p>
-            <p className="text-[10px]" style={{ color: "#dc2626" }}>Excluded</p>
+          <div className="rounded-lg px-2 py-2 text-center" style={{ background: "var(--danger-bg)", border: "1px solid var(--danger)" }}>
+            <p className="text-lg font-bold" style={{ color: "var(--danger)" }}>{excluded_count}</p>
+            <p className="text-[10px]" style={{ color: "var(--danger)" }}>Excluded</p>
           </div>
         </div>
       </div>
@@ -475,9 +477,9 @@ function ExistingReviewsScreeningSection({ result }: { result: ScreeningResult }
                 key={code}
                 className="text-[10px] px-2 py-0.5 rounded-full border"
                 style={{
-                  background: "rgba(239,68,68,0.06)",
-                  color: "#b91c1c",
-                  borderColor: "rgba(239,68,68,0.2)",
+                  background: "var(--danger-bg)",
+                  color: "var(--danger)",
+                  borderColor: "var(--danger)",
                 }}
               >
                 {REASON_CODE_LABELS[code]} ({count})
@@ -520,11 +522,11 @@ export function PrismaFlowDiagram({
         <span className="flex items-center gap-1.5">
           <span
             className="inline-block w-3 h-3 rounded-sm"
-            style={{ background: "rgba(251,191,36,0.2)", border: "1px solid rgba(251,191,36,0.4)" }}
+            style={{ background: "var(--warning-bg)", border: "1px solid var(--warning)" }}
           />
           <span
             className="font-medium"
-            style={{ color: "#92400e" }}
+            style={{ color: "var(--warning)" }}
           >
             est.
           </span>{" "}
@@ -540,12 +542,12 @@ export function PrismaFlowDiagram({
       <div
         className="mt-2 mb-1 rounded-md px-3 py-2.5 text-xs leading-relaxed"
         style={{
-          background: "rgba(251,191,36,0.08)",
-          border: "1px solid rgba(251,191,36,0.3)",
+          background: "var(--warning-bg)",
+          border: "1px solid var(--warning)",
           color: "var(--foreground)",
         }}
       >
-        <span className="font-semibold" style={{ color: "#92400e" }}>
+        <span className="font-semibold" style={{ color: "var(--warning)" }}>
           Databases not searched by Blindspot:
         </span>{" "}
         <span style={{ color: "var(--muted)" }}>
@@ -633,7 +635,7 @@ export function PrismaFlowDiagram({
           <FlowBox highlighted>
             <p
               className="text-xs font-semibold uppercase tracking-wide mb-0.5"
-              style={{ color: "rgba(244,241,234,0.65)" }}
+              style={{ color: "var(--on-brand)", opacity: 0.65 }}
             >
               Studies included in review
               <EstimatedBadge />
@@ -641,11 +643,11 @@ export function PrismaFlowDiagram({
             <p className="text-3xl font-bold tabular-nums">
               {data.included.toLocaleString("en-US")}
             </p>
-            <p className="text-xs mt-1" style={{ color: "rgba(244,241,234,0.7)" }}>
+            <p className="text-xs mt-1" style={{ color: "var(--on-brand)", opacity: 0.7 }}>
               Estimated 95% CI: {data.includedLow.toLocaleString("en-US")}–{data.includedHigh.toLocaleString("en-US")} studies
             </p>
             {data.studyDesignType && (
-              <p className="text-xs mt-0.5" style={{ color: "rgba(244,241,234,0.55)" }}>
+              <p className="text-xs mt-0.5" style={{ color: "var(--on-brand)", opacity: 0.55 }}>
                 Design: {data.studyDesignType}
               </p>
             )}

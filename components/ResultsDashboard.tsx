@@ -43,11 +43,13 @@ import { InsufficientEvidencePanel, AlternativesSection } from "@/components/Ins
 import { PrismaFlowDiagram } from "@/components/PrismaFlowDiagram";
 import { computePrimaryStudyPrismaData } from "@/lib/prisma-diagram";
 
-const FEASIBILITY_STYLES: Record<FeasibilityScore, string> = {
-  High: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 font-medium",
-  Moderate: "bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700 font-medium",
-  Low: "bg-orange-50 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700 font-medium",
-  Insufficient: "bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700 font-medium",
+// design 004 D1: ordinal → semantic tokens. 4 steps collapse onto 3 hues; Low vs
+// Moderate distinguished by fill (Low = warning outline, Moderate = warning filled).
+const FEASIBILITY_STYLES: Record<FeasibilityScore, React.CSSProperties> = {
+  High: { background: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" },
+  Moderate: { background: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" },
+  Low: { background: "transparent", color: "var(--warning)", border: "1px solid var(--warning)" },
+  Insufficient: { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" },
 };
 
 const FEASIBILITY_ICONS: Record<FeasibilityScore, string> = {
@@ -66,10 +68,11 @@ const GAP_LABELS: Record<GapDimension, string> = {
   theoretical: "Theoretical",
 };
 
-const IMPORTANCE_STYLES = {
-  high: "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800 font-medium",
-  medium: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800",
-  low: "bg-stone-50 dark:bg-stone-800/60 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700",
+// design 004 D1: ordinal importance → semantic tokens (high=danger, medium=warning, low=neutral).
+const IMPORTANCE_STYLES: Record<string, React.CSSProperties> = {
+  high: { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" },
+  medium: { background: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" },
+  low: { background: "var(--surface-2)", color: "var(--muted)", border: "1px solid var(--border)" },
 };
 
 /**
@@ -82,46 +85,46 @@ const IMPORTANCE_STYLES = {
  *   5–9  → Low Confidence
  *   < 5  → Very Low Confidence
  */
+// design 004 D1: ordinal confidence → semantic tokens (Low = warning outline vs Moderate filled).
 function getAnalysisConfidence(reviewsAnalyzedCount: number): {
   label: string;
-  badgeClass: string;
+  badgeStyle: React.CSSProperties;
   tooltip: string;
 } {
   if (reviewsAnalyzedCount >= 20) {
     return {
       label: "High Confidence",
-      badgeClass: "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600",
+      badgeStyle: { background: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" },
       tooltip: `Based on ${reviewsAnalyzedCount} existing reviews analyzed by AI.`,
     };
   }
   if (reviewsAnalyzedCount >= 10) {
     return {
       label: "Moderate Confidence",
-      badgeClass: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600",
+      badgeStyle: { background: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" },
       tooltip: `Based on ${reviewsAnalyzedCount} existing reviews analyzed by AI. More reviews would increase confidence.`,
     };
   }
   if (reviewsAnalyzedCount >= 5) {
     return {
       label: "Low Confidence",
-      badgeClass: "bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600",
+      badgeStyle: { background: "transparent", color: "var(--warning)", border: "1px solid var(--warning)" },
       tooltip: `Based on only ${reviewsAnalyzedCount} existing reviews analyzed by AI. Interpret gaps with caution.`,
     };
   }
   return {
     label: "Very Low Confidence",
-    badgeClass: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-300 dark:border-red-600",
+    badgeStyle: { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" },
     tooltip: `Based on only ${reviewsAnalyzedCount} existing review${reviewsAnalyzedCount === 1 ? "" : "s"} analyzed by AI. Results should be interpreted with significant caution.`,
   };
 }
 
-const SOURCE_STYLES: Record<string, string> = {
-  PubMed: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-  OpenAlex: "bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
-  "Europe PMC": "bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800",
-  Scopus: "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
-  Cochrane: "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800",
-  "Semantic Scholar": "bg-stone-50 dark:bg-stone-800/60 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-700",
+// design 004 D2 (Option A): sources are categorical — the label distinguishes them,
+// so render as neutral chips rather than a per-source hue. One shared neutral style.
+const SOURCE_CHIP_STYLE: React.CSSProperties = {
+  background: "var(--surface-2)",
+  color: "var(--foreground)",
+  border: "1px solid var(--border)",
 };
 
 /**
@@ -130,26 +133,27 @@ const SOURCE_STYLES: Record<string, string> = {
  * "stable"  = typical publication rate
  * "declining" = few recent publications → mature or waning field
  */
+// design 004 D1: ordinal trend → semantic token text color (growing=success, stable=warning, declining=muted).
 const STUDY_TREND_CONFIG: Record<
   StudyTrend,
-  { icon: string; label: string; colorClass: string; tooltip: string }
+  { icon: string; label: string; color: string; tooltip: string }
 > = {
   growing: {
     icon: "↑",
     label: "Growing",
-    colorClass: "text-emerald-700 dark:text-emerald-400",
+    color: "var(--success)",
     tooltip: "More than 35% of primary studies on this topic were published in the last 3 years — this is an actively expanding research field.",
   },
   stable: {
     icon: "→",
     label: "Stable",
-    colorClass: "text-amber-700 dark:text-amber-400",
+    color: "var(--warning)",
     tooltip: "15–34% of primary studies on this topic were published in the last 3 years — this field is publishing at a steady rate.",
   },
   declining: {
     icon: "↓",
     label: "Declining",
-    colorClass: "text-slate-500 dark:text-slate-400",
+    color: "var(--muted)",
     tooltip: "Fewer than 15% of primary studies on this topic were published in the last 3 years — publication in this field may be slowing.",
   },
 };
@@ -533,7 +537,7 @@ function PublicViewerBanner({ query }: { query: string }) {
   return (
     <div
       className="mb-5 rounded-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-      style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+      style={{ background: "var(--brand-surface)", color: "var(--on-brand)" }}
     >
       <div>
         <p className="text-sm font-semibold">You&apos;re viewing a shared Blindspot report.</p>
@@ -545,7 +549,7 @@ function PublicViewerBanner({ query }: { query: string }) {
         <button
           onClick={handleCopy}
           className="text-xs font-medium px-3 py-1.5 rounded-md transition-opacity hover:opacity-80"
-          style={{ background: "rgba(255,255,255,0.15)", color: "#f4f1ea" }}
+          style={{ background: "rgba(255,255,255,0.15)", color: "var(--on-brand)" }}
         >
           {copied ? "Copied ✓" : "Copy link"}
         </button>
@@ -913,7 +917,8 @@ export function ResultsDashboard({
               {/* NEW-2: Study trend indicator */}
               {studyTrend !== null && studyTrend !== undefined && (
                 <span
-                  className={`text-xs font-semibold ${STUDY_TREND_CONFIG[studyTrend].colorClass}`}
+                  className="text-xs font-semibold"
+                  style={{ color: STUDY_TREND_CONFIG[studyTrend].color }}
                   title={STUDY_TREND_CONFIG[studyTrend].tooltip}
                   aria-label={`Field trend: ${STUDY_TREND_CONFIG[studyTrend].label}`}
                 >
@@ -1055,7 +1060,7 @@ export function ResultsDashboard({
                 <p className="text-xs uppercase tracking-[0.15em]" style={{ color: "var(--muted)" }}>Feasibility</p>
                 <FeasibilityExplainer />
               </div>
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${FEASIBILITY_STYLES[localFeasibilityScore]}`}>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium" style={FEASIBILITY_STYLES[localFeasibilityScore]}>
                 <span className="text-xs">{FEASIBILITY_ICONS[localFeasibilityScore]}</span>
                 {localFeasibilityScore}
               </span>
@@ -1297,7 +1302,8 @@ export function ResultsDashboard({
                   className="shrink-0 text-xs font-medium px-3 py-1.5 rounded transition-opacity hover:opacity-80 whitespace-nowrap"
                   style={{
                     background: "var(--brand-surface)",
-                    color: "#f4f1ea",
+                    color: "var(--on-brand)",
+                    border: "1px solid var(--brand-border)",
                   }}
                   title="Run a new search with this topic to get updated results"
                 >
@@ -1321,11 +1327,11 @@ export function ResultsDashboard({
 
         {/* Top gaps quick summary */}
         {topGaps.length > 0 && (
-          <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md">
-            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wide mb-1.5">Key gaps identified</p>
+          <div className="mt-4 p-3 rounded-md" style={{ background: "var(--warning-bg)", border: "1px solid var(--warning)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: "var(--warning)" }}>Key gaps identified</p>
             <div className="flex flex-wrap gap-2">
               {topGaps.map((gap, i) => (
-                <span key={i} className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-700 rounded-full px-2.5 py-0.5">
+                <span key={i} className="inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5" style={{ color: "var(--warning)", background: "var(--warning-bg)", border: "1px solid var(--warning)" }}>
                   {GAP_LABELS[gap.dimension]}
                 </span>
               ))}
@@ -1344,7 +1350,7 @@ export function ResultsDashboard({
                 style={
                   localFeasibilityScore === "Insufficient"
                     ? { background: "var(--surface-2)", color: "var(--muted)", cursor: "not-allowed", opacity: 0.6 }
-                    : { background: "var(--brand-surface)", color: "#f4f1ea" }
+                    : { background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }
                 }
               >
                 Run AI Gap Analysis
@@ -1360,14 +1366,14 @@ export function ResultsDashboard({
             <a
               href="/signup"
               className="inline-block px-4 py-2 text-sm font-medium rounded-md transition-opacity hover:opacity-90"
-              style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+              style={{ background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)" }}
             >
               Sign up free to run AI analysis
             </a>
           )}
           {isPending && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center justify-between text-xs" style={{ color: "var(--muted)" }}>
                 <span>Analyzing with AI…</span>
                 <span>~20 seconds</span>
               </div>
@@ -1393,7 +1399,7 @@ export function ResultsDashboard({
           )}
         </div>
         {analysisError && (
-          <p className="mt-2 text-sm text-red-600">{analysisError}</p>
+          <p className="mt-2 text-sm" style={{ color: "var(--danger)" }}>{analysisError}</p>
         )}
       </div>
 
@@ -1535,13 +1541,12 @@ function GapsSkeleton() {
 /* Related Searches section                                                  */
 /* -------------------------------------------------------------------------- */
 
-const GAP_TYPE_COLORS: Record<string, string> = {
-  population:  "bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800",
-  methodology: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-  outcome:     "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800",
-  geographic:  "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
-  temporal:    "bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800",
-  theoretical: "bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800",
+// design 004 D2 (Option A): gap dimensions are categorical → neutral chip; the
+// label carries the meaning. One shared neutral style.
+const GAP_TYPE_CHIP_STYLE: React.CSSProperties = {
+  background: "var(--surface-2)",
+  color: "var(--foreground)",
+  border: "1px solid var(--border)",
 };
 
 const GAP_TYPE_LABELS: Record<string, string> = {
@@ -1553,17 +1558,17 @@ const GAP_TYPE_LABELS: Record<string, string> = {
   theoretical: "Theoretical",
 };
 
-const RELATED_FEASIBILITY_BADGE: Record<string, string> = {
-  high:     "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300",
-  moderate: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
-  low:      "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
+// design 004 D1: ordinal feasibility → semantic tokens.
+const RELATED_FEASIBILITY_BADGE: Record<string, React.CSSProperties> = {
+  high:     { background: "var(--success-bg)", color: "var(--success)" },
+  moderate: { background: "var(--warning-bg)", color: "var(--warning)" },
+  low:      { background: "var(--surface-2)", color: "var(--muted)" },
 };
 
 function RelatedSearchCard({ search }: { search: RelatedSearch }) {
   const href = `/?q=${encodeURIComponent(search.query)}`;
-  const dimColor = GAP_TYPE_COLORS[search.gapType] ?? "bg-gray-50 text-gray-600 border-gray-200";
   const dimLabel = GAP_TYPE_LABELS[search.gapType] ?? search.gapType;
-  const feasBadge = RELATED_FEASIBILITY_BADGE[search.feasibility] ?? "bg-gray-50 text-gray-500";
+  const feasBadge = RELATED_FEASIBILITY_BADGE[search.feasibility] ?? { background: "var(--surface-2)", color: "var(--muted)" };
 
   return (
     <a
@@ -1573,10 +1578,10 @@ function RelatedSearchCard({ search }: { search: RelatedSearch }) {
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex flex-wrap gap-1.5">
-          <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${dimColor}`}>
+          <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded" style={GAP_TYPE_CHIP_STYLE}>
             {dimLabel}
           </span>
-          <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${feasBadge}`}>
+          <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded" style={feasBadge}>
             {search.feasibility.charAt(0).toUpperCase() + search.feasibility.slice(1)} feasibility
           </span>
         </div>
@@ -1628,9 +1633,8 @@ function RelatedSearchesSection({ gapAnalysis }: { gapAnalysis: import("@/types"
 
 function SourceBadge({ source }: { source?: string }) {
   if (!source) return null;
-  const style = SOURCE_STYLES[source] ?? "bg-gray-50 text-gray-600 border-gray-200";
   return (
-    <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${style}`}>
+    <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded" style={SOURCE_CHIP_STYLE}>
       {source}
     </span>
   );
@@ -1820,7 +1824,7 @@ function ReviewsTab({ resultId, reviews }: { resultId: string; reviews: Existing
                 className="px-2.5 py-1 text-xs rounded-full border font-medium transition-colors"
                 style={
                   activeSource === null
-                    ? { background: "var(--brand, #1e3a5f)", color: "var(--background, #f4f1ea)", borderColor: "var(--brand, #1e3a5f)" }
+                    ? { background: "var(--brand-surface)", color: "var(--on-brand)", borderColor: "var(--brand-border)" }
                     : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
                 }
               >
@@ -2052,13 +2056,14 @@ function BooleanSearchBlock({ booleanString }: { booleanString: string }) {
 /* Gap dimension filter chip strip                                           */
 /* -------------------------------------------------------------------------- */
 
-const DIMENSION_CHIP_COLORS: Record<GapDimension, { active: string; inactive: string }> = {
-  population:  { active: "bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-300 border-violet-300 dark:border-violet-600", inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-violet-300 dark:hover:border-violet-500 hover:text-violet-700 dark:hover:text-violet-300" },
-  methodology: { active: "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-600",             inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-500 hover:text-blue-700 dark:hover:text-blue-300" },
-  outcome:     { active: "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-300 dark:border-green-600",        inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-green-300 dark:hover:border-green-500 hover:text-green-700 dark:hover:text-green-300" },
-  geographic:  { active: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-600",        inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-500 hover:text-amber-700 dark:hover:text-amber-300" },
-  temporal:    { active: "bg-pink-100 dark:bg-pink-900/40 text-pink-800 dark:text-pink-300 border-pink-300 dark:border-pink-600",              inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-pink-300 dark:hover:border-pink-500 hover:text-pink-700 dark:hover:text-pink-300" },
-  theoretical: { active: "bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-600",              inactive: "text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-teal-300 dark:hover:border-teal-500 hover:text-teal-700 dark:hover:text-teal-300" },
+// design 004 D2 (Option A): gap-dimension chips use one accent treatment for the
+// active/selected state and neutral for the rest — differentiation comes from the
+// label, not six hues. Shared styles, no per-dimension palette.
+const DIMENSION_CHIP_ACTIVE: React.CSSProperties = {
+  background: "var(--brand-surface)", color: "var(--on-brand)", border: "1px solid var(--brand-border)",
+};
+const DIMENSION_CHIP_INACTIVE: React.CSSProperties = {
+  background: "transparent", color: "var(--muted)", border: "1px solid var(--border)",
 };
 
 function GapDimensionFilter({
@@ -2085,22 +2090,22 @@ function GapDimensionFilter({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-gray-600 dark:text-gray-400 mr-0.5 shrink-0">Filter:</span>
+      <span className="text-xs mr-0.5 shrink-0" style={{ color: "var(--muted)" }}>Filter:</span>
       {ALL_DIMENSIONS.map((d, index) => {
         const isActive = activeDimensions.has(d);
         const count = gapCounts[d];
         // Hide dimensions with zero gaps — no point filtering by them
         if (count === 0) return null;
-        const colors = DIMENSION_CHIP_COLORS[d];
         return (
           <button
             key={d}
             onClick={() => onToggle(d)}
             aria-pressed={isActive}
-            className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full border font-medium transition-colors ${
-              isActive ? colors.active : colors.inactive
-            } ${shouldAnimate ? "animate-badge-in" : "opacity-0"}`}
-            style={shouldAnimate ? { animationDelay: `${index * 50}ms` } : undefined}
+            className={`inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-medium transition-colors ${shouldAnimate ? "animate-badge-in" : "opacity-0"}`}
+            style={{
+              ...(isActive ? DIMENSION_CHIP_ACTIVE : DIMENSION_CHIP_INACTIVE),
+              ...(shouldAnimate ? { animationDelay: `${index * 50}ms` } : {}),
+            }}
           >
             {DIMENSION_LABELS[d]}
             {count > 0 && (
@@ -2114,10 +2119,10 @@ function GapDimensionFilter({
       {filtered && (
         <button
           onClick={onReset}
-          className={`inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ml-1 underline underline-offset-2 ${
+          className={`inline-flex items-center gap-1 text-xs hover:opacity-70 transition-opacity ml-1 underline underline-offset-2 ${
             shouldAnimate ? "animate-badge-in" : "opacity-0"
           }`}
-          style={shouldAnimate ? { animationDelay: `${ALL_DIMENSIONS.length * 50}ms` } : undefined}
+          style={{ color: "var(--muted)", ...(shouldAnimate ? { animationDelay: `${ALL_DIMENSIONS.length * 50}ms` } : {}) }}
           aria-label="Clear all gap dimension filters"
         >
           Clear
@@ -2154,11 +2159,14 @@ const EGM_TIERS: Array<{ key: "high" | "moderate" | "low" | "none"; label: strin
   { key: "none",     label: "None" },
 ];
 
-const EGM_CELL_STYLES: Record<"high" | "moderate" | "low" | "none", { filled: string; empty: string }> = {
-  high:     { filled: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 cursor-pointer",     empty: "bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-300 dark:text-emerald-800 border-emerald-100 dark:border-emerald-900" },
-  moderate: { filled: "bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900/60 cursor-pointer",                    empty: "bg-amber-50/50 dark:bg-amber-950/20 text-amber-300 dark:text-amber-800 border-amber-100 dark:border-amber-900" },
-  low:      { filled: "bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700 hover:bg-orange-200 dark:hover:bg-orange-900/60 cursor-pointer",              empty: "bg-orange-50/50 dark:bg-orange-950/20 text-orange-300 dark:text-orange-800 border-orange-100 dark:border-orange-900" },
-  none:     { filled: "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-900/60 cursor-pointer",                                      empty: "bg-slate-50 dark:bg-slate-900/20 text-slate-300 dark:text-slate-700 border-slate-100 dark:border-slate-800" },
+// design 004 D1: EGM heatmap ordinal → semantic tokens. Filled = cell has topics
+// (solid semantic); empty = none (neutral, subdued). Low uses warning (outline-ish
+// via -bg) to share the warning hue with moderate without a 4th color.
+const EGM_CELL_STYLES: Record<"high" | "moderate" | "low" | "none", { filled: React.CSSProperties; empty: React.CSSProperties }> = {
+  high:     { filled: { background: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" }, empty: { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" } },
+  moderate: { filled: { background: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" }, empty: { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" } },
+  low:      { filled: { background: "transparent", color: "var(--warning)", border: "1px solid var(--warning)" },        empty: { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" } },
+  none:     { filled: { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" },    empty: { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" } },
 };
 
 function EvidenceGapMapTab({
@@ -2246,14 +2254,15 @@ function EvidenceGapMapTab({
                     const topics = matrix[dim][tier.key];
                     const count = topics.length;
                     const styles = EGM_CELL_STYLES[tier.key];
-                    const cellClass = count > 0 ? styles.filled : styles.empty;
+                    const cellStyle = count > 0 ? styles.filled : styles.empty;
                     return (
                       <td key={tier.key} className="py-1.5 px-1 text-center">
                         <button
                           type="button"
                           disabled={count === 0}
                           onClick={count > 0 ? onNavigateToGaps : undefined}
-                          className={`inline-flex items-center justify-center w-12 h-9 rounded border font-semibold text-sm transition-colors ${cellClass} disabled:cursor-default`}
+                          className={`inline-flex items-center justify-center w-12 h-9 rounded font-semibold text-sm transition-colors ${count > 0 ? "cursor-pointer hover:opacity-80" : ""} disabled:cursor-default`}
+                          style={cellStyle}
                           title={count > 0 ? topics.join("\n") : `No ${tier.label} feasibility topics in ${GAP_LABELS[dim]} dimension`}
                           aria-label={
                             count > 0
@@ -2277,7 +2286,7 @@ function EvidenceGapMapTab({
       <div className="flex flex-wrap gap-3 pt-1 border-t" style={{ borderColor: "var(--border)" }}>
         <p className="text-[10px] mr-1 self-center font-medium" style={{ color: "var(--muted)" }}>Feasibility:</p>
         {EGM_TIERS.map((tier) => (
-          <span key={tier.key} className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border ${EGM_CELL_STYLES[tier.key].filled.split(" hover:")[0]}`}>
+          <span key={tier.key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded" style={EGM_CELL_STYLES[tier.key].filled}>
             {tier.label}
           </span>
         ))}
@@ -2405,7 +2414,8 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
               const confidence = getAnalysisConfidence(gapAnalysis.reviews_analyzed_count!);
               return (
                 <span
-                  className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${confidence.badgeClass}`}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                  style={confidence.badgeStyle}
                   title={confidence.tooltip}
                   aria-label={`Analysis confidence: ${confidence.label}. ${confidence.tooltip}`}
                 >
@@ -2483,7 +2493,7 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
         ) : (
           <div className="space-y-2">
             {visibleGaps.map((gap, i) => (
-              <div key={i} className={`border rounded-md p-3 transition-shadow hover:shadow-sm ${IMPORTANCE_STYLES[gap.importance]}`}>
+              <div key={i} className="rounded-md p-3 transition-shadow hover:shadow-sm" style={IMPORTANCE_STYLES[gap.importance]}>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs font-semibold uppercase tracking-wide">{GAP_LABELS[gap.dimension]}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${
@@ -2765,12 +2775,13 @@ function DesignTab({ studyDesign, gapAnalysis, isPending, onAnalyze, error, isOw
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               <span
-                className={`text-xs px-2 py-0.5 rounded-full border font-medium ${FEASIBILITY_STYLES[topicFeasibility]}`}
+                className="text-xs px-2 py-0.5 rounded-full font-medium"
+                style={FEASIBILITY_STYLES[topicFeasibility]}
                 title={topTopic.verified_feasibility ? "Feasibility verified against real PubMed data" : "Derived from AI-estimated study count for this specific sub-topic"}
               >
                 {topicFeasibility} feasibility
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${FEASIBILITY_STYLES[topicFeasibility]}`}>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={FEASIBILITY_STYLES[topicFeasibility]}>
                 ~{topTopic.estimated_studies.toLocaleString("en-US")} primary {topTopic.estimated_studies === 1 ? "study" : "studies"}
               </span>
             </div>
@@ -3010,7 +3021,7 @@ function AnalysisPrompt({ isPending, onAnalyze, error }: {
       >
         {isPending ? "Analyzing… (~20 seconds)" : "Run AI Gap Analysis"}
       </button>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-sm" style={{ color: "var(--danger)" }}>{error}</p>}
     </div>
   );
 }

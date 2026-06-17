@@ -13,7 +13,7 @@ export default function HomePage() {
       {/* Hero */}
       <section
         className="relative overflow-hidden"
-        style={{ background: "var(--brand-surface)", color: "#f4f1ea" }}
+        style={{ background: "var(--brand-surface)", color: "var(--on-brand)" }}
       >
         {/* Subtle grain texture overlay */}
         <div
@@ -29,16 +29,18 @@ export default function HomePage() {
           {/* Main headline — serif, editorial, large */}
           <h1
             className="font-serif text-4xl sm:text-5xl lg:text-6xl leading-[1.1] mb-6 max-w-3xl"
-            style={{ color: "#f4f1ea" }}
+            style={{ color: "var(--on-brand)" }}
             suppressHydrationWarning
           >
             Find the systematic review{" "}
+            {/* design 006 L2: literal is the on-dark gold (= dark --accent); the hero is an
+                always-navy island, so this is theme-independent by design (verified ≈5.5:1 on navy). */}
             <em className="not-italic" style={{ color: "#c49a2e" }}>
               no one&apos;s written yet
             </em>
           </h1>
 
-          <p className="text-base sm:text-lg leading-relaxed max-w-xl mb-8" style={{ color: "#e8e4dc", opacity: 0.8 }}>
+          <p className="text-base sm:text-lg leading-relaxed max-w-xl mb-8" style={{ color: "var(--on-brand)", opacity: 0.8 }}>
             Search existing literature, score feasibility, and surface the specific
             systematic review topics most worth writing — in minutes, not weeks.
           </p>
@@ -47,7 +49,7 @@ export default function HomePage() {
           <div>
             <p
               className="text-[10px] font-semibold tracking-[0.18em] uppercase mb-3"
-              style={{ color: "rgba(244,241,234,0.35)" }}
+              style={{ color: "var(--on-brand)", opacity: 0.35 }}
             >
               Searches across
             </p>

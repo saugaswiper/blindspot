@@ -10,10 +10,11 @@ import type { ExploreSubtopic } from "@/lib/explore";
 
 function FeasibilityDot({ score }: { score: string }) {
   const map: Record<string, { color: string; label: string }> = {
-    High:         { color: "#22c55e", label: "High feasibility" },
-    Moderate:     { color: "#f59e0b", label: "Moderate feasibility" },
-    Low:          { color: "#ef4444", label: "Low feasibility" },
-    Insufficient: { color: "#6b7280", label: "Insufficient evidence" },
+    // design 005 FE3: ordinal → tokens (keeps the color-mix technique below).
+    High:         { color: "var(--success)", label: "High feasibility" },
+    Moderate:     { color: "var(--warning)", label: "Moderate feasibility" },
+    Low:          { color: "var(--danger)", label: "Low feasibility" },
+    Insufficient: { color: "var(--muted)", label: "Insufficient evidence" },
   };
   const { color, label } = map[score] ?? map.Insufficient;
   return (
@@ -81,8 +82,10 @@ function SubtopicCard({
           disabled={anySearching}
           className="text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80 disabled:cursor-not-allowed"
           style={{
-            background: "var(--brand)",
-            color: "#fff",
+            // design 005 FE2: brand-surface recipe (not --brand, which is a text color in dark).
+            background: "var(--brand-surface)",
+            color: "var(--on-brand)",
+            border: "1px solid var(--brand-border)",
             opacity: anySearching && !isSearching ? 0.5 : 1,
           }}
         >
@@ -225,7 +228,7 @@ export function FieldExplorer() {
           type="submit"
           disabled={loading || field.trim().length < 2}
           className="text-sm font-medium px-4 py-2.5 rounded-lg transition-opacity disabled:opacity-50"
-          style={{ background: "var(--accent)", color: "#fff" }}
+          style={{ background: "var(--accent)", color: "var(--on-accent)" }}
         >
           {loading ? "Exploring…" : "Explore"}
         </button>
@@ -233,7 +236,7 @@ export function FieldExplorer() {
 
       {/* Error */}
       {error && (
-        <p className="text-sm" style={{ color: "#ef4444" }}>{error}</p>
+        <p className="text-sm" style={{ color: "var(--danger)" }}>{error}</p>
       )}
 
       {/* Loading skeletons */}

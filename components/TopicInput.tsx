@@ -125,7 +125,7 @@ export function TopicInput() {
             key={m}
             type="button"
             onClick={() => handleModeToggle(m)}
-            className="px-3 py-1.5 text-sm font-medium rounded transition-all"
+            className="px-3 py-1.5 text-sm font-medium rounded transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:[--tw-ring-offset-color:var(--surface)]"
             style={{
               color: mode === m ? "var(--foreground)" : "var(--muted)",
               background: mode === m ? "var(--surface-2)" : "transparent",
@@ -152,7 +152,7 @@ export function TopicInput() {
               const v = e.target.value;
               setMinYear(v === "" ? undefined : parseInt(v, 10));
             }}
-            className="text-xs rounded px-2 py-1 transition-colors cursor-pointer"
+            className="text-xs rounded px-2 py-1 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:[--tw-ring-offset-color:var(--surface)]"
             style={{
               background: "var(--surface-2)",
               border: "1px solid var(--border)",
@@ -177,11 +177,11 @@ export function TopicInput() {
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
             placeholder="e.g. cognitive behavioral therapy for insomnia in elderly patients"
-            className="w-full px-0 py-3 text-sm bg-transparent outline-none transition-colors"
+            className="w-full px-0 py-3 text-sm bg-transparent outline-none transition-colors focus-visible:outline-none"
             style={{
               color: "var(--foreground)",
               borderBottom: errors.queryText
-                ? "2px solid #dc2626"
+                ? "2px solid var(--danger)"
                 : "2px solid var(--border)",
               caretColor: "var(--accent)",
             }}
@@ -197,7 +197,7 @@ export function TopicInput() {
             }}
           />
           {errors.queryText && (
-            <p className="text-xs mt-1.5" style={{ color: "#dc2626" }}>
+            <p className="text-xs mt-1.5" style={{ color: "var(--danger)" }}>
               {errors.queryText}
             </p>
           )}
@@ -287,7 +287,7 @@ export function TopicInput() {
       )}
 
       {errors.root && (
-        <p className="text-sm mt-2" style={{ color: "#dc2626" }}>
+        <p className="text-sm mt-2" style={{ color: "var(--danger)" }}>
           {errors.root}
         </p>
       )}
@@ -295,10 +295,11 @@ export function TopicInput() {
       <button
         type="submit"
         disabled={loading}
-        className="mt-6 w-full py-3 px-6 text-sm font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-6 w-full py-3 px-6 text-sm font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:[--tw-ring-offset-color:var(--surface)]"
         style={{
           background: loading ? "var(--muted)" : "var(--brand-surface)",
-          color: "#f4f1ea",
+          color: loading ? "var(--foreground)" : "var(--on-brand)",
+          border: `1px solid ${loading ? "transparent" : "var(--brand-border)"}`,
         }}
       >
         {loading ? (

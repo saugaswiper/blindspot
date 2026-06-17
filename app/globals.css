@@ -14,6 +14,7 @@
   --brand-surface: #1c2b3a; /* always dark navy — safe for white text in any mode */
   --brand-border: #1c2b3a;  /* = --brand-surface; no visible edge needed in light (design 002) */
   --on-brand: #f4f1ea;      /* text/icon color on --brand-surface (design 002) */
+  --on-accent: #1c2b3a;     /* dark navy text on --accent gold fills (design 005) */
   --ring: #a67c2e;          /* = --accent; focus indicator (design 002) */
   --accent: #a67c2e;
   --accent-hover: #8a6424;
@@ -38,6 +39,7 @@ html.dark {
   --brand-surface: #1c2b3a; /* stays dark navy — use for BACKGROUNDS with white text */
   --brand-border: #62748c;  /* visible edge on brand controls in dark, ≥3:1 (design 002) */
   --on-brand: #f4f1ea;      /* text/icon on --brand-surface (design 002) */
+  --on-accent: #1c2b3a;     /* dark navy text on --accent gold fills (design 005) */
   --ring: #c49a2e;          /* = --accent; focus indicator (design 002) */
   --accent: #c49a2e;
   --accent-hover: #d4aa3e;
@@ -61,6 +63,7 @@ html.dark {
     --brand-surface: #1c2b3a;
     --brand-border: #62748c;
     --on-brand: #f4f1ea;
+    --on-accent: #1c2b3a;
     --ring: #c49a2e;
     --accent: #c49a2e;
     --accent-hover: #d4aa3e;
@@ -140,11 +143,14 @@ body {
   border-radius: 3px;
 }
 
+/* design 005 PR5 / 004 D2 (Option A): source/process are categorical → neutral
+   chips; included/excluded carry semantic success/danger. All token-driven, so
+   the .dark overrides below are no longer needed for these boxes. */
 .prisma-box {
-  border: 1.5px solid #93c5fd;
+  border: 1.5px solid var(--border);
   border-radius: 6px;
   padding: 10px 12px;
-  background: #eff6ff;
+  background: var(--surface-2);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -153,18 +159,18 @@ body {
 }
 
 .prisma-box-source {
-  border-color: #4a90d9;
-  background: #eff6ff;
+  border-color: var(--border);
+  background: var(--surface-2);
 }
 
 .prisma-box-process {
-  border-color: #6366f1;
-  background: #eef2ff;
+  border-color: var(--border);
+  background: var(--surface-2);
 }
 
 .prisma-box-included {
-  border-color: #16a34a;
-  background: #f0fdf4;
+  border-color: var(--success);
+  background: var(--success-bg);
 }
 
 .prisma-box-context {
@@ -173,8 +179,8 @@ body {
 }
 
 .prisma-box-excluded {
-  border-color: #f87171;
-  background: #fef2f2;
+  border-color: var(--danger);
+  background: var(--danger-bg);
 }
 
 .prisma-box-label {
@@ -220,36 +226,9 @@ body {
   border-color: var(--border);
 }
 
-.dark .prisma-box {
-  background: #1e3a5f22;
-  border-color: #60a5fa;
-}
-
-.dark .prisma-box-source {
-  border-color: #60a5fa;
-  background: #1e3a5f33;
-}
-
-.dark .prisma-box-process {
-  border-color: #818cf8;
-  background: #312e8133;
-}
-
-.dark .prisma-box-included {
-  border-color: #4ade80;
-  background: #14532d33;
-}
-
-.dark .prisma-box-context {
-  border-color: var(--border);
-  background: var(--surface-2);
-}
-
-.dark .prisma-box-excluded {
-  border-color: #f87171;
-  background: #7f1d1d33;
-}
-
+/* .prisma-box / -source / -process / -included / -context / -excluded are now
+   token-driven (see light rules above) — tokens flip for dark automatically, so
+   the former hardcoded dark overrides for those boxes were removed (design 005 PR5). */
 .dark .prisma-box-label {
   color: var(--brand);
 }

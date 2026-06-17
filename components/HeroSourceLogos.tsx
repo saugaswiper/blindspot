@@ -76,7 +76,7 @@ function FaviconChip({
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-1.5 transition-opacity hover:opacity-90"
-      style={{ color: "rgba(244,241,234,0.5)" }}
+      style={{ color: "var(--on-brand)", opacity: 0.5 }}
     >
       <img
         src={src}
@@ -104,7 +104,7 @@ function TextChip({ name, href }: { name: string; href: string }) {
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center transition-opacity hover:opacity-90"
-      style={{ color: "rgba(244,241,234,0.5)" }}
+      style={{ color: "var(--on-brand)", opacity: 0.5 }}
     >
       <span className="text-xs font-medium tracking-wide">{name}</span>
     </a>
