@@ -97,6 +97,22 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Tailwind v4 Preflight defaults <button> to cursor:default. Restore the
+   pointer (hand) cursor on interactive controls so they read as clickable,
+   while leaving disabled controls with the not-allowed affordance. */
+button:not(:disabled):not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]),
+label[for],
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* ── Typography helpers ────────────────────────────────────────────────────── */
 .font-serif {
   font-family: var(--font-serif);

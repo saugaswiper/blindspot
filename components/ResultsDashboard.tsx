@@ -161,7 +161,28 @@ const STUDY_TREND_CONFIG: Record<
 /* -------------------------------------------------------------------------- */
 /* NEW-14: Animation styles for gap dimension filter badges                   */
 /* -------------------------------------------------------------------------- */
-const animationStyle = "@keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } } .animate-badge-in { animation: fadeInUp 0.3s ease-out forwards; }";
+const animationStyle = `
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-badge-in {
+    animation: fadeInUp 0.3s ease-out forwards;
+  }
+  @keyframes gapBadgeFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  .gap-badge-animate {
+    animation: gapBadgeFadeIn 150ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+`;
 
 /**
  * UI-1: Per-source study count breakdown.
@@ -229,12 +250,11 @@ function SourceBreakdown({
     cochrane: cochraneCount,
   });
 
-  // Map agreement level → badge palette. Kept inline rather than in the
-  // pure helper so the colour logic stays tied to the design system.
-  const agreementBadgeClass: Record<"agree" | "vary" | "disagree", string> = {
-    agree: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700",
-    vary: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700",
-    disagree: "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-700",
+  // Map agreement level → design tokens. Agree (success) / Vary (warning) / Disagree (danger)
+  const agreementBadgeStyle: Record<"agree" | "vary" | "disagree", React.CSSProperties> = {
+    agree: { background: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" },
+    vary: { background: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" },
+    disagree: { background: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" },
   };
   const agreementIcon: Record<"agree" | "vary" | "disagree", string> = {
     agree: "✓",
@@ -263,7 +283,8 @@ function SourceBreakdown({
       {agreement && (
         <div className="mt-1.5">
           <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border ${agreementBadgeClass[agreement.level]}`}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border"
+            style={agreementBadgeStyle[agreement.level]}
             title={agreement.tooltip}
             aria-label={`Source agreement: ${agreement.label}`}
           >
@@ -1427,7 +1448,7 @@ export function ResultsDashboard({
             <ReviewsTab resultId={resultId} reviews={existingReviews} />
           )}
           {activeTab === "gaps" && (
-            <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} screeningRecordCount={primaryStudyCount} savedScreeningResult={screeningResult} />
+            <GapsTab gapAnalysis={localGapAnalysis} gapAnalysisGeneratedAt={gapAnalysisGeneratedAt} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} resultId={resultId} isOwner={isOwner} protocolDraft={protocolDraft} primaryStudyCount={primaryStudyCount} feasibilityScore={localFeasibilityScore} query={query} screeningRecordCount={primaryStudyCount} savedScreeningResult={screeningResult} isTabActive={activeTab === "gaps"} />
           )}
           {activeTab === "design" && (
             <DesignTab studyDesign={localStudyDesign} gapAnalysis={localGapAnalysis} isPending={isPending} onAnalyze={runAnalysis} error={analysisError} isOwner={isOwner} primaryStudyCount={primaryStudyCount} query={query} />
@@ -1921,7 +1942,8 @@ function ReviewsTab({ resultId, reviews }: { resultId: string; reviews: Existing
               {/* NEW-7: Living review indicator — continuously-updated reviews */}
               {review.isLivingReview && (
                 <span
-                  className="inline-flex items-center gap-0.5 px-2 py-1 text-[10px] font-semibold rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-600 whitespace-nowrap"
+                  className="inline-flex items-center gap-0.5 px-2 py-1 text-[10px] font-semibold rounded-full border whitespace-nowrap"
+                  style={{ background: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" }}
                   title="This is a living systematic review — continuously updated with new evidence as it emerges"
                 >
                   🔄 Living
@@ -2308,7 +2330,7 @@ function EvidenceGapMapTab({
 /* Gaps tab                                                                   */
 /* -------------------------------------------------------------------------- */
 
-function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query, screeningRecordCount, savedScreeningResult }: {
+function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, error, resultId, isOwner, protocolDraft, primaryStudyCount, feasibilityScore, query, screeningRecordCount, savedScreeningResult, isTabActive = false }: {
   gapAnalysis: GapAnalysis | null;
   gapAnalysisGeneratedAt?: string | null;
   isPending: boolean;
@@ -2325,6 +2347,8 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
   screeningRecordCount?: number;
   /** Pre-loaded ScreeningResult from the DB (if any), scoped to one topic by topic_title match */
   savedScreeningResult?: ScreeningResult | null;
+  /** Whether the Gaps tab is currently active — triggers stagger animation on gaps */
+  isTabActive?: boolean;
 }) {
   const [activeDimensions, setActiveDimensions] = useState<Set<GapDimension>>(resetFilter);
 
@@ -2493,7 +2517,14 @@ function GapsTab({ gapAnalysis, gapAnalysisGeneratedAt, isPending, onAnalyze, er
         ) : (
           <div className="space-y-2">
             {visibleGaps.map((gap, i) => (
-              <div key={i} className="rounded-md p-3 transition-shadow hover:shadow-sm" style={IMPORTANCE_STYLES[gap.importance]}>
+              <div
+                key={i}
+                className={`rounded-md p-3 transition-shadow hover:shadow-sm ${isTabActive ? "gap-badge-animate" : ""}`}
+                style={{
+                  ...IMPORTANCE_STYLES[gap.importance],
+                  animationDelay: isTabActive ? `${i * 50}ms` : "0ms",
+                }}
+              >
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs font-semibold uppercase tracking-wide">{GAP_LABELS[gap.dimension]}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${

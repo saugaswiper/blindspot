@@ -57,7 +57,12 @@ async function search(query: string, reviewsOnly: boolean, pageSize = 25): Promi
 }
 
 export async function searchExistingReviews(query: string): Promise<ExistingReview[]> {
-  const data = await search(query, true, 25);
+  // Apply TITLE_ABS field restriction to systematic review searches to match
+  // the scope of PubMed's [tiab] and prevent inflated counts from full-text mentions.
+  // This ensures existing reviews are found only when the topic appears in title/abstract,
+  // reducing noise from tangential mentions in the full text.
+  const restricted = withFieldRestriction(query);
+  const data = await search(restricted, true, 25);
   const results = data.resultList?.result ?? [];
 
   return results
@@ -94,7 +99,11 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
 }
 
 export async function countSystematicReviews(query: string): Promise<number> {
-  const data = await search(query, true, 1);
+  // Apply TITLE_ABS field restriction to systematic review search to match the scope
+  // of PubMed's [tiab] and prevent inflated counts from full-text-only mentions.
+  // This ensures we count only reviews where the topic appears explicitly in title/abstract.
+  const restricted = withFieldRestriction(query);
+  const data = await search(restricted, true, 1);
   return data.hitCount ?? 0;
 }
 
