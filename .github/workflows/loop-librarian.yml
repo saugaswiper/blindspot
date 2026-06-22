@@ -1,0 +1,49 @@
+name: Loop — Librarian (haiku)
+
+on:
+  schedule:
+    - cron: "7 20 * * *"   # 20:07 UTC daily (after tester) — adjust to your timezone
+  workflow_dispatch: {}
+
+permissions:
+  contents: read           # reads the code repo (spec/) only
+
+concurrency:
+  group: blindspot-loop
+  cancel-in-progress: false
+
+jobs:
+  librarian:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4   # code repo = read-only source (spec/, lib/, app/)
+        with:
+          fetch-depth: 0
+      - name: Clone wiki (write target)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.WIKI_DEPLOY_KEY }}" > ~/.ssh/wiki && chmod 600 ~/.ssh/wiki
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/wiki -o StrictHostKeyChecking=no" \
+            git clone git@github.com:saugaswiper/blindspot-wiki.git wiki
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Claude Code
+        run: npm i -g @anthropic-ai/claude-code
+      - name: Run Librarian routine
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "$(cat .github/loop/librarian-prompt.md)" \
+            --model claude-haiku-4-5-20251001 \
+            --permission-mode acceptEdits \
+            --allowedTools "Bash,Read,Edit,Write,Glob,Grep"
+      - name: Push wiki updates (librarian is the only wiki writer)
+        run: |
+          cd wiki
+          if [ -z "$(git status --porcelain)" ]; then echo "No wiki changes."; exit 0; fi
+          git config user.name "blindspot-librarian-bot"
+          git config user.email "librarian-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "loop(librarian): ingest new spec/* reports"
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/wiki -o StrictHostKeyChecking=no" git push origin main
