@@ -374,6 +374,61 @@ export interface ScreeningDecision {
    * examples (active-learning loop).
    */
   refined?: boolean;
+  /**
+   * Resolved open-access full-text URL for an included study (Brief 001).
+   * Populated on demand via /api/fulltext; absent until the reviewer fetches it.
+   */
+  fulltext_url?: string;
+  /** Which source in the OA chain returned `fulltext_url` (provenance). */
+  fulltext_source?: FulltextSource;
+  /** ISO timestamp of when the full text was resolved. */
+  fulltext_fetched_at?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Full-text retrieval (Brief 001)
+// ---------------------------------------------------------------------------
+
+/** Which source in the open-access resolution chain returned the full text. */
+export type FulltextSource =
+  | "unpaywall"
+  | "openalex"
+  | "europepmc"
+  | "pmc"
+  | "user_upload";
+
+/**
+ * Open-access colour status (Unpaywall taxonomy). `closed` URLs are never
+ * returned — the resolution chain gates them out before producing a result.
+ */
+export type FulltextOaStatus = "gold" | "green" | "hybrid" | "bronze" | "closed";
+
+/** Whether the resolved URL points at a PDF or an HTML/XML full-text page. */
+export type FulltextContentType = "pdf" | "html";
+
+/**
+ * Reason a full-text resolution produced no URL. `paywalled` means a record
+ * was found but is closed-access; `source_error` means a source threw;
+ * `all_sources_failed` means every applicable source returned nothing.
+ * `no_doi` / `no_pmid` are reserved for callers that key on a single id.
+ */
+export type FulltextFailureReason =
+  | "no_doi"
+  | "no_pmid"
+  | "paywalled"
+  | "all_sources_failed"
+  | "source_error";
+
+/** A successfully resolved open-access full-text location with provenance. */
+export interface FulltextResult {
+  /** The resolved open-access URL (PDF or HTML/XML). Never paywalled. */
+  url: string;
+  /** Which source in the chain returned it (the audit trail Otto-SR lacks). */
+  source: FulltextSource;
+  /** OA colour status; guaranteed `!== "closed"`. */
+  oa_status: FulltextOaStatus;
+  /** PDF vs HTML/XML — lets the UI choose the right viewer affordance. */
+  content_type: FulltextContentType;
 }
 
 /** Full screening run result stored on the search_result row. */
