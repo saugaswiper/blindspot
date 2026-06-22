@@ -46,3 +46,6 @@ github.txt
 github.txt.pub
 *.pem
 id_ed25519*
+
+# Loop run logs
+loop/logs/
