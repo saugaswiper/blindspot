@@ -40,3 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .claude/worktrees/
+
+# Never commit keys/secrets
+github.txt
+github.txt.pub
+*.pem
+id_ed25519*
