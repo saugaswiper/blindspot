@@ -10,7 +10,7 @@ import { resolveFulltext } from "@/lib/fulltext";
  * degradation, and chain latency (AC2).
  */
 
-type Canned = { status: number; json?: unknown; throw?: boolean };
+type Canned = { status: number; json?: unknown; throw?: boolean; delay?: number };
 
 function route(handlers: {
   unpaywall?: Canned;
@@ -26,6 +26,7 @@ function route(handlers: {
     else if (url.includes("fullTextXML")) c = handlers.europepmc;
     else if (url.includes("idconv")) c = handlers.idconv;
     if (!c) return new Response("not found", { status: 404 });
+    if (c.delay) await new Promise((r) => setTimeout(r, c.delay));
     if (c.throw) throw new Error("network down");
     return new Response(c.json !== undefined ? JSON.stringify(c.json) : "", {
       status: c.status,
@@ -188,5 +189,45 @@ describe("resolveFulltext — latency (AC2)", () => {
     const { result } = await resolveFulltext("10.1/abc");
     expect(result).not.toBeNull();
     expect(Date.now() - start).toBeLessThanOrEqual(3000);
+  });
+
+  // AC2-unit (brief 002): the DOI fanout must complete in ~max(source latency),
+  // not ~sum. A slow Unpaywall miss (400 ms) must not delay an OpenAlex hit that
+  // lands at 200 ms. This test FAILS if the orchestrator is reverted to a
+  // sequential chain (which would take ~600 ms).
+  it("races DOI sources concurrently: a slow miss never delays a faster hit", async () => {
+    route({
+      // Higher-priority source misses, but takes the longest to respond.
+      unpaywall: { status: 200, delay: 400, json: { is_oa: false, oa_status: "closed" } },
+      // Lower-priority source hits and responds sooner.
+      openalex: {
+        status: 200,
+        delay: 200,
+        json: { open_access: { is_oa: true, oa_status: "green", oa_url: "https://oa.example/v.pdf" } },
+      },
+    });
+    const start = Date.now();
+    const { result } = await resolveFulltext("10.1/abc");
+    const elapsed = Date.now() - start;
+    expect(result?.source).toBe("openalex");
+    // Concurrent: ~200 ms (OpenAlex). Sequential would be ~600 ms (400 + 200).
+    expect(elapsed).toBeLessThanOrEqual(350);
+  });
+
+  it("does not serially accumulate latency when both DOI sources are slow", async () => {
+    route({
+      unpaywall: { status: 404, delay: 300 },
+      openalex: {
+        status: 200,
+        delay: 300,
+        json: { open_access: { is_oa: true, oa_status: "gold", oa_url: "https://oa.example/x.pdf" } },
+      },
+    });
+    const start = Date.now();
+    const { result } = await resolveFulltext("10.1/abc");
+    const elapsed = Date.now() - start;
+    expect(result?.source).toBe("openalex");
+    // Concurrent: ~300 ms (max). Sequential would be ~600 ms (sum).
+    expect(elapsed).toBeLessThanOrEqual(450);
   });
 });
