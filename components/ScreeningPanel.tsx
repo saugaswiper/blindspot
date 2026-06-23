@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useState } from "react";
-import type { CalibrationExample, ExistingReview, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
+import type { CalibrationExample, ExistingReview, FulltextSource, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
 import { downloadTextFile, toRis } from "@/lib/citation-export";
 import {
   buildCsv,
@@ -141,6 +141,87 @@ function ConfidenceBar({ level }: { level: "high" | "medium" | "low" }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Full-text retrieval (Brief 003)
+//
+// "Get full text" action on include-verdict rows. On success it resolves to a
+// labeled source chip (via Unpaywall / OpenAlex / …) — the provenance trail
+// Otto-SR can't show. The resolved URL/source live on the ScreeningDecision and
+// persist through the same screening_result blob save as human overrides, so the
+// chip survives reload without re-fetching.
+// ---------------------------------------------------------------------------
+
+// Display form of each FulltextSource (DB stores the union value, not this label).
+const FULLTEXT_SOURCE_LABELS: Record<FulltextSource, string> = {
+  unpaywall: "Unpaywall",
+  openalex:  "OpenAlex",
+  europepmc: "Europe PMC",
+  pmc:       "PubMed Central",
+  user_upload: "Upload",
+};
+
+/** Per-row resolution status held locally by the results table. */
+type FulltextRowState = "idle" | "loading" | "notfound" | "error";
+
+function FulltextControl({
+  decision,
+  state,
+  onResolve,
+}: {
+  decision: ScreeningDecision;
+  state: FulltextRowState;
+  onResolve: () => void;
+}) {
+  // Resolved (hydrated from the DB or just fetched): render the source chip.
+  if (decision.fulltext_url && decision.fulltext_source) {
+    return (
+      <a
+        href={decision.fulltext_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 transition-opacity hover:opacity-80"
+        style={{ color: "var(--success)", background: "var(--success-bg)", border: "1px solid var(--success)" }}
+        title={`Open-access full text resolved via ${FULLTEXT_SOURCE_LABELS[decision.fulltext_source]}`}
+      >
+        Full text · via {FULLTEXT_SOURCE_LABELS[decision.fulltext_source]} ↗
+      </a>
+    );
+  }
+
+  // No open-access version found (404). Upload fallback is deferred to brief 004.
+  if (state === "notfound") {
+    return (
+      <span className="text-[10px]" style={{ color: "var(--muted)" }}>
+        No open-access version found
+      </span>
+    );
+  }
+
+  const loading = state === "loading";
+  return (
+    <button
+      type="button"
+      onClick={onResolve}
+      disabled={loading}
+      className="inline-flex items-center gap-1 text-[11px] transition-opacity hover:opacity-70 disabled:cursor-wait"
+      style={{ color: "var(--accent)" }}
+      title="Resolve the open-access full text for this included study"
+    >
+      {loading ? (
+        <>
+          <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Resolving full text…
+        </>
+      ) : (
+        state === "error" ? "Retry full text" : "Get full text ↓"
+      )}
+    </button>
+  );
+}
+
 // Token-based keyboard key-cap (S7).
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
@@ -250,6 +331,7 @@ function ScreeningResultsTable({
   onOverride,
   onRefine,
   refining,
+  onResolveFulltext,
 }: {
   result: ScreeningResult;
   /** Set or clear the human override for the decision at this index in result.decisions. */
@@ -257,11 +339,33 @@ function ScreeningResultsTable({
   /** Re-screen flagged records using the reviewer's verified decisions as calibration. */
   onRefine: () => void;
   refining: boolean;
+  /**
+   * Resolve the open-access full text for the decision at this index, persisting
+   * the result onto the decision. Resolves to the outcome so the row can show a
+   * 404/error state ("ok" means the chip now renders from the updated decision).
+   */
+  onResolveFulltext: (index: number) => Promise<"ok" | "notfound" | "error">;
 }) {
   const [filter, setFilter] = useState<FilterMode>("all");
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("default");
+  // Per-row full-text resolution status, keyed by decision index.
+  const [fulltextState, setFulltextState] = useState<Record<number, FulltextRowState>>({});
+
+  async function handleGetFulltext(index: number) {
+    // Guard against a double-click firing a second request while in-flight.
+    if (fulltextState[index] === "loading") return;
+    setFulltextState((s) => ({ ...s, [index]: "loading" }));
+    const outcome = await onResolveFulltext(index);
+    setFulltextState((s) => {
+      const next = { ...s };
+      // On success the chip renders from the now-populated decision; clear state.
+      if (outcome === "ok") delete next[index];
+      else next[index] = outcome;
+      return next;
+    });
+  }
   // Incremental rendering: with 1 000+ decisions a full render is sluggish.
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   // Keyboard speed mode: position of the active row within the visible list.
@@ -613,6 +717,14 @@ function ScreeningResultsTable({
                         <span className="text-[10px]" style={{ color: "var(--muted)" }}>
                           AI said: {d.decision}
                         </span>
+                      )}
+                      {/* Full-text retrieval on included studies only (Brief 003). */}
+                      {verdict === "include" && (
+                        <FulltextControl
+                          decision={d}
+                          state={fulltextState[idx] ?? "idle"}
+                          onResolve={() => handleGetFulltext(idx)}
+                        />
                       )}
                     </div>
                     {isExpanded && (
@@ -1044,6 +1156,64 @@ export function ScreeningPanel({
   }
 
   // ---------------------------------------------------------------------------
+  // Full-text retrieval (Brief 003): resolve the open-access URL for one
+  // included decision, store the result on the decision, and persist via the
+  // same screening_result blob save as overrides (best-effort). Returns the
+  // outcome so the row can render a 404/error note.
+  // ---------------------------------------------------------------------------
+  async function handleResolveFulltext(index: number): Promise<"ok" | "notfound" | "error"> {
+    const sr = screeningResult;
+    const decision = sr?.decisions[index];
+    if (!sr || !decision) return "error";
+    if (!decision.doi && !decision.pmid) return "notfound";
+
+    try {
+      const res = await fetch("/api/fulltext", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doi: decision.doi, pmid: decision.pmid }),
+      });
+      if (res.status === 404) return "notfound";
+      const data = (await res.json()) as {
+        fulltext?: { url: string; source: FulltextSource };
+        fetched_at?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.fulltext) return "error";
+      const { url, source } = data.fulltext;
+
+      setScreeningResult((prev) => {
+        if (!prev || !prev.decisions[index]) return prev;
+        const decisions = prev.decisions.map((d, i) =>
+          i === index
+            ? {
+                ...d,
+                fulltext_url: url,
+                fulltext_source: source,
+                fulltext_fetched_at: data.fetched_at ?? new Date().toISOString(),
+              }
+            : d,
+        );
+        const updated: ScreeningResult = { ...prev, decisions };
+
+        fetch("/api/screening/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resultId, screeningResult: updated }),
+        }).catch(() => {
+          // Non-fatal: the resolved chip still applies in this session.
+        });
+
+        return updated;
+      });
+
+      return "ok";
+    } catch {
+      return "error";
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
@@ -1257,6 +1427,7 @@ export function ScreeningPanel({
           onOverride={handleOverride}
           onRefine={handleRefine}
           refining={refining}
+          onResolveFulltext={handleResolveFulltext}
         />
       </div>
     );
