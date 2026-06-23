@@ -10,6 +10,9 @@ Read first, in order, and STOP once you have enough (token discipline):
 Read ONLY those wiki pages and the exact code files the brief names. Never sweep the codebase.
 
 Implement exactly ONE scoped stage, in the design-token system (no hardcoded colors).
+If the brief lists multiple items, implement ONLY the first/smallest shippable one and
+note the rest as deferred. A run is INVALID without a handoff — you MUST write
+spec/NNN-handoff.md even for partial work, before you finish.
 GATES before you finish: `npm run lint`, `npm test`, `npm run build` — fix or revert until
 green; never leave the tree broken. Write spec/NNN-handoff.md (increment NNN; APPEND-ONLY —
 never edit an existing handoff) documenting: changes, files touched, behavior, which

@@ -7,7 +7,8 @@ plus spec/briefs/ (existing) and the latest few spec/validation/* (verified vs b
 
 Pick the single highest-value UNBLOCKED stage (skip anything waiting on ops/secrets — note
 the blocker instead). Frontier: full-text retrieval → data extraction → risk-of-bias
-(Otto-SR parity), then meta-analysis and living reviews. Write ONE new spec/briefs/NNN.md
+(Otto-SR parity), then meta-analysis and living reviews. A brief is ONE shippable change — never bundle multiple features (a multi-item brief
+forces a partial dev run). Write ONE new spec/briefs/NNN.md
 (increment NNN) with: goal, why-now, the exact files to touch, scope (in/out), and
 "beat, don't match" acceptance criteria with a measurable bar. Keep it tight.
 
