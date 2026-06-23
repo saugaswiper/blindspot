@@ -52,12 +52,20 @@ function parseArticles(xml: string): ExistingReview[] {
   return articles;
 }
 
-async function esearch(term: string, retmax = 50): Promise<{ count: number; ids: string[] }> {
+async function esearch(
+  term: string,
+  retmax = 50,
+  sort?: string,
+): Promise<{ count: number; ids: string[] }> {
   const url = new URL(`${BASE}/esearch.fcgi`);
   url.searchParams.set("db", "pubmed");
   url.searchParams.set("term", term);
   url.searchParams.set("retmax", String(retmax));
   url.searchParams.set("retmode", "json");
+  // Default (no sort) preserves PubMed's implicit date-sorted order for count
+  // and existing-review callers. "relevance" uses PubMed's Best Match ranking,
+  // needed so comprehensive primary-study retrieval is not date-truncated.
+  if (sort) url.searchParams.set("sort", sort);
   if (API_KEY) url.searchParams.set("api_key", API_KEY);
 
   const res = await fetch(url.toString(), { next: { revalidate: 0 } });
@@ -250,10 +258,14 @@ export async function fetchPrimaryStudiesForScreening(
 export async function fetchPrimaryStudyIds(
   query: string,
   minYear?: number,
-  limit = 200,
+  limit = 2000,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const datePart = minYear ? ` AND ${minYear}:${new Date().getFullYear()}[dp]` : "";
-  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, limit);
+  // Relevance ("Best Match") sort + a high retmax ceiling: the prior 200-record
+  // date-sorted cap excluded older included studies (validation 004: 0% recall on
+  // Mitchell 2012). ESearch retmax supports up to 10 000 in a single call, so the
+  // full result set is retrieved without a pagination loop.
+  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, limit, "relevance");
   // PubMed ESearch returns bare PMIDs; no DOI available without an EFetch round-trip
   return ids.map((pmid) => ({ pmid }));
 }
