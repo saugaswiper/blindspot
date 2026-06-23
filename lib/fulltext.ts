@@ -197,11 +197,68 @@ async function tryPmc(pmid: string): Promise<SourceOutcome> {
 // Orchestrator
 // ---------------------------------------------------------------------------
 
+/** Accumulated outcome of a concurrent source fanout. */
+interface FanoutOutcome {
+  result: FulltextResult | null;
+  paywalled: boolean;
+  errored: boolean;
+}
+
+/**
+ * Race a set of source calls concurrently, resolving with the first OA hit as
+ * soon as it arrives — without waiting for slower misses (AC2 latency fix). If
+ * no source hits, resolves once all have settled, carrying the accumulated
+ * paywall/error signals for reason-code reporting. A thrown source is caught so
+ * one failure never blocks the others; the OA gate (AC4) still applies.
+ */
+function fanout(calls: Array<Promise<SourceOutcome>>): Promise<FanoutOutcome> {
+  return new Promise((resolve) => {
+    let paywalled = false;
+    let errored = false;
+    let remaining = calls.length;
+    let done = false;
+    if (remaining === 0) {
+      resolve({ result: null, paywalled, errored });
+      return;
+    }
+    const settle = () => {
+      remaining -= 1;
+      if (!done && remaining === 0) {
+        done = true;
+        resolve({ result: null, paywalled, errored });
+      }
+    };
+    for (const call of calls) {
+      call.then(
+        (outcome) => {
+          if (done) return;
+          if (outcome.result) {
+            const gated = gate(outcome.result);
+            if (gated) {
+              done = true;
+              resolve({ result: gated, paywalled, errored });
+              return;
+            }
+            paywalled = true; // closed-access slipped past; gate caught it
+          }
+          if (outcome.paywalled) paywalled = true;
+        },
+        () => {
+          if (!done) errored = true;
+        },
+      ).finally(settle);
+    }
+  });
+}
+
 /**
  * Resolve a study's open-access full text through the ranked source chain.
  * Returns the first non-paywalled hit with provenance, or `null` plus a reason
- * code. Sources are tried sequentially in priority order; a thrown source is
- * caught so one failure never blocks the rest of the chain.
+ * code. The two DOI-keyed sources (Unpaywall, OpenAlex) are **raced
+ * concurrently** so chain-fallthrough no longer serially accumulates latency;
+ * the PMID-keyed fallbacks (Europe PMC, PMC) stay sequential and run only if the
+ * DOI fanout returns null — they are cheap, rarely needed, and not worth racing.
+ * A thrown source is caught so one failure never blocks the rest of the chain.
  */
 export async function resolveFulltext(
   doiInput?: string,
@@ -214,22 +271,32 @@ export async function resolveFulltext(
   let paywalled = false;
   let errored = false;
 
-  const chain: Array<() => Promise<SourceOutcome>> = [
-    ...(doi ? [() => tryUnpaywall(doi), () => tryOpenAlex(doi)] : []),
-    ...(pmid ? [() => tryEuropePMC(pmid), () => tryPmc(pmid)] : []),
-  ];
+  // DOI-keyed sources: concurrent fanout, first OA hit wins (AC2).
+  if (doi) {
+    const out = await fanout([tryUnpaywall(doi), tryOpenAlex(doi)]);
+    if (out.result) return { result: out.result };
+    paywalled = paywalled || out.paywalled;
+    errored = errored || out.errored;
+  }
 
-  for (const run of chain) {
-    try {
-      const outcome = await run();
-      if (outcome.result) {
-        const gated = gate(outcome.result);
-        if (gated) return { result: gated };
-        paywalled = true; // closed-access slipped past a source; gate caught it
+  // PMID-keyed fallbacks: sequential, only after the DOI fanout misses.
+  if (pmid) {
+    const fallbacks: Array<() => Promise<SourceOutcome>> = [
+      () => tryEuropePMC(pmid),
+      () => tryPmc(pmid),
+    ];
+    for (const run of fallbacks) {
+      try {
+        const outcome = await run();
+        if (outcome.result) {
+          const gated = gate(outcome.result);
+          if (gated) return { result: gated };
+          paywalled = true; // closed-access slipped past a source; gate caught it
+        }
+        if (outcome.paywalled) paywalled = true;
+      } catch {
+        errored = true;
       }
-      if (outcome.paywalled) paywalled = true;
-    } catch {
-      errored = true;
     }
   }
 
