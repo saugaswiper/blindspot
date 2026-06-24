@@ -261,11 +261,19 @@ export async function fetchPrimaryStudyIds(
   limit = 2000,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const datePart = minYear ? ` AND ${minYear}:${new Date().getFullYear()}[dp]` : "";
-  // Relevance ("Best Match") sort + a high retmax ceiling: the prior 200-record
-  // date-sorted cap excluded older included studies (validation 004: 0% recall on
-  // Mitchell 2012). ESearch retmax supports up to 10 000 in a single call, so the
-  // full result set is retrieved without a pagination loop.
-  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, limit, "relevance");
+  // Exclude systematic reviews with a BINARY `NOT systematic[sb]` (not `AND NOT`).
+  // Validation 005 (F1) proved PubMed's ATM silently drops the NOT from
+  // `... AND NOT systematic[sb]`, translating it to `... AND "systematic"[Filter]`
+  // — so the function returned systematic-review IDs, the exact inverse of intent
+  // (measured: NOT-systematic and systematic sets were 313/313 identical). PubMed
+  // treats NOT as a binary operator; `(topic) NOT systematic[sb]` is respected
+  // (count 313 → 3421 for the Mitchell query) and the included primary studies appear.
+  //
+  // Relevance ("Best Match") sort + a high retmax ceiling: the truth papers sit at
+  // relevance positions ~855–1619, so the 2 000-record ceiling is required to reach
+  // them (validation 005). ESearch retmax supports up to 10 000 in a single call, so
+  // the full result set is retrieved without a pagination loop.
+  const { ids } = await esearch(`(${query}) NOT systematic[sb]${datePart}`, limit, "relevance");
   // PubMed ESearch returns bare PMIDs; no DOI available without an EFetch round-trip
   return ids.map((pmid) => ({ pmid }));
 }
