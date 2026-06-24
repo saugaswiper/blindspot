@@ -121,7 +121,10 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
   }
 
   const datePart = minYear ? ` AND ${minYear}:${new Date().getFullYear()}[dp]` : "";
-  const { count } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, 1);
+  // Exclude systematic reviews with a BINARY `NOT systematic[sb]` (not `AND NOT`).
+  // Validation 005 (F1) proved PubMed's ATM silently drops the NOT from `AND NOT`,
+  // counting SRs instead of excluding them (handoff 106 / validation 006).
+  const { count } = await esearch(`(${query}) NOT systematic[sb]${datePart}`, 1);
 
   // NEW-12: Store in cache if this was an unfiltered query (for reuse next time)
   if (!minYear) {
@@ -231,7 +234,10 @@ export async function fetchPrimaryStudiesForScreening(
   query: string,
   limit = 500,
 ): Promise<ExistingReview[]> {
-  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]`, Math.min(limit, 10000));
+  // Binary `NOT systematic[sb]` (not `AND NOT`): ATM silently drops the NOT from
+  // `AND NOT`, feeding the screening workbench systematic reviews instead of the
+  // primary studies it is supposed to screen (validation 006 F4).
+  const { ids } = await esearch(`(${query}) NOT systematic[sb]`, Math.min(limit, 10000));
   if (ids.length === 0) return [];
 
   // EFetch supports up to 200 IDs per call — batch as needed
@@ -290,7 +296,8 @@ export async function countPrimaryStudiesRecent(query: string, years = 3): Promi
   const minYear = new Date().getFullYear() - years;
   const url = new URL(`${BASE}/esearch.fcgi`);
   url.searchParams.set("db", "pubmed");
-  url.searchParams.set("term", `(${query}) AND NOT systematic[sb]`);
+  // Binary `NOT systematic[sb]` (not `AND NOT`): see countPrimaryStudies (validation 006 F4).
+  url.searchParams.set("term", `(${query}) NOT systematic[sb]`);
   url.searchParams.set("retmax", "1");
   url.searchParams.set("retmode", "json");
   url.searchParams.set("datetype", "pdat");
