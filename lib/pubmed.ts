@@ -121,7 +121,7 @@ export async function countPrimaryStudies(query: string, minYear?: number): Prom
   }
 
   const datePart = minYear ? ` AND ${minYear}:${new Date().getFullYear()}[dp]` : "";
-  const { count } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, 1);
+  const { count } = await esearch(`(${query}) NOT (systematic review[pt] OR meta-analysis[pt])${datePart}`, 1);
 
   // NEW-12: Store in cache if this was an unfiltered query (for reuse next time)
   if (!minYear) {
@@ -231,7 +231,7 @@ export async function fetchPrimaryStudiesForScreening(
   query: string,
   limit = 500,
 ): Promise<ExistingReview[]> {
-  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]`, Math.min(limit, 10000));
+  const { ids } = await esearch(`(${query}) NOT (systematic review[pt] OR meta-analysis[pt])`, Math.min(limit, 10000));
   if (ids.length === 0) return [];
 
   // EFetch supports up to 200 IDs per call — batch as needed
@@ -265,7 +265,7 @@ export async function fetchPrimaryStudyIds(
   // date-sorted cap excluded older included studies (validation 004: 0% recall on
   // Mitchell 2012). ESearch retmax supports up to 10 000 in a single call, so the
   // full result set is retrieved without a pagination loop.
-  const { ids } = await esearch(`(${query}) AND NOT systematic[sb]${datePart}`, limit, "relevance");
+  const { ids } = await esearch(`(${query}) NOT (systematic review[pt] OR meta-analysis[pt])${datePart}`, limit, "relevance");
   // PubMed ESearch returns bare PMIDs; no DOI available without an EFetch round-trip
   return ids.map((pmid) => ({ pmid }));
 }
@@ -282,7 +282,7 @@ export async function countPrimaryStudiesRecent(query: string, years = 3): Promi
   const minYear = new Date().getFullYear() - years;
   const url = new URL(`${BASE}/esearch.fcgi`);
   url.searchParams.set("db", "pubmed");
-  url.searchParams.set("term", `(${query}) AND NOT systematic[sb]`);
+  url.searchParams.set("term", `(${query}) NOT (systematic review[pt] OR meta-analysis[pt])`);
   url.searchParams.set("retmax", "1");
   url.searchParams.set("retmode", "json");
   url.searchParams.set("datetype", "pdat");
