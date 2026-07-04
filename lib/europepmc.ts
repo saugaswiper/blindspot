@@ -113,6 +113,16 @@ export async function countSystematicReviews(query: string): Promise<number> {
  * so its records bridge PubMed PMIDs and OpenAlex/Scopus DOIs — making it the
  * ideal "linker" source for cross-database deduplication.
  *
+ * Europe PMC returns records in date-sorted (newest-first) order by default, so a
+ * single page truncates the retrieval window and misses older studies. Validation
+ * 006 (F3) measured this: with a single 200-record page the 1991–2006 truth papers
+ * for the Mitchell 2012 SR sat in pages 8–10 of a ~2 000-record result set and were
+ * never returned (0/5 recall). We page through the result set with the cursorMark
+ * API — the mechanism the tester confirmed viable (validation 006 probe C2: cursor
+ * advances between pages, no infinite loop) — until `limit` records are collected
+ * or Europe PMC runs out of pages. Default limit mirrors PubMed's 2 000-record
+ * ceiling (handoff 105) so the recall pipeline reaches the full set.
+ *
  * @param query    Review-mode boolean query string
  * @param minYear  Optional publication year floor (ACC-8)
  * @param limit    Maximum records to fetch (Europe PMC supports up to 1 000 per page)
@@ -120,7 +130,7 @@ export async function countSystematicReviews(query: string): Promise<number> {
 export async function fetchPrimaryStudyIds(
   query: string,
   minYear?: number,
-  limit = 200,
+  limit = 2000,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const restricted = withFieldRestriction(query);
   const datePart = minYear
@@ -128,19 +138,42 @@ export async function fetchPrimaryStudyIds(
     : "";
   const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
-  const url = new URL(`${BASE}/search`);
-  url.searchParams.set("query", primaryQuery);
-  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
-  url.searchParams.set("resultType", "lite");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+  const pageSize = Math.min(limit, 1000);
+  const records: Array<{ pmid?: string; doi?: string }> = [];
+  // Europe PMC's cursor paging starts at the sentinel "*"; each response returns
+  // the cursor for the next page in `nextCursorMark`.
+  let cursorMark = "*";
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+  while (records.length < limit) {
+    const url = new URL(`${BASE}/search`);
+    url.searchParams.set("query", primaryQuery);
+    // "lite" result type returns just the bibliographic fields (including PMID + DOI)
+    url.searchParams.set("resultType", "lite");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("pageSize", String(pageSize));
+    url.searchParams.set("cursorMark", cursorMark);
 
-  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
-  return (data.resultList?.result ?? []).map((r) => ({
-    pmid: r.pmid || undefined,
-    doi: r.doi?.toLowerCase() || undefined,
-  }));
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+    const data = (await res.json()) as {
+      resultList?: { result?: EuropePMCArticle[] };
+      nextCursorMark?: string;
+    };
+    const page = data.resultList?.result ?? [];
+    for (const r of page) {
+      records.push({
+        pmid: r.pmid || undefined,
+        doi: r.doi?.toLowerCase() || undefined,
+      });
+    }
+
+    // Stop when the page is empty, the API omits a next cursor, or the cursor does
+    // not advance (last page) — any of these signals the result set is exhausted.
+    const nextCursorMark = data.nextCursorMark;
+    if (page.length === 0 || !nextCursorMark || nextCursorMark === cursorMark) break;
+    cursorMark = nextCursorMark;
+  }
+
+  return records.slice(0, limit);
 }
