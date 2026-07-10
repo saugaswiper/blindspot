@@ -115,7 +115,8 @@ export async function countSystematicReviews(query: string): Promise<number> {
  *
  * @param query    Review-mode boolean query string
  * @param minYear  Optional publication year floor (ACC-8)
- * @param limit    Maximum records to fetch (Europe PMC supports up to 1 000 per page)
+ * @param limit    Maximum records to fetch; paginated via cursorMark in 1 000-record
+ *                 pages (Europe PMC's per-page cap) until `limit` is reached (F3)
  */
 export async function fetchPrimaryStudyIds(
   query: string,
@@ -128,19 +129,46 @@ export async function fetchPrimaryStudyIds(
     : "";
   const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
-  const url = new URL(`${BASE}/search`);
-  url.searchParams.set("query", primaryQuery);
-  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
-  url.searchParams.set("resultType", "lite");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+  // Europe PMC caps a single page at 1 000 records, so the prior single-page fetch
+  // truncated any larger result set. Validation 006 (F3) measured this: a 200-record
+  // page returned 185 of 1 994 matches, and the date-sorted 1991–2006 truth papers sit
+  // in the tail (positions ~1 400–1 994), so they were never retrieved. Walk the
+  // cursorMark pagination API to collect up to `limit` records across pages.
+  const PAGE_SIZE = Math.min(limit, 1000);
+  const results: Array<{ pmid?: string; doi?: string }> = [];
+  let cursorMark = "*";
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+  while (results.length < limit) {
+    const url = new URL(`${BASE}/search`);
+    url.searchParams.set("query", primaryQuery);
+    // "lite" result type returns just the bibliographic fields (including PMID + DOI)
+    url.searchParams.set("resultType", "lite");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("pageSize", String(PAGE_SIZE));
+    url.searchParams.set("cursorMark", cursorMark);
 
-  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
-  return (data.resultList?.result ?? []).map((r) => ({
-    pmid: r.pmid || undefined,
-    doi: r.doi?.toLowerCase() || undefined,
-  }));
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+    const data = (await res.json()) as {
+      nextCursorMark?: string;
+      resultList?: { result?: EuropePMCArticle[] };
+    };
+    const page = data.resultList?.result ?? [];
+    for (const r of page) {
+      results.push({
+        pmid: r.pmid || undefined,
+        doi: r.doi?.toLowerCase() || undefined,
+      });
+    }
+
+    // Stop when the result set is exhausted. Europe PMC signals this by returning a
+    // short/empty page or by not advancing the cursor; guarding on both prevents an
+    // infinite loop when nextCursorMark is absent or repeats the current mark.
+    const next = data.nextCursorMark;
+    if (page.length === 0 || !next || next === cursorMark) break;
+    cursorMark = next;
+  }
+
+  return results.slice(0, limit);
 }
