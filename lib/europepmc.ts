@@ -128,19 +128,44 @@ export async function fetchPrimaryStudyIds(
     : "";
   const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
-  const url = new URL(`${BASE}/search`);
-  url.searchParams.set("query", primaryQuery);
-  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
-  url.searchParams.set("resultType", "lite");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+  // EuropePMC caps pageSize at 1000, so a single page cannot reach truth papers that
+  // sit deep in a large, date-sorted result set (validation 006 F3: production 185
+  // records → 0/5 recall; the 1991–2006 papers live in pages 8–10 of ~1994 records).
+  // Page through the set with the cursorMark API: cursorMark=* starts the cursor and
+  // each response returns nextCursorMark for the following page. Stop when we have
+  // `limit` records, the page is short (end of results), or the cursor stops advancing
+  // — the last two guards prevent an infinite loop. For limit ≤ one page (e.g. the
+  // production dedup path's 200), this makes exactly one request, preserving prior behavior.
+  const pageSize = Math.min(limit, 1000);
+  const results: Array<{ pmid?: string; doi?: string }> = [];
+  let cursorMark = "*";
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+  while (results.length < limit) {
+    const url = new URL(`${BASE}/search`);
+    url.searchParams.set("query", primaryQuery);
+    // "lite" result type returns just the bibliographic fields (including PMID + DOI)
+    url.searchParams.set("resultType", "lite");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("pageSize", String(pageSize));
+    url.searchParams.set("cursorMark", cursorMark);
 
-  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
-  return (data.resultList?.result ?? []).map((r) => ({
-    pmid: r.pmid || undefined,
-    doi: r.doi?.toLowerCase() || undefined,
-  }));
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+    const data = (await res.json()) as {
+      nextCursorMark?: string;
+      resultList?: { result?: EuropePMCArticle[] };
+    };
+    const page = data.resultList?.result ?? [];
+    for (const r of page) {
+      results.push({ pmid: r.pmid || undefined, doi: r.doi?.toLowerCase() || undefined });
+    }
+
+    const next = data.nextCursorMark;
+    // A short page or a non-advancing/absent cursor means we've reached the end.
+    if (page.length < pageSize || !next || next === cursorMark) break;
+    cursorMark = next;
+  }
+
+  return results.slice(0, limit);
 }
