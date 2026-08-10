@@ -37,6 +37,9 @@ interface EuropePMCResponse {
   resultList: {
     result: EuropePMCArticle[];
   };
+  // Deep-pagination token. Present on the /search endpoint; a request with
+  // cursorMark="*" returns the first page plus the nextCursorMark for page 2.
+  nextCursorMark?: string;
 }
 
 async function search(query: string, reviewsOnly: boolean, pageSize = 25): Promise<EuropePMCResponse> {
@@ -113,14 +116,22 @@ export async function countSystematicReviews(query: string): Promise<number> {
  * so its records bridge PubMed PMIDs and OpenAlex/Scopus DOIs — making it the
  * ideal "linker" source for cross-database deduplication.
  *
+ * Uses Europe PMC's cursorMark deep-pagination to retrieve the full result set
+ * up to `limit`, rather than a single truncated page. Validation 004/005/006
+ * (Mitchell 2012 truth set) measured 0/5 recall on the old single-page,
+ * 200-record path: the query returns ~1 994 records and the older truth papers
+ * sit beyond the first page, so they were never fetched. cursorMark paging
+ * (verified viable in validation 006 probe C2 — nextCursorMark advances, no
+ * infinite loop) recovers the complete set.
+ *
  * @param query    Review-mode boolean query string
  * @param minYear  Optional publication year floor (ACC-8)
- * @param limit    Maximum records to fetch (Europe PMC supports up to 1 000 per page)
+ * @param limit    Maximum records to fetch across all pages (brief 005: ceiling 2 000)
  */
 export async function fetchPrimaryStudyIds(
   query: string,
   minYear?: number,
-  limit = 200,
+  limit = 2000,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const restricted = withFieldRestriction(query);
   const datePart = minYear
@@ -128,19 +139,40 @@ export async function fetchPrimaryStudyIds(
     : "";
   const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
-  const url = new URL(`${BASE}/search`);
-  url.searchParams.set("query", primaryQuery);
-  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
-  url.searchParams.set("resultType", "lite");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+  const results: Array<{ pmid?: string; doi?: string }> = [];
+  let cursorMark = "*";
+  // Safety cap on iterations so a misbehaving cursor can never loop forever;
+  // at 1 000 records/page a 2 000-record ceiling needs 2 pages, so a handful of
+  // extra iterations is ample slack for short pages.
+  const maxPages = Math.ceil(limit / 1000) + 3;
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+  for (let page = 0; page < maxPages && results.length < limit; page++) {
+    const url = new URL(`${BASE}/search`);
+    url.searchParams.set("query", primaryQuery);
+    // "lite" result type returns just the bibliographic fields (including PMID + DOI)
+    url.searchParams.set("resultType", "lite");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("pageSize", String(Math.min(limit - results.length, 1000)));
+    url.searchParams.set("cursorMark", cursorMark);
 
-  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
-  return (data.resultList?.result ?? []).map((r) => ({
-    pmid: r.pmid || undefined,
-    doi: r.doi?.toLowerCase() || undefined,
-  }));
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+    const data = (await res.json()) as EuropePMCResponse;
+    const pageResults = data.resultList?.result ?? [];
+    for (const r of pageResults) {
+      results.push({
+        pmid: r.pmid || undefined,
+        doi: r.doi?.toLowerCase() || undefined,
+      });
+    }
+
+    // Stop when the page is empty (no more records) or the cursor did not
+    // advance (Europe PMC echoes the same nextCursorMark on the final page).
+    const next = data.nextCursorMark;
+    if (pageResults.length === 0 || !next || next === cursorMark) break;
+    cursorMark = next;
+  }
+
+  return results.slice(0, limit);
 }
