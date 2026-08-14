@@ -37,6 +37,9 @@ interface EuropePMCResponse {
   resultList: {
     result: EuropePMCArticle[];
   };
+  // Cursor token for deep pagination: each search response returns the cursor to
+  // pass as `cursorMark` on the next request (see fetchPrimaryStudyIds).
+  nextCursorMark?: string;
 }
 
 async function search(query: string, reviewsOnly: boolean, pageSize = 25): Promise<EuropePMCResponse> {
@@ -113,14 +116,20 @@ export async function countSystematicReviews(query: string): Promise<number> {
  * so its records bridge PubMed PMIDs and OpenAlex/Scopus DOIs — making it the
  * ideal "linker" source for cross-database deduplication.
  *
+ * Recall fix (brief 005 / validation 006 F3): retrieval is RELEVANCE-sorted and
+ * paginated via Europe PMC's `cursorMark` so topically-relevant records surface
+ * first and the full result window (up to `limit`) is walked, rather than the
+ * old date-sorted single page of 200 that buried truth papers past position 200.
+ *
  * @param query    Review-mode boolean query string
  * @param minYear  Optional publication year floor (ACC-8)
- * @param limit    Maximum records to fetch (Europe PMC supports up to 1 000 per page)
+ * @param limit    Maximum records to fetch (Europe PMC caps a page at 1 000, so
+ *                 anything above 1 000 is fetched across multiple cursor pages)
  */
 export async function fetchPrimaryStudyIds(
   query: string,
   minYear?: number,
-  limit = 200,
+  limit = 2000,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const restricted = withFieldRestriction(query);
   const datePart = minYear
@@ -128,19 +137,43 @@ export async function fetchPrimaryStudyIds(
     : "";
   const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
-  const url = new URL(`${BASE}/search`);
-  url.searchParams.set("query", primaryQuery);
-  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
-  url.searchParams.set("resultType", "lite");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+  // Europe PMC caps a single page at 1 000 records. Walk the cursor until we
+  // reach the ceiling or run out of results. The first request uses the reserved
+  // cursor "*"; each response carries `nextCursorMark` for the following page.
+  const PAGE_SIZE = 1000;
+  const collected: Array<{ pmid?: string; doi?: string }> = [];
+  let cursorMark = "*";
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+  while (collected.length < limit) {
+    const pageSize = Math.min(PAGE_SIZE, limit - collected.length);
 
-  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
-  return (data.resultList?.result ?? []).map((r) => ({
-    pmid: r.pmid || undefined,
-    doi: r.doi?.toLowerCase() || undefined,
-  }));
+    const url = new URL(`${BASE}/search`);
+    url.searchParams.set("query", primaryQuery);
+    // "lite" result type returns just the bibliographic fields (including PMID + DOI)
+    url.searchParams.set("resultType", "lite");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("sort", "RELEVANCE");
+    url.searchParams.set("pageSize", String(pageSize));
+    url.searchParams.set("cursorMark", cursorMark);
+
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+    const data = (await res.json()) as EuropePMCResponse;
+    const results = data.resultList?.result ?? [];
+    for (const r of results) {
+      collected.push({
+        pmid: r.pmid || undefined,
+        doi: r.doi?.toLowerCase() || undefined,
+      });
+    }
+
+    // Stop at the end of results: a short/empty page, or a cursor that did not
+    // advance (Europe PMC returns the same cursor once the set is exhausted).
+    const next = data.nextCursorMark;
+    if (results.length < pageSize || !next || next === cursorMark) break;
+    cursorMark = next;
+  }
+
+  return collected.slice(0, limit);
 }
