@@ -34,6 +34,9 @@ interface EuropePMCArticle {
 
 interface EuropePMCResponse {
   hitCount: number;
+  // Cursor token for deep pagination. Present on `/search` responses; echo it
+  // back as `cursorMark` on the next request to page past the first 1 000 hits.
+  nextCursorMark?: string;
   resultList: {
     result: EuropePMCArticle[];
   };
@@ -113,14 +116,24 @@ export async function countSystematicReviews(query: string): Promise<number> {
  * so its records bridge PubMed PMIDs and OpenAlex/Scopus DOIs — making it the
  * ideal "linker" source for cross-database deduplication.
  *
+ * Retrieval is relevance-sorted and cursor-paginated up to `limit` records:
+ * Europe PMC caps a single page at 1 000 hits, so a topic with more primary
+ * studies than that (e.g. the Mitchell 2012 CBT-insomnia set has ~1 994) needs
+ * multiple round-trips. The old single 200-record page date-truncated the result
+ * set and dropped older truth papers — validation 006 F3 measured 0/5 recall
+ * from this source. Walking the full result set via `cursorMark` recovers them.
+ *
  * @param query    Review-mode boolean query string
  * @param minYear  Optional publication year floor (ACC-8)
- * @param limit    Maximum records to fetch (Europe PMC supports up to 1 000 per page)
+ * @param limit    Maximum records to fetch across all pages (Europe PMC caps a
+ *                 single page at 1 000, so >1 000 spans multiple cursor requests)
  */
+const EPMC_PAGE_SIZE = 1000; // Europe PMC hard maximum records per page
+
 export async function fetchPrimaryStudyIds(
   query: string,
   minYear?: number,
-  limit = 200,
+  limit = 2000,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const restricted = withFieldRestriction(query);
   const datePart = minYear
@@ -128,19 +141,44 @@ export async function fetchPrimaryStudyIds(
     : "";
   const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
-  const url = new URL(`${BASE}/search`);
-  url.searchParams.set("query", primaryQuery);
-  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
-  url.searchParams.set("resultType", "lite");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+  const collected: Array<{ pmid?: string; doi?: string }> = [];
+  let cursorMark = "*";
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+  while (collected.length < limit) {
+    const url = new URL(`${BASE}/search`);
+    url.searchParams.set("query", primaryQuery);
+    // "lite" result type returns just the bibliographic fields (including PMID + DOI)
+    url.searchParams.set("resultType", "lite");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("sort", "RELEVANCE");
+    url.searchParams.set("pageSize", String(Math.min(EPMC_PAGE_SIZE, limit - collected.length)));
+    url.searchParams.set("cursorMark", cursorMark);
 
-  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
-  return (data.resultList?.result ?? []).map((r) => ({
-    pmid: r.pmid || undefined,
-    doi: r.doi?.toLowerCase() || undefined,
-  }));
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+    const data = (await res.json()) as EuropePMCResponse;
+    const results = data.resultList?.result ?? [];
+    for (const r of results) {
+      collected.push({
+        pmid: r.pmid || undefined,
+        doi: r.doi?.toLowerCase() || undefined,
+      });
+    }
+
+    // Stop when the page is empty, we've pulled every hit Europe PMC reports, or
+    // the cursor stops advancing (guards against an unexpected non-terminating loop).
+    const next = data.nextCursorMark;
+    if (
+      results.length === 0 ||
+      collected.length >= (data.hitCount ?? collected.length) ||
+      !next ||
+      next === cursorMark
+    ) {
+      break;
+    }
+    cursorMark = next;
+  }
+
+  return collected.slice(0, limit);
 }
