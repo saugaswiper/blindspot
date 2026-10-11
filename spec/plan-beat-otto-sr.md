@@ -80,6 +80,10 @@ Otto-SR's 93.1% is the headline number. We beat it on trust, by having no falsel
 - PMC/EuropePMC JATS XML first. It has structured tables and no PDF parsing errors.
 - PDF second, as text layer plus layout.
 - Store the pages so check 1 ("the number appears on this page") has something to match against.
+- **OCR fallback for scanned PDFs or ones with a broken text layer: `baidu/Unlimited-OCR`** (MIT licence, 3B MoE, outputs markdown with HTML tables plus bounding boxes; served with vLLM on a separate GPU worker, because Vercel can't host it). Rules:
+  - The PDF's own text layer or the JATS XML always wins. OCR runs only when the text layer is missing or garbled.
+  - A value whose *only* evidence is OCR output is capped at `check`, never `verified`. OCR is model-generated text, so a misread digit would otherwise pass check 1 as if it were in the source.
+  - Use the OCR bounding boxes to locate each value on the page for the cropped-evidence UI (brief 016), even when the text layer supplied the value.
 
 **Brief 009 — Extraction with the 4-check gate** (already written). Backend only.
 
