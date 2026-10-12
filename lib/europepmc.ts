@@ -37,6 +37,9 @@ interface EuropePMCResponse {
   resultList: {
     result: EuropePMCArticle[];
   };
+  // Top-level pagination cursor returned by the REST search endpoint; present when
+  // cursorMark is supplied. Confirmed by validation 006 Probe C2 (not nested in resultList).
+  nextCursorMark?: string;
 }
 
 async function search(query: string, reviewsOnly: boolean, pageSize = 25): Promise<EuropePMCResponse> {
@@ -113,14 +116,22 @@ export async function countSystematicReviews(query: string): Promise<number> {
  * so its records bridge PubMed PMIDs and OpenAlex/Scopus DOIs — making it the
  * ideal "linker" source for cross-database deduplication.
  *
+ * EuropePMC's single-page window is date-sorted, so a one-shot fetch silently drops
+ * every record beyond the first page. For a 1 994-hit query that meant only ~185 of
+ * ~2 000 records were ever seen, excluding older relevant RCTs from the union
+ * (validation 006 F3: EPMC recall was 0/5 purely from this truncation). We instead
+ * paginate with `cursorMark` up to the ceiling so the full result set contributes.
+ *
  * @param query    Review-mode boolean query string
  * @param minYear  Optional publication year floor (ACC-8)
- * @param limit    Maximum records to fetch (Europe PMC supports up to 1 000 per page)
+ * @param limit    Maximum records to fetch, capped at 2 000 (matches PubMed/OpenAlex
+ *                 ceilings). Default 2 000 so a bare call retrieves full depth; the
+ *                 search route passes an explicit lower limit for its sampled union.
  */
 export async function fetchPrimaryStudyIds(
   query: string,
   minYear?: number,
-  limit = 200,
+  limit = 2000,
 ): Promise<Array<{ pmid?: string; doi?: string }>> {
   const restricted = withFieldRestriction(query);
   const datePart = minYear
@@ -128,19 +139,42 @@ export async function fetchPrimaryStudyIds(
     : "";
   const primaryQuery = `${restricted} NOT PUB_TYPE:"Systematic Review" NOT PUB_TYPE:"Meta-Analysis"${datePart}`;
 
-  const url = new URL(`${BASE}/search`);
-  url.searchParams.set("query", primaryQuery);
-  // "lite" result type returns just the bibliographic fields (including PMID + DOI)
-  url.searchParams.set("resultType", "lite");
-  url.searchParams.set("format", "json");
-  url.searchParams.set("pageSize", String(Math.min(limit, 1000)));
+  // Paginate with cursorMark. No sort param — sort=RELEVANCE is deprecated and returns
+  // zero results (validation 005 F5); default date sort with full pagination retrieves
+  // every record regardless of position.
+  const ceiling = Math.min(limit, 2000);
+  const pageSize = 200;
+  const collected: Array<{ pmid?: string; doi?: string }> = [];
+  let cursor = "*";
 
-  const res = await fetch(url.toString(), { next: { revalidate: 0 } });
-  if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+  while (collected.length < ceiling) {
+    const url = new URL(`${BASE}/search`);
+    url.searchParams.set("query", primaryQuery);
+    // "lite" result type returns the bibliographic fields (including PMID + DOI) this
+    // function needs for cross-database deduplication; "idlist" would omit the DOI.
+    url.searchParams.set("resultType", "lite");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("pageSize", String(pageSize));
+    url.searchParams.set("cursorMark", cursor);
 
-  const data = (await res.json()) as { resultList?: { result?: EuropePMCArticle[] } };
-  return (data.resultList?.result ?? []).map((r) => ({
-    pmid: r.pmid || undefined,
-    doi: r.doi?.toLowerCase() || undefined,
-  }));
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) throw new ApiError(`Europe PMC ID fetch failed: ${res.status}`, 502);
+
+    const data = (await res.json()) as EuropePMCResponse;
+    const page = data.resultList?.result ?? [];
+    for (const r of page) {
+      if (collected.length >= ceiling) break;
+      collected.push({
+        pmid: r.pmid || undefined,
+        doi: r.doi?.toLowerCase() || undefined,
+      });
+    }
+
+    // End of results: no cursor, cursor unchanged (API signals the last page), or empty page.
+    const next = data.nextCursorMark;
+    if (!next || next === cursor || page.length === 0) break;
+    cursor = next;
+  }
+
+  return collected;
 }
