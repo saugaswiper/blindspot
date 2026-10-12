@@ -33,6 +33,23 @@ run_claude() {  # $1 = working dir
 
 echo "[$(date)] start $ROLE ($MODEL)" >>"$LOG"
 
+# Always start from the latest main, so runs never redo work that's already merged.
+cd "$CODE" || exit 1
+git checkout -q main >>"$LOG" 2>&1
+git fetch -q --prune origin >>"$LOG" 2>&1
+git pull -q --ff-only origin main >>"$LOG" 2>&1
+
+# Gate: build roles wait for the human to review their previous output. Without this,
+# an unattended loop re-implements the same brief every day (seen Jul-Aug 2026: 13
+# duplicate dev branches for brief 008).
+if [ "$ROLE" != "librarian" ]; then
+  PENDING=$(git branch -r --no-merged origin/main 2>/dev/null | grep -c "origin/loop/$ROLE-")
+  if [ "$PENDING" -gt 0 ]; then
+    echo "[$(date)] $ROLE: $PENDING unmerged loop/$ROLE branch(es) awaiting review — skipping. Merge or delete them first." >>"$LOG"
+    exit 0
+  fi
+fi
+
 if [ "$ROLE" = "librarian" ]; then
   run_claude "$WIKI"
   cd "$WIKI"

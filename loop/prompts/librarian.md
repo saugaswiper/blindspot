@@ -18,3 +18,6 @@ passed; else keep it `claimed`. Code wins over wiki on facts. Append one
 "## [YYYY-MM-DD] type | title" entry to log.md and a row to Meta/Handoff Log.md.
 
 Rules: never edit anything outside "./blindspot wiki/"; never run the app; keep edits tight.
+Only ingest reports that exist on the code repo's `main` (the runner checks out main before you
+start). NEVER record a handoff as "shipped" unless its file is on main — reports on unmerged
+`loop/*` branches are unreviewed work, not shipped work.
