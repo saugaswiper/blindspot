@@ -474,6 +474,62 @@ export type ExtractionFailureCode =
   | "n_exceeds_randomised"
   | "out_of_range";
 
+/**
+ * Where in the source a value was read from — enough for a later UI to show the
+ * cropped evidence strip (Cochrane Ch 5 §5.7: capture the verbatim location).
+ */
+export interface ExtractionProvenance {
+  /** 1-based page the value was read from. */
+  page?: number;
+  /** The verbatim text strip the number was read from. */
+  source_text?: string;
+  /** A within-page locator (e.g. "Table 2, row 3" / "Figure 1"). */
+  locator?: string;
+}
+
+/**
+ * One extracted numeric datum with its verification disposition and provenance.
+ * `value` is the reading the two passes agreed on (or a single pass's reading
+ * when only one found it); it is NEVER an average of two disagreeing passes
+ * (AC4). `status` is `verified` only when all four checks passed. Source-reported
+ * values are kept as-is — `calculated` is always false here, because extraction
+ * performs no SE→SD / endpoint→change conversion (Cochrane §5.2.3).
+ */
+export interface ExtractedValue {
+  /** The target outcome id — row identity, so decisions survive re-extraction. */
+  target_id: string;
+  /** Human label of the outcome. */
+  label: string;
+  /** The agreed value, or null when no pass could read it. */
+  value: number | null;
+  /** Verification disposition. `verified` requires all four checks to pass. */
+  status: ExtractionStatus;
+  /** The primary failure code when `status` is not `verified`. */
+  failure_code?: ExtractionFailureCode;
+  /** Every failure code that fired (source-presence, conflict, consistency, range). */
+  failure_codes?: ExtractionFailureCode[];
+  /** Where the value came from; non-null for any value a pass actually read. */
+  provenance?: ExtractionProvenance;
+  /** Always false here — extraction stores reported values, never conversions. */
+  calculated: boolean;
+  /** Human-readable explanation for the check/manual queue and the audit log. */
+  detail?: string;
+}
+
+/**
+ * The result of an extraction run over a set of targets. `method` is an explicit
+ * RAISE disclosure: these are two differently-framed passes of ONE model, which
+ * is AI-assisted extraction, NOT the dual-independent (two-human) extraction of
+ * Cochrane §5.5.2 — the two must never be conflated.
+ */
+export interface ExtractionResult {
+  values: ExtractedValue[];
+  /** Counts by status, for a summary view. */
+  summary: Record<ExtractionStatus, number>;
+  /** Disclosure of the extraction method (not dual-independent extraction). */
+  method: "ai-assisted-two-pass";
+}
+
 /** Full screening run result stored on the search_result row. */
 export interface ScreeningResult {
   /** The approved criteria used for this screening run. */
