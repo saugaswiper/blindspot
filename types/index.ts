@@ -431,6 +431,49 @@ export interface FulltextResult {
   content_type: FulltextContentType;
 }
 
+// ---------------------------------------------------------------------------
+// Data extraction (Brief 009) — verification core
+//
+// Shared status + failure-code vocabulary for the extraction-verification
+// pipeline. A value is `verified` ONLY when all four independent checks pass
+// (source-presence, two-pass agreement, internal consistency, range). Anything
+// that fails a check is `check` (a human reads it); anything the tool refuses
+// to attempt is `manual`. `human` marks a value a reviewer has signed off on
+// (never auto-promoted to `verified`); `author_contact` marks a datum that can
+// only be obtained from the authors (e.g. values that live in a figure).
+// This slice ships the pure consistency/range checks (`lib/extraction-checks`);
+// the two-pass extractor + API route are a follow-on.
+// ---------------------------------------------------------------------------
+
+/** Disposition of an extracted numeric datum. See section header. */
+export type ExtractionStatus =
+  | "verified"
+  | "check"
+  | "manual"
+  | "human"
+  | "author_contact";
+
+/**
+ * Why a value failed one of the four checks. These are distinct on purpose:
+ * `not_in_source` (the number appears nowhere in the resolved text) is a
+ * *fabrication*, whereas `wrong_page` (it appears, but on a different page than
+ * cited) is a *mis-citation* — the field report (§4.1) treats these as
+ * different severities. Consistency codes name the exact Cochrane Ch 6 relation
+ * that did not hold; `out_of_range` is the instrument range check (Ch 6 range).
+ */
+export type ExtractionFailureCode =
+  | "not_in_source"
+  | "wrong_page"
+  | "spelled_out"
+  | "conflict"
+  | "inconsistent_se_ci"
+  | "inconsistent_sd_se"
+  | "inconsistent_proportion"
+  | "mean_outside_ci"
+  | "ci_order"
+  | "n_exceeds_randomised"
+  | "out_of_range";
+
 /** Full screening run result stored on the search_result row. */
 export interface ScreeningResult {
   /** The approved criteria used for this screening run. */
