@@ -29,7 +29,7 @@ const live = process.env.LIVE === "1";
 
 async function truth(doi: string) {
   const r = await fetch(`${BASE}/search?query=${encodeURIComponent(`DOI:"${doi}"`)}&format=json&resultType=core&pageSize=1`);
-  const rec = ((await r.json()) as any).resultList?.result?.[0] ?? {};
+  const rec = ((await r.json()) as { resultList?: { result?: Record<string, unknown>[] } }).resultList?.result?.[0] ?? {};
   return {
     pmid: rec.pmid as string | undefined, pmcid: rec.pmcid as string | undefined,
     isOpenAccess: rec.isOpenAccess === "Y", inEPMC: rec.inEPMC === "Y",
@@ -48,10 +48,10 @@ function abstractNumbers(a: string): number[] {
 
 describe.skipIf(!live)("011 live Europe PMC XML-first", () => {
   it("measures XML-path outcomes vs Europe PMC OA flags + abstract numbers", async () => {
-    const rows: any[] = [];
+    const rows: Record<string, unknown>[] = [];
     for (const doi of DOIS) {
       const t = await truth(doi);
-      const noResolve = (async () => ({ result: null })) as any;
+      const noResolve = (async () => ({ result: null })) as unknown as NonNullable<Parameters<typeof fetchPagesForIdentifier>[1]>["resolve"];
       const byDoi = await fetchPagesForIdentifier({ doi }, { resolve: noResolve, fetchImpl: fetch });
       const byPmid = t.pmid ? await fetchPagesForIdentifier({ pmid: t.pmid }, { resolve: noResolve, fetchImpl: fetch }) : null;
       const nums = abstractNumbers(t.abstract);
@@ -67,7 +67,7 @@ describe.skipIf(!live)("011 live Europe PMC XML-first", () => {
         doi, ...t, abstract: undefined, abstractNums: nums.length,
         doiOk: byDoi.ok, doiReason: byDoi.ok ? null : byDoi.reason,
         units: byDoi.ok ? byDoi.pages.length : 0,
-        locators: byDoi.ok ? byDoi.pages.map((p: any) => p.locator).filter(Boolean).slice(0, 12) : [],
+        locators: byDoi.ok ? byDoi.pages.map((p) => (p as { locator?: string }).locator).filter(Boolean).slice(0, 12) : [],
         pmidOk: byPmid?.ok ?? null, abstractNumsFoundInXml: hit, controlFalsePass: fab,
       });
     }
