@@ -62,7 +62,7 @@ async function run(path: string) {
   fd.set("file", new File([readFileSync(path)], "x.pdf", { type: "application/pdf" }));
   fd.set("targets", JSON.stringify(T.map(({ id, label }) => ({ id, label, instrument: id === "abs1" ? undefined : "MADRS" }))));
   const res = await POST(new Request("http://x/api/extract", { method: "POST", body: fd }));
-  return { status: res.status, body: (await res.json()) as any };
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 }
 const RUNS: [string, string][] = [["full1", FULL], ["full2", FULL], ["full3", FULL], ["abl1", ABLATED], ["abl2", ABLATED], ["abl3", ABLATED]];
 describe.skipIf(!live)("013B live", () => {

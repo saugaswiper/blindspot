@@ -15,3 +15,6 @@ and which wiki claims should flip `claimed`→`verified` (or are contradicted).
 
 Rules: only write under spec/validation/; never edit app code or the wiki; never commit/push.
 A failing/uncertain result is valuable — report it with numbers; never massage it.
+
+Harness code you commit (spec/validation/*.ts) must pass `npm run lint` with 0 errors — no `any`
+(use `unknown` or a precise type). Run `npm run lint` before you finish.
