@@ -29,7 +29,7 @@ export interface ModelReply {
   /** True when the model stopped on its output limit (reply may be cut off). */
   truncated: boolean;
 }
-export type ModelCaller = (system: string, user: string) => Promise<ModelReply>;
+export type ModelCaller = (system: string, user: string, signal?: AbortSignal) => Promise<ModelReply>;
 
 export type PassFraming = "transcriber" | "hunter";
 
@@ -102,9 +102,17 @@ export function parseReply(reply: ModelReply): PassCandidate {
 }
 
 /** Build one framed pass around an injected model caller. */
-export function createModelPass(framing: PassFraming, call: ModelCaller): ExtractionPass {
-  return async (pages, target) =>
-    parseReply(await call(FRAMING_SYSTEM[framing], buildUserPrompt(pages, target)));
+export function createModelPass(
+  framing: PassFraming,
+  call: ModelCaller,
+  deadline?: number,
+): ExtractionPass {
+  return async (pages, target) => {
+    // Hard request budget: abort an in-flight call at the deadline, not after it.
+    const signal =
+      deadline === undefined ? undefined : AbortSignal.timeout(Math.max(0, deadline - Date.now()));
+    return parseReply(await call(FRAMING_SYSTEM[framing], buildUserPrompt(pages, target), signal));
+  };
 }
 
 const GEMINI_URL =
@@ -132,7 +140,7 @@ function isTimeout(e: unknown): boolean {
  * `AbortSignal.timeout`, with at most one retry after a short backoff.
  * Throws `ModelTimeoutError` if both attempts time out.
  */
-export const callGeminiExtraction: ModelCaller = async (system, user) => {
+export const callGeminiExtraction: ModelCaller = async (system, user, deadlineSignal) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new ApiError("Gemini API key not configured", 500);
   const init = {
@@ -151,7 +159,10 @@ export const callGeminiExtraction: ModelCaller = async (system, user) => {
     error?: { message: string };
   };
   const attempt = async (): Promise<{ res: Response; data: GeminiBody }> => {
-    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, { ...init, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) });
+    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, { ...init, signal: deadlineSignal
+        ? AbortSignal.any([AbortSignal.timeout(GEMINI_TIMEOUT_MS), deadlineSignal])
+        : AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    });
     const data = (await res.json()) as GeminiBody;
     return { res, data };
   };
@@ -160,6 +171,8 @@ export const callGeminiExtraction: ModelCaller = async (system, user) => {
     out = await attempt();
   } catch (e) {
     if (!isTimeout(e)) throw e;
+    // Budget exhausted: no retry.
+    if (deadlineSignal?.aborted) throw new ModelTimeoutError();
     await new Promise((r) => setTimeout(r, GEMINI_RETRY_BACKOFF_MS));
     try {
       out = await attempt();
