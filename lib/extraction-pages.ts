@@ -9,6 +9,8 @@
 export interface TextPage {
   page: number;
   text: string;
+  /** Human-readable origin (e.g. "Table 2"); set for XML-derived units, absent for PDF pages. */
+  locator?: string;
 }
 
 export function splitIntoPages(raw: string): TextPage[] {
