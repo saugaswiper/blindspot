@@ -8,7 +8,7 @@
  * - 200 → { result: ExtractionResult, method, disclosure, extracted_at }
  * - 400 → { error: string }  (malformed body)
  *
- * Stateless: no auth and no DB write. Page text is supplied by the caller
+ * Requires a signed-in user (it spends Gemini quota). No DB write. Page text is supplied by the caller
  * because there is no PDF → text-layer step yet (deferred). The two passes are
  * AI-assisted, NOT dual-independent extraction (Cochrane §5.5.2) — disclosed.
  */
@@ -16,6 +16,7 @@
 import { extractOutcomesAsync } from "@/lib/extraction";
 import { createModelPass, callGeminiExtraction } from "@/lib/extraction-passes";
 import { toApiError } from "@/lib/errors";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 const MAX_PAGES = 200;
@@ -48,6 +49,15 @@ export const maxDuration = 300;
 
 export async function POST(request: Request) {
   try {
+    // Auth first: this route calls Gemini, so anonymous callers must not reach it.
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return Response.json({ error: "Please sign in to use extraction." }, { status: 401 });
+    }
+
     let body: unknown;
     try {
       body = await request.json();
