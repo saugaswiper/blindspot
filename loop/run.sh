@@ -15,9 +15,9 @@ TS="$(date +%Y%m%d-%H%M)"
 LOG="$LOGDIR/$ROLE-$TS.log"
 
 case "$ROLE" in
-  planner)   MODEL="claude-sonnet-4-6";;
-  dev)       MODEL="claude-opus-4-8";;
-  tester)    MODEL="claude-sonnet-4-6";;
+  planner)   MODEL="claude-sonnet-5-5";;
+  dev)       MODEL="claude-sonnet-5-5";;
+  tester)    MODEL="claude-sonnet-5-5";;
   librarian) MODEL="claude-haiku-4-5-20251001";;
   *) echo "unknown role: $ROLE" >&2; exit 2;;
 esac
@@ -65,12 +65,17 @@ if [ "$ROLE" = "librarian" ]; then
 else
   run_claude "$CODE"
   cd "$CODE"
+  PARTIAL=""
+  if grep -qiE "hit your (session|usage) limit|usage limit reached" "$LOG"; then
+    PARTIAL="-PARTIAL"
+    echo "[$(date)] $ROLE: PARTIAL RUN — usage limit hit mid-run; gates/handoff likely missing. Review before merging." >>"$LOG"
+  fi
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-    BR="loop/$ROLE-$TS"
+    BR="loop/$ROLE-$TS$PARTIAL"
     git checkout -b "$BR" >>"$LOG" 2>&1
     git add -A
     git -c user.name="blindspot-$ROLE" -c user.email="$ROLE@blindspot.local" \
-      commit -m "loop($ROLE): automated run" >>"$LOG" 2>&1
+      commit -m "loop($ROLE): automated run${PARTIAL:+ (PARTIAL: usage limit hit)}" >>"$LOG" 2>&1
     git push origin "$BR" >>"$LOG" 2>&1
     git checkout main >>"$LOG" 2>&1
     echo "[$(date)] $ROLE pushed branch $BR — open a PR to review" >>"$LOG"

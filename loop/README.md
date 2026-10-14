@@ -6,9 +6,9 @@ key, no secrets, no deploy key. Model-tiered for efficiency. Documented in the w
 
 | Role | Time (local) | Model | Does |
 |------|--------------|-------|------|
-| planner | Mon 08:57 | sonnet | write next `spec/briefs/NNN.md` → branch |
-| dev | daily 09:07 | **opus** | implement top brief → gates → `spec/NNN-handoff.md` → branch |
-| tester | daily 12:07 | sonnet | validate vs. published SRs → `spec/validation/NNN.md` → branch |
+| planner | Mon 08:57 | sonnet 5.5 | write next `spec/briefs/NNN.md` → branch |
+| dev | daily 09:07 | **sonnet 5.5** | implement top brief → gates → `spec/NNN-handoff.md` → branch |
+| tester | daily 12:07 | sonnet 5.5 | validate vs. published SRs → `spec/validation/NNN.md` → branch |
 | librarian | daily 13:07 | **haiku** | ingest new `spec/*` into the wiki → push wiki |
 
 ## Run / schedule
