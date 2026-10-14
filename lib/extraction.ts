@@ -137,6 +137,26 @@ function figureFoundAsText(
   return checkSourcePresence(value, pages, citedPage).ok;
 }
 
+/** Targets that are continuous statistics (mean/SD/change/score), not counts. */
+const CONTINUOUS_LABEL = /\b(mean|sd|s\.d\.|standard deviation|median|change|score|difference|md|smd|se)\b/i;
+const TABLE_CUE = /\btable\b|\btbl\b/i;
+
+/**
+ * Precision guard (validation 013): an integer read from body prose for a
+ * continuous-statistic target (e.g. prose "9 days" vs Table 4's 8.70) is a
+ * rounded mention, not the reported statistic → `check`, never `verified`.
+ */
+function proseIntegerForContinuous(
+  target: ExtractionTarget,
+  value: number,
+  provenance: { locator?: string; source_text?: string } | undefined,
+): boolean {
+  if (!Number.isInteger(value)) return false;
+  if (!target.instrument && !CONTINUOUS_LABEL.test(target.label)) return false;
+  const cited = `${provenance?.locator ?? ""} ${provenance?.source_text ?? ""}`;
+  return !TABLE_CUE.test(cited);
+}
+
 /**
  * Run the four-check gate for one target against its two passes.
  * Precedence of dispositions:
@@ -207,6 +227,14 @@ function verifyTarget(
   if (!presence.ok && presence.code) {
     failures.push(presence.code);
     if (presence.detail) details.push(presence.detail);
+  }
+
+  // Precision guard — prose integer standing in for a continuous statistic.
+  if (proseIntegerForContinuous(target, value, provenance)) {
+    failures.push("prose_integer");
+    details.push(
+      `${value} was read from body prose, not a table, for a continuous statistic — likely a rounded mention; confirm against the table`,
+    );
   }
 
   // Check 3 — internal consistency (Cochrane Ch 6 relations).
