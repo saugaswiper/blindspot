@@ -59,6 +59,8 @@ const RequestSchema = z
   });
 
 export const maxDuration = 300;
+/** Stop starting new targets after this; leaves room for one in-flight target (2×45 s + backoff) under maxDuration. */
+const EXTRACTION_BUDGET_MS = 180_000;
 
 export async function POST(request: Request) {
   try {
@@ -163,6 +165,7 @@ export async function POST(request: Request) {
     const result = await extractOutcomesAsync(pages, targets, {
       transcriber: createModelPass("transcriber", callGeminiExtraction),
       hunter: createModelPass("hunter", callGeminiExtraction),
+      deadline: Date.now() + EXTRACTION_BUDGET_MS,
     });
 
     return Response.json(

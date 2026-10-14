@@ -110,11 +110,32 @@ export function createModelPass(framing: PassFraming, call: ModelCaller): Extrac
 const GEMINI_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-/** Live Gemini caller (temperature 0). Not unit-tested; the logic above is. */
+/** Per-attempt cap on a Gemini request (validation 012: unbounded calls hung >900 s). */
+export const GEMINI_TIMEOUT_MS = 45_000;
+const GEMINI_RETRY_BACKOFF_MS = 1_000;
+
+/** A model call that did not complete in time (after one retry) → target is `manual`. */
+export class ModelTimeoutError extends Error {
+  readonly reason = "model_timeout";
+  constructor(message = "Model call timed out") {
+    super(message);
+    this.name = "ModelTimeoutError";
+  }
+}
+
+function isTimeout(e: unknown): boolean {
+  return e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+}
+
+/**
+ * Live Gemini caller (temperature 0), bounded: each attempt has an
+ * `AbortSignal.timeout`, with at most one retry after a short backoff.
+ * Throws `ModelTimeoutError` if both attempts time out.
+ */
 export const callGeminiExtraction: ModelCaller = async (system, user) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new ApiError("Gemini API key not configured", 500);
-  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+  const init = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -122,7 +143,20 @@ export const callGeminiExtraction: ModelCaller = async (system, user) => {
       contents: [{ role: "user", parts: [{ text: user }] }],
       generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json" },
     }),
-  });
+  };
+  let res: Response;
+  try {
+    res = await fetch(`${GEMINI_URL}?key=${apiKey}`, { ...init, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) });
+  } catch (e) {
+    if (!isTimeout(e)) throw e;
+    await new Promise((r) => setTimeout(r, GEMINI_RETRY_BACKOFF_MS));
+    try {
+      res = await fetch(`${GEMINI_URL}?key=${apiKey}`, { ...init, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) });
+    } catch (e2) {
+      if (isTimeout(e2)) throw new ModelTimeoutError();
+      throw e2;
+    }
+  }
   const data = (await res.json()) as {
     candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
     error?: { message: string };
