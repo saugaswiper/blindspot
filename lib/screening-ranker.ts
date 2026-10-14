@@ -128,7 +128,7 @@ export function rankRecords(records: RankRecord[], verdicts: RankVerdict[] = [])
 export interface RecallEstimate {
   /** Point estimate of the share of all includes already found (0–1). */
   estimate: number;
-  /** Conservative lower bound (Wilson-style, scaled by unscreened mass). */
+  /** Conservative lower bound: assumes up to 2x the expected unscreened includes (heuristic, unvalidated). */
   lower: number;
   advisory: true;
 }
