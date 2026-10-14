@@ -89,6 +89,20 @@ describe("bounded model calls (validation 012)", () => {
     expect(await p).toEqual({ text: "{}", truncated: false });
   });
 
+  it("a stall while reading the response body is also retried, then ModelTimeoutError", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    // Headers arrive (fetch resolves) but the body read times out — the 012-style stall.
+    const stalled = { ok: true, json: async () => { throw timeoutErr(); } };
+    const fetchMock = vi.fn().mockResolvedValue(stalled);
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    const p = callGeminiExtraction("s", "u");
+    const assertion = expect(p).rejects.toBeInstanceOf(ModelTimeoutError);
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("a timed-out target becomes manual (model_timeout), later targets still run", async () => {
     let n = 0;
     const call: ModelCaller = async () => {

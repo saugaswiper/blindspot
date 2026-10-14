@@ -144,23 +144,31 @@ export const callGeminiExtraction: ModelCaller = async (system, user) => {
       generationConfig: { temperature: 0, maxOutputTokens: 4096, responseMimeType: "application/json" },
     }),
   };
-  let res: Response;
+  // One attempt = request AND body read, both under the same timeout, so a stall while
+  // streaming the response is also caught (and retried) rather than escaping as a raw error.
+  type GeminiBody = {
+    candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+    error?: { message: string };
+  };
+  const attempt = async (): Promise<{ res: Response; data: GeminiBody }> => {
+    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, { ...init, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) });
+    const data = (await res.json()) as GeminiBody;
+    return { res, data };
+  };
+  let out: { res: Response; data: GeminiBody };
   try {
-    res = await fetch(`${GEMINI_URL}?key=${apiKey}`, { ...init, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) });
+    out = await attempt();
   } catch (e) {
     if (!isTimeout(e)) throw e;
     await new Promise((r) => setTimeout(r, GEMINI_RETRY_BACKOFF_MS));
     try {
-      res = await fetch(`${GEMINI_URL}?key=${apiKey}`, { ...init, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) });
+      out = await attempt();
     } catch (e2) {
       if (isTimeout(e2)) throw new ModelTimeoutError();
       throw e2;
     }
   }
-  const data = (await res.json()) as {
-    candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
-    error?: { message: string };
-  };
+  const { res, data } = out;
   if (!res.ok || data.error) {
     throw new ApiError(`Gemini API error: ${data.error?.message ?? res.status}`, 502);
   }
