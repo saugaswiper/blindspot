@@ -162,10 +162,11 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    const deadline = Date.now() + EXTRACTION_BUDGET_MS;
     const result = await extractOutcomesAsync(pages, targets, {
-      transcriber: createModelPass("transcriber", callGeminiExtraction),
-      hunter: createModelPass("hunter", callGeminiExtraction),
-      deadline: Date.now() + EXTRACTION_BUDGET_MS,
+      transcriber: createModelPass("transcriber", callGeminiExtraction, deadline),
+      hunter: createModelPass("hunter", callGeminiExtraction, deadline),
+      deadline,
     });
 
     return Response.json(

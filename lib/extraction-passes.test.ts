@@ -103,6 +103,24 @@ describe("bounded model calls (validation 012)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("an aborted deadline signal ends the call without a retry", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const fetchMock = vi.fn().mockRejectedValue(timeoutErr());
+    vi.stubGlobal("fetch", fetchMock);
+    const aborted = AbortSignal.abort();
+    await expect(callGeminiExtraction("s", "u", aborted)).rejects.toBeInstanceOf(ModelTimeoutError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it("createModelPass hands the caller a deadline-derived signal", async () => {
+    const call = vi.fn().mockResolvedValue(ok({ value: 1, page: 1, source_text: "1" }));
+    await createModelPass("hunter", call, Date.now() + 60_000)(pages, target);
+    expect(call.mock.calls[0][2]).toBeInstanceOf(AbortSignal);
+    await createModelPass("hunter", call)(pages, target);
+    expect(call.mock.calls[1][2]).toBeUndefined();
+  });
+
   it("a timed-out target becomes manual (model_timeout), later targets still run", async () => {
     let n = 0;
     const call: ModelCaller = async () => {
