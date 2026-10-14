@@ -1,0 +1,79 @@
+{
+  "ms": 180705,
+  "http": 200,
+  "calls": 8,
+  "values": [
+    {
+      "target_id": "k10",
+      "label": "Mean MADRS score at day 10, ketamine group, intention-to-treat (Table 2)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: the model did not respond in time; extract manually"
+    },
+    {
+      "target_id": "m10",
+      "label": "Mean MADRS score at day 10, midazolam group, intention-to-treat (Table 2)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: the model did not respond in time; extract manually"
+    },
+    {
+      "target_id": "k31",
+      "label": "Mean MADRS score at day 31, ketamine group, intention-to-treat (Table 2)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: request time budget exhausted before this target; extract manually"
+    },
+    {
+      "target_id": "kd10",
+      "label": "Mean change in MADRS from baseline at day 10, ketamine group, intention-to-treat (Table 3)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: request time budget exhausted before this target; extract manually"
+    },
+    {
+      "target_id": "md10",
+      "label": "Mean change in MADRS from baseline at day 10, midazolam group, intention-to-treat (Table 3)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: request time budget exhausted before this target; extract manually"
+    },
+    {
+      "target_id": "krem",
+      "label": "Mean days in remission, ketamine group (Table 4)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: request time budget exhausted before this target; extract manually"
+    },
+    {
+      "target_id": "age",
+      "label": "Mean age in years, ketamine group (Table 1)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: request time budget exhausted before this target; extract manually"
+    },
+    {
+      "target_id": "abs1",
+      "label": "HAM-D total score at day 10, ketamine group",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: request time budget exhausted before this target; extract manually"
+    },
+    {
+      "target_id": "abs2",
+      "label": "MADRS score at day 60, ketamine group",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "model_timeout: request time budget exhausted before this target; extract manually"
+    }
+  ]
+}

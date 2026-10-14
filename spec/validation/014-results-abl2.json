@@ -1,0 +1,160 @@
+{
+  "T": [
+    {
+      "id": "k10",
+      "label": "Mean MADRS score at day 10, ketamine group, intention-to-treat (Table 2)",
+      "truth": 21.18
+    },
+    {
+      "id": "m10",
+      "label": "Mean MADRS score at day 10, midazolam group, intention-to-treat (Table 2)",
+      "truth": 18.11
+    },
+    {
+      "id": "k31",
+      "label": "Mean MADRS score at day 31, ketamine group, intention-to-treat (Table 2)",
+      "truth": 20
+    },
+    {
+      "id": "kd10",
+      "label": "Mean change in MADRS from baseline at day 10, ketamine group, intention-to-treat (Table 3)",
+      "truth": 12.55
+    },
+    {
+      "id": "md10",
+      "label": "Mean change in MADRS from baseline at day 10, midazolam group, intention-to-treat (Table 3)",
+      "truth": 17.22
+    },
+    {
+      "id": "krem",
+      "label": "Mean days in remission, ketamine group (Table 4)",
+      "truth": 8.7
+    },
+    {
+      "id": "age",
+      "label": "Mean age in years, ketamine group (Table 1)",
+      "truth": 32.36
+    },
+    {
+      "id": "abs1",
+      "label": "HAM-D total score at day 10, ketamine group",
+      "truth": null
+    },
+    {
+      "id": "abs2",
+      "label": "MADRS score at day 60, ketamine group",
+      "truth": null
+    }
+  ],
+  "name": "abl2",
+  "ms": 75532,
+  "http": 200,
+  "summary": {
+    "verified": 0,
+    "check": 3,
+    "manual": 6,
+    "human": 0,
+    "author_contact": 0
+  },
+  "values": [
+    {
+      "target_id": "k10",
+      "label": "Mean MADRS score at day 10, ketamine group, intention-to-treat (Table 2)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "neither pass could read a value for this target"
+    },
+    {
+      "target_id": "m10",
+      "label": "Mean MADRS score at day 10, midazolam group, intention-to-treat (Table 2)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "neither pass could read a value for this target"
+    },
+    {
+      "target_id": "k31",
+      "label": "Mean MADRS score at day 31, ketamine group, intention-to-treat (Table 2)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "neither pass could read a value for this target"
+    },
+    {
+      "target_id": "kd10",
+      "label": "Mean change in MADRS from baseline at day 10, ketamine group, intention-to-treat (Table 3)",
+      "calculated": false,
+      "value": 12.55,
+      "status": "check",
+      "failure_code": "conflict",
+      "failure_codes": [
+        "conflict"
+      ],
+      "provenance": {
+        "page": 1,
+        "source_text": "By day 10th, the ketamine group had a mean reduction in MADRS score of 12.55 (95% CI = 6.70–18.09)",
+        "locator": "Abstract, Results section"
+      },
+      "detail": "two-pass disagreement: transcriber read 12.55, hunter read none — not reconciled (never averaged)"
+    },
+    {
+      "target_id": "md10",
+      "label": "Mean change in MADRS from baseline at day 10, midazolam group, intention-to-treat (Table 3)",
+      "calculated": false,
+      "value": 17.22,
+      "status": "check",
+      "failure_code": "conflict",
+      "failure_codes": [
+        "conflict"
+      ],
+      "provenance": {
+        "page": 1,
+        "source_text": "whereas the midazolam group had a decrease of 17.22 (95% CI = 11.09–23.36).",
+        "locator": "Abstract, Results section"
+      },
+      "detail": "two-pass disagreement: transcriber read 17.22, hunter read -17.22 — not reconciled (never averaged)"
+    },
+    {
+      "target_id": "krem",
+      "label": "Mean days in remission, ketamine group (Table 4)",
+      "calculated": false,
+      "value": 9,
+      "status": "check",
+      "failure_code": "prose_integer",
+      "failure_codes": [
+        "prose_integer"
+      ],
+      "provenance": {
+        "page": 6,
+        "source_text": "mean durations in remission of 9 days for ketamine (95% CI = 0.87–16.54)",
+        "locator": "Duration of response and remission in treatment-resistant depression following ketamine and midazolam administrations"
+      },
+      "detail": "9 was read from body prose, not a table, for a continuous statistic — likely a rounded mention; confirm against the table"
+    },
+    {
+      "target_id": "age",
+      "label": "Mean age in years, ketamine group (Table 1)",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "neither pass could read a value for this target"
+    },
+    {
+      "target_id": "abs1",
+      "label": "HAM-D total score at day 10, ketamine group",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "neither pass could read a value for this target"
+    },
+    {
+      "target_id": "abs2",
+      "label": "MADRS score at day 60, ketamine group",
+      "calculated": false,
+      "value": null,
+      "status": "manual",
+      "detail": "neither pass could read a value for this target"
+    }
+  ]
+}
