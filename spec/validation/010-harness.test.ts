@@ -95,15 +95,9 @@ describe("E1 — number tokenizer edge cases", () => {
 // ── E2: ASCII-hyphen-as-range-dash limitation (documented in handoff 110) ────
 
 describe("E2 — ASCII-hyphen range-separator limitation (documented)", () => {
-  it("correctly reports the ASCII-hyphen-range limitation: 4 NOT found in '2-4'", () => {
-    // Handoff 110 documents this known limitation: ASCII hyphen in "2-4" binds
-    // the "4" as a negative token, so standalone 4 is not tokenized.
-    // This verifies the limitation exists as claimed — not a pass/fail judgment.
+  it("limitation FIXED (handoff 117): 4 is now FOUND in '2-4' (hyphen after a digit is a separator)", () => {
     const r = checkSourcePresence(4, [pg(1, "Scores ranged from 2-4 on the CGI.")], 1);
-    // The gate should return not_in_source OR spelled_out, NOT ok=true.
-    expect(r.ok).toBe(false);
-    // The specific code depends on whether "four" appears; since it doesn't, not_in_source.
-    expect(r.code).toBe("not_in_source");
+    expect(r.ok).toBe(true);
   });
 
   it("en-dash range works correctly: 4 FOUND in '2–4' (en-dash)", () => {

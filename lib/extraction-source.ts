@@ -72,11 +72,14 @@ function canonicalizeNumericText(text: string): string {
 /**
  * Every number-like token in a run of text, as normalised numeric values.
  * Matches comma-grouped thousands ("1,234") and plain integers/decimals, each
- * with an optional leading ASCII minus. Commas are stripped before parsing.
+ * with an optional leading ASCII minus (not when it directly follows a digit,
+ * where it is a range separator). Commas are stripped before parsing.
  */
 function numericTokens(text: string): number[] {
   const canon = canonicalizeNumericText(text);
-  const re = /-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g;
+  // A hyphen directly after a digit is a range separator ("6.70-18.09"), not a
+  // sign; a sign must follow whitespace, "(", "=", etc. (validation 010 limitation).
+  const re = /(?:(?<!\d)-)?(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)/g;
   const out: number[] = [];
   for (const m of canon.matchAll(re)) {
     const n = Number(m[0].replace(/,/g, ""));
