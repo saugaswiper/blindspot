@@ -149,6 +149,29 @@ describe("extractOutcomes — refusals", () => {
     expect(res.values[0].status).toBe("verified");
   });
 
+  it("keeps author_contact when a figure-flagged value appears only on a different page (wrong-page variant)", () => {
+    const src = pages({ 3: "Table 2: MADRS change 12.55", 6: "see Figure 2" });
+    const cand: PassCandidate = { value: 12.55, page: 6, from_figure: true };
+    const res = extractOutcomes(src, [target()], {
+      transcriber: fixedPass(cand),
+      hunter: fixedPass({ ...cand }),
+    });
+    expect(res.values[0].status).toBe("author_contact");
+  });
+
+  it.each([10, 31, 60, 2, 0.05])(
+    "never verifies a figure-flagged common value %s that coincidentally appears in text",
+    (value) => {
+      const src = pages({ 4: `Participants n=${value}; p<${value}; see Figure 1` });
+      const cand: PassCandidate = { value, page: 4, from_figure: true };
+      const res = extractOutcomes(src, [target()], {
+        transcriber: fixedPass(cand),
+        hunter: fixedPass({ ...cand }),
+      });
+      expect(res.values[0].status).toBe("author_contact");
+    },
+  );
+
   it("does not route to author_contact when only one pass says figure", () => {
     const src = pages({ 4: "see Figure 1" });
     const res = extractOutcomes(src, [target()], {

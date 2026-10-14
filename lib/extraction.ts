@@ -120,6 +120,23 @@ function record(
   return v;
 }
 
+/** Values too generic to count as evidence of a text occurrence (coincidental matches). */
+const COMMON_VALUES = new Set([0.05, 0.01, 0.001, 95]);
+
+function isCommonValue(v: number): boolean {
+  return COMMON_VALUES.has(v) || (Number.isInteger(v) && Math.abs(v) < 100);
+}
+
+/** A figure-flagged value counts as text only if found at the cited page and not a common value. */
+function figureFoundAsText(
+  value: number | null,
+  pages: SourcePage[],
+  citedPage: number | undefined,
+): boolean {
+  if (value === null || citedPage === undefined || isCommonValue(value)) return false;
+  return checkSourcePresence(value, pages, citedPage).ok;
+}
+
 /**
  * Run the four-check gate for one target against its two passes.
  * Precedence of dispositions:
@@ -135,13 +152,14 @@ function verifyTarget(
   const base = { target_id: target.id, label: target.label, calculated: false as const };
 
   // A value that lives only in a figure cannot be verified from the text layer.
-  // Both passes must say figure AND the value must not appear verbatim in any
-  // table/body unit — a table cell a pass called a "figure" is text (validation 012).
+  // Both passes must say figure; it is then treated as text only if it appears
+  // verbatim at the page the passes cite AND is not a bare small/common number
+  // that could coincide with unrelated text (validation 012 vs 013).
   const figureValue = a.value ?? b.value;
   if (
     a.from_figure &&
     b.from_figure &&
-    (figureValue === null || !checkSourcePresence(figureValue, pages).ok)
+    !figureFoundAsText(figureValue, pages, a.page ?? b.page)
   ) {
     return {
       ...base,
