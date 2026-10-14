@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   buildUserPrompt,
   createModelPass,
   parseReply,
   scopePages,
+  callGeminiExtraction,
+  ModelTimeoutError,
   type ModelCaller,
 } from "@/lib/extraction-passes";
 import { extractOutcomesAsync } from "@/lib/extraction";
@@ -50,5 +52,62 @@ describe("extraction-passes", () => {
       hunter: createModelPass("hunter", call),
     });
     expect(res.values[0].status).toBe("verified");
+  });
+});
+
+describe("bounded model calls (validation 012)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
+  });
+  const timeoutErr = () => Object.assign(new Error("timed out"), { name: "TimeoutError" });
+
+  it("retries once on timeout, then throws ModelTimeoutError", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const fetchMock = vi.fn().mockRejectedValue(timeoutErr());
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    const p = callGeminiExtraction("s", "u");
+    const assertion = expect(p).rejects.toBeInstanceOf(ModelTimeoutError);
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("succeeds when the retry returns", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "k");
+    const good = {
+      ok: true,
+      json: async () => ({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: "{}" }] } }] }),
+    };
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(timeoutErr()).mockResolvedValueOnce(good));
+    vi.useFakeTimers();
+    const p = callGeminiExtraction("s", "u");
+    await vi.runAllTimersAsync();
+    expect(await p).toEqual({ text: "{}", truncated: false });
+  });
+
+  it("a timed-out target becomes manual (model_timeout), later targets still run", async () => {
+    let n = 0;
+    const call: ModelCaller = async () => {
+      if (n++ < 2) throw new ModelTimeoutError();
+      return ok({ value: 12.4, page: 1, source_text: "12.4" });
+    };
+    const pass = createModelPass("transcriber", call);
+    const r = await extractOutcomesAsync(pages, [target, { ...target, id: "t2" }], { transcriber: pass, hunter: pass });
+    expect(r.values[0].status).toBe("manual");
+    expect(r.values[0].detail).toContain("model_timeout");
+    expect(r.values[1].status).toBe("verified");
+  });
+
+  it("past the deadline, remaining targets are manual without calling the model", async () => {
+    const call = vi.fn();
+    const pass = createModelPass("transcriber", call);
+    const r = await extractOutcomesAsync(pages, [target], { transcriber: pass, hunter: pass, deadline: Date.now() - 1 });
+    expect(call).not.toHaveBeenCalled();
+    expect(r.values[0].status).toBe("manual");
+    expect(r.summary.manual).toBe(1);
   });
 });

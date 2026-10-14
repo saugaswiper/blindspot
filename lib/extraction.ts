@@ -33,6 +33,7 @@ import type {
   ExtractionResult,
   ExtractionStatus,
 } from "@/types";
+import { ModelTimeoutError } from "./extraction-passes";
 import { checkSourcePresence, type SourcePage } from "./extraction-source";
 import {
   checkInstrumentRange,
@@ -83,6 +84,8 @@ export interface ExtractOptions {
   transcriber: ExtractionPass;
   /** Pass B — a target-hunting pass (seeks the specific outcome). */
   hunter: ExtractionPass;
+  /** Epoch ms after which no new target is started; the rest become `manual`. */
+  deadline?: number;
 }
 
 /**
@@ -250,11 +253,29 @@ export async function extractOutcomesAsync(
   const summary = emptySummary();
   const values: ExtractedValue[] = [];
   for (const target of targets) {
-    const [a, b] = await Promise.all([
-      opts.transcriber(pages, target),
-      opts.hunter(pages, target),
-    ]);
-    values.push(record(summary, verifyTarget(target, pages, a, b)));
+    const manual = (detail: string) =>
+      record(summary, {
+        target_id: target.id,
+        label: target.label,
+        calculated: false,
+        value: null,
+        status: "manual",
+        detail,
+      });
+    if (opts.deadline !== undefined && Date.now() >= opts.deadline) {
+      values.push(manual("model_timeout: request time budget exhausted before this target; extract manually"));
+      continue;
+    }
+    try {
+      const [a, b] = await Promise.all([
+        opts.transcriber(pages, target),
+        opts.hunter(pages, target),
+      ]);
+      values.push(record(summary, verifyTarget(target, pages, a, b)));
+    } catch (e) {
+      if (!(e instanceof ModelTimeoutError)) throw e;
+      values.push(manual("model_timeout: the model did not respond in time; extract manually"));
+    }
   }
   return { values, summary, method: "ai-assisted-two-pass" };
 }
