@@ -84,6 +84,18 @@ describe("checkSourcePresence — journal number formatting", () => {
     expect(r.ok).toBe(true);
   });
 
+  it("reads an ASCII hyphen between digits as a range separator, not a sign", () => {
+    const text = "MADRS 12.55 (SE 2.64, 95% CI 6.70-18.09) vs 17.22";
+    expect(checkSourcePresence(18.09, pages({ 6: text }), 6).ok).toBe(true);
+    expect(checkSourcePresence(6.7, pages({ 6: text }), 6).ok).toBe(true);
+  });
+
+  it("still reads a hyphen after whitespace as a negative sign, and never fabricates one", () => {
+    const text = "change from baseline -4.2 (CI 6.70-18.09)";
+    expect(checkSourcePresence(-4.2, pages({ 1: text }), 1).ok).toBe(true);
+    expect(checkSourcePresence(-18.09, pages({ 1: text }), 1).ok).toBe(false);
+  });
+
   it("recognises a value written with a trailing percent", () => {
     const r = checkSourcePresence(42, pages({ 1: "response rate was 42% at week 4" }), 1);
     expect(r.ok).toBe(true);
