@@ -33,6 +33,16 @@ run_claude() {  # $1 = working dir
 
 echo "[$(date)] start $ROLE ($MODEL)" >>"$LOG"
 
+# Export ONLY the research-API keys the tester/dev need for live runs (Gemini, NCBI, OpenAlex,
+# Elsevier). Deliberately NOT the Supabase service-role key (production DB admin) — an unattended
+# agent must not hold it. Values are never echoed.
+if [ -f "$CODE/.env.local" ]; then
+  for K in GEMINI_API_KEY NCBI_API_KEY OPENALEX_API_KEY ELSEVIER_API_KEY; do
+    V=$(grep -E "^${K}=" "$CODE/.env.local" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
+    [ -n "$V" ] && export "$K=$V"
+  done
+fi
+
 # Always start from the latest main, so runs never redo work that's already merged.
 cd "$CODE" || exit 1
 git checkout -q main >>"$LOG" 2>&1
