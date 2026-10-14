@@ -6,6 +6,7 @@
  * POST /api/extract
  * - Request body: { pages: [{ page, text }] | text: "<form-feed-separated text layer>" | doi | pmid,
  *   targets: [{ id, label, instrument?, range? }] }
+ * - Or multipart/form-data: `file` (a PDF, <= 25 MB) + `targets` (JSON string). Text layer only, no OCR.
  * - 200 → { result: ExtractionResult, method, disclosure, extracted_at }
  * - 400 → { error: string }  (malformed body)
  * - 422 → { status: "manual", reason, error }  (doi/pmid: no OA PDF, scanned, too large, …)
@@ -17,7 +18,8 @@
 
 import { extractOutcomesAsync } from "@/lib/extraction";
 import { splitIntoPages } from "@/lib/extraction-pages";
-import { fetchPagesForIdentifier } from "@/lib/extraction-fetch";
+import { fetchPagesForIdentifier, MAX_PDF_BYTES } from "@/lib/extraction-fetch";
+import { pdfToPages } from "@/lib/extraction-pdf";
 import { createModelPass, callGeminiExtraction } from "@/lib/extraction-passes";
 import { toApiError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
@@ -54,9 +56,6 @@ const RequestSchema = z
       )
       .min(1, "Provide at least one target.")
       .max(MAX_TARGETS),
-  })
-  .refine((b) => b.pages || b.text || b.doi || b.pmid, {
-    message: "Provide pages, text, doi or pmid.",
   });
 
 export const maxDuration = 300;
@@ -76,13 +75,34 @@ export async function POST(request: Request) {
     }
 
     let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json(
-        { error: "Invalid JSON in request body." },
-        { status: 400 },
-      );
+    let upload: Uint8Array | undefined;
+    if ((request.headers.get("content-type") ?? "").includes("multipart/form-data")) {
+      try {
+        const form = await request.formData();
+        const file = form.get("file");
+        if (!(file instanceof File)) {
+          return Response.json({ error: "Attach a PDF as `file`." }, { status: 400 });
+        }
+        if (file.size > MAX_PDF_BYTES) {
+          return Response.json({ error: "PDF is larger than the 25 MB limit." }, { status: 413 });
+        }
+        upload = new Uint8Array(await file.arrayBuffer());
+        if (String.fromCharCode(...upload.slice(0, 4)) !== "%PDF") {
+          return Response.json({ error: "File is not a PDF." }, { status: 400 });
+        }
+        body = { targets: JSON.parse(String(form.get("targets") ?? "null")) };
+      } catch {
+        return Response.json({ error: "Invalid multipart request." }, { status: 400 });
+      }
+    } else {
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json(
+          { error: "Invalid JSON in request body." },
+          { status: 400 },
+        );
+      }
     }
 
     const parsed = RequestSchema.safeParse(body);
@@ -94,8 +114,25 @@ export async function POST(request: Request) {
     }
 
     const { targets } = parsed.data;
+    if (!upload && !(parsed.data.pages || parsed.data.text || parsed.data.doi || parsed.data.pmid)) {
+      return Response.json({ error: "Provide pages, text, doi, pmid or a PDF file." }, { status: 400 });
+    }
     let pages;
-    if (parsed.data.pages || parsed.data.text) {
+    if (upload) {
+      // User-uploaded PDF: the main path for the ~70% of studies with no OA XML (validation 011).
+      const parsedPdf = await pdfToPages(upload);
+      if (!parsedPdf.ok) {
+        return Response.json(
+          {
+            status: "manual",
+            reason: parsedPdf.reason,
+            error: "Could not extract automatically; extract this study manually.",
+          },
+          { status: 422 },
+        );
+      }
+      pages = parsedPdf.pages.slice(0, MAX_PAGES);
+    } else if (parsed.data.pages || parsed.data.text) {
       pages = (
         parsed.data.pages ?? splitIntoPages(parsed.data.text ?? "")
       ).slice(0, MAX_PAGES);
