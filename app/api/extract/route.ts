@@ -4,7 +4,8 @@
  * Run the 4-check extraction gate over caller-supplied page text.
  *
  * POST /api/extract
- * - Request body: { pages: [{ page, text }], targets: [{ id, label, instrument?, range? }] }
+ * - Request body: { pages: [{ page, text }] | text: "<form-feed-separated text layer>",
+ *   targets: [{ id, label, instrument?, range? }] }
  * - 200 → { result: ExtractionResult, method, disclosure, extracted_at }
  * - 400 → { error: string }  (malformed body)
  *
@@ -14,6 +15,7 @@
  */
 
 import { extractOutcomesAsync } from "@/lib/extraction";
+import { splitIntoPages } from "@/lib/extraction-pages";
 import { createModelPass, callGeminiExtraction } from "@/lib/extraction-passes";
 import { toApiError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
@@ -22,28 +24,34 @@ import { z } from "zod";
 const MAX_PAGES = 200;
 const MAX_TARGETS = 50;
 
-const RequestSchema = z.object({
-  pages: z
-    .array(
-      z.object({
-        page: z.number().int().min(1),
-        text: z.string(),
-      }),
-    )
-    .min(1, "Provide at least one page of text.")
-    .max(MAX_PAGES),
-  targets: z
-    .array(
-      z.object({
-        id: z.string().trim().min(1),
-        label: z.string().trim().min(1),
-        instrument: z.string().trim().min(1).optional(),
-        range: z.object({ name: z.string(), min: z.number(), max: z.number() }).optional(),
-      }),
-    )
-    .min(1, "Provide at least one target.")
-    .max(MAX_TARGETS),
-});
+const RequestSchema = z
+  .object({
+    text: z.string().optional(),
+    pages: z
+      .array(
+        z.object({
+          page: z.number().int().min(1),
+          text: z.string(),
+        }),
+      )
+      .min(1, "Provide at least one page of text.")
+      .max(MAX_PAGES)
+      .optional(),
+    targets: z
+      .array(
+        z.object({
+          id: z.string().trim().min(1),
+          label: z.string().trim().min(1),
+          instrument: z.string().trim().min(1).optional(),
+          range: z
+            .object({ name: z.string(), min: z.number(), max: z.number() })
+            .optional(),
+        }),
+      )
+      .min(1, "Provide at least one target.")
+      .max(MAX_TARGETS),
+  })
+  .refine((b) => b.pages || b.text, { message: "Provide pages or text." });
 
 export const maxDuration = 300;
 
@@ -55,14 +63,20 @@ export async function POST(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      return Response.json({ error: "Please sign in to use extraction." }, { status: 401 });
+      return Response.json(
+        { error: "Please sign in to use extraction." },
+        { status: 401 },
+      );
     }
 
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return Response.json({ error: "Invalid JSON in request body." }, { status: 400 });
+      return Response.json(
+        { error: "Invalid JSON in request body." },
+        { status: 400 },
+      );
     }
 
     const parsed = RequestSchema.safeParse(body);
@@ -73,7 +87,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const { pages, targets } = parsed.data;
+    const { targets } = parsed.data;
+    const pages = (
+      parsed.data.pages ?? splitIntoPages(parsed.data.text ?? "")
+    ).slice(0, MAX_PAGES);
+    if (pages.length === 0) {
+      return Response.json(
+        { error: "Provide at least one page of text." },
+        { status: 400 },
+      );
+    }
     const result = await extractOutcomesAsync(pages, targets, {
       transcriber: createModelPass("transcriber", callGeminiExtraction),
       hunter: createModelPass("hunter", callGeminiExtraction),
@@ -91,6 +114,9 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     const apiError = toApiError(error);
-    return Response.json({ error: apiError.userMessage }, { status: apiError.statusCode });
+    return Response.json(
+      { error: apiError.userMessage },
+      { status: apiError.statusCode },
+    );
   }
 }
