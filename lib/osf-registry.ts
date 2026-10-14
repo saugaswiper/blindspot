@@ -15,6 +15,8 @@
  * ACC-6: This check closes the coverage gap left by PROSPERO + INPLASY alone.
  */
 
+import { userAgent } from "@/lib/site";
+
 interface OsfRegistrationsApiResponse {
   /** Total number of matching registrations */
   meta?: {
@@ -47,7 +49,7 @@ export async function searchOSFRegistrations(query: string): Promise<number> {
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "Blindspot (blindspot-sr.dev; school.dharmayu@gmail.com)",
+        "User-Agent": userAgent("school.dharmayu@gmail.com"),
         Accept: "application/vnd.api+json",
       },
       // Cache for 24 hours — OSF registration data doesn't change frequently
