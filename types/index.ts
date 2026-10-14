@@ -472,7 +472,8 @@ export type ExtractionFailureCode =
   | "mean_outside_ci"
   | "ci_order"
   | "n_exceeds_randomised"
-  | "out_of_range";
+  | "out_of_range"
+  | "prose_integer";
 
 /**
  * Where in the source a value was read from — enough for a later UI to show the

@@ -216,3 +216,34 @@ describe("extractOutcomes — provenance (AC3)", () => {
     }
   });
 });
+
+describe("extractOutcomes — precision guard (validation 013)", () => {
+  const src = pages({ 4: "Mean stay was 9 days overall.", 5: "Table 4: mean stay 8.70" });
+  const run = (cand: PassCandidate, t: ExtractionTarget) =>
+    extractOutcomes(src, [t], { transcriber: fixedPass(cand), hunter: fixedPass({ ...cand }) }).values[0];
+
+  it("sends a prose integer for a continuous target to `check` (prose_integer)", () => {
+    const v = run(
+      { value: 9, page: 4, source_text: "Mean stay was 9 days overall." },
+      target({ label: "Mean length of stay", instrument: undefined }),
+    );
+    expect(v.status).toBe("check");
+    expect(v.failure_codes).toContain("prose_integer");
+  });
+
+  it("verifies the table-unit decimal for the same quantity", () => {
+    const v = run(
+      { value: 8.7, page: 5, locator: "Table 4", source_text: "mean stay 8.70" },
+      target({ label: "Mean length of stay", instrument: undefined }),
+    );
+    expect(v.status).toBe("verified");
+  });
+
+  it("does not apply to a count target", () => {
+    const v = run(
+      { value: 9, page: 4, source_text: "Mean stay was 9 days overall." },
+      target({ label: "Participants randomised", instrument: undefined }),
+    );
+    expect(v.status).toBe("verified");
+  });
+});
