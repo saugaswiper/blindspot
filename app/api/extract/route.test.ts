@@ -46,4 +46,17 @@ describe("POST /api/extract", () => {
     expect(json.result.values[0].status).toBe("manual");
     expect(json.disclosure).toMatch(/not dual-independent/);
   });
+
+  it("accepts a form-feed-separated text layer in place of pages", async () => {
+    const res = await post({
+      text: "MADRS 12.3\fsecond page",
+      targets: [{ id: "t1", label: "MADRS" }],
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects a blank text layer", async () => {
+    const res = await post({ text: " \f ", targets: [{ id: "t1", label: "MADRS" }] });
+    expect(res.status).toBe(400);
+  });
 });
