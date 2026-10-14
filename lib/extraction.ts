@@ -135,7 +135,14 @@ function verifyTarget(
   const base = { target_id: target.id, label: target.label, calculated: false as const };
 
   // A value that lives only in a figure cannot be verified from the text layer.
-  if (a.from_figure || b.from_figure) {
+  // Both passes must say figure AND the value must not appear verbatim in any
+  // table/body unit — a table cell a pass called a "figure" is text (validation 012).
+  const figureValue = a.value ?? b.value;
+  if (
+    a.from_figure &&
+    b.from_figure &&
+    (figureValue === null || !checkSourcePresence(figureValue, pages).ok)
+  ) {
     return {
       ...base,
       value: a.value ?? b.value ?? null,

@@ -139,6 +139,25 @@ describe("extractOutcomes — refusals", () => {
     expect(res.values[0].status).toBe("author_contact");
   });
 
+  it("treats a figure-flagged value found verbatim in the text as text, not author_contact", () => {
+    const src = pages({ 4: "Table 2: MADRS change 12.4" });
+    const cand: PassCandidate = { value: 12.4, page: 4, source_text: "12.4", from_figure: true };
+    const res = extractOutcomes(src, [target()], {
+      transcriber: fixedPass(cand),
+      hunter: fixedPass({ ...cand }),
+    });
+    expect(res.values[0].status).toBe("verified");
+  });
+
+  it("does not route to author_contact when only one pass says figure", () => {
+    const src = pages({ 4: "see Figure 1" });
+    const res = extractOutcomes(src, [target()], {
+      transcriber: fixedPass({ value: 12.4, page: 4, from_figure: true }),
+      hunter: fixedPass({ value: 12.4, page: 4 }),
+    });
+    expect(res.values[0].status).not.toBe("author_contact");
+  });
+
   it("marks a target neither pass could read `manual`", () => {
     const src = pages({ 4: "prose with no outcome numbers" });
     const res = extractOutcomes(src, [target()], {
