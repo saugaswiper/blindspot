@@ -39,7 +39,8 @@ describe("013A coincidental-match probe (deterministic)", () => {
       const oneSided = extractOutcomes(pages, [{ id: "t", label: "x" }], { transcriber: mk(true), hunter: () => ({ value: p.v, page: hit?.page, from_figure: false }) }).values[0];
       out.push({ ...p, textPage: hit?.page ?? null, bothFigure: both.status, oneSided: oneSided.status });
     }
-    writeFileSync("spec/validation/013-coincidence.json", JSON.stringify(out, null, 2));
+    // Validation records are immutable: only rewrite when explicitly regenerating.
+    if (process.env.WRITE_RESULTS === "1") writeFileSync("spec/validation/013-coincidence.json", JSON.stringify(out, null, 2));
     console.log("[013A]", JSON.stringify(out));
     expect(out.length).toBe(probes.length);
   });

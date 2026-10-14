@@ -3,28 +3,28 @@
     "v": 10,
     "why": "small integer (day 10 / n)",
     "textPage": 1,
-    "bothFigure": "author_contact",
+    "bothFigure": "verified",
     "oneSided": "verified"
   },
   {
     "v": 31,
     "why": "day 31",
     "textPage": 1,
-    "bothFigure": "author_contact",
+    "bothFigure": "verified",
     "oneSided": "verified"
   },
   {
     "v": 60,
     "why": "MADRS max / day 60",
     "textPage": 2,
-    "bothFigure": "author_contact",
+    "bothFigure": "verified",
     "oneSided": "verified"
   },
   {
     "v": 2,
     "why": "tiny integer",
     "textPage": 2,
-    "bothFigure": "author_contact",
+    "bothFigure": "verified",
     "oneSided": "verified"
   },
   {
@@ -38,7 +38,7 @@
     "v": 0.05,
     "why": "p-threshold",
     "textPage": 4,
-    "bothFigure": "author_contact",
+    "bothFigure": "verified",
     "oneSided": "verified"
   }
 ]
