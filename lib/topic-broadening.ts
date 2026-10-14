@@ -27,6 +27,7 @@ import { countPrimaryStudies } from "@/lib/pubmed";
 import { getFeasibilityScore } from "@/lib/feasibility";
 import { buildNormalizedQuery } from "@/lib/review-query";
 import type { FeasibilityScore } from "@/types";
+import { APP_URL } from "@/lib/site";
 
 const OPENALEX_BASE = "https://api.openalex.org";
 // CRIT-1: Use api_key= instead of mailto= (OpenAlex discontinued polite pool 2026-02-13).
@@ -160,7 +161,7 @@ export function filterCandidates(
 
 function openAlexHeaders(): HeadersInit {
   // Keep a User-Agent for polite identification even without the mailto= pool.
-  return { "User-Agent": "blindspot/1.0 (https://blindspot-sr.dev)" };
+  return { "User-Agent": `blindspot/1.0 (${APP_URL})` };
 }
 
 /**

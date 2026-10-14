@@ -30,14 +30,17 @@ import {
   shouldSendAlert,
 } from "@/lib/email-alerts";
 import type { ExistingReview } from "@/types";
+import { APP_URL } from "@/lib/site";
 
 // ---------------------------------------------------------------------------
 // Email sending
 // ---------------------------------------------------------------------------
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM_EMAIL = "alerts@blindspot-sr.dev";
-const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://blindspot-sr.dev";
+// Resend only sends from a verified domain. Until one is set up, its shared test sender
+// works but delivers ONLY to the Resend account owner. Set RESEND_FROM_EMAIL once a domain is verified.
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Blindspot <onboarding@resend.dev>";
+const APP_BASE_URL = APP_URL;
 
 async function sendEmail(
   to: string,

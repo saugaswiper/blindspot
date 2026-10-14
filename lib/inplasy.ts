@@ -13,6 +13,8 @@
  *               Returns `X-WP-Total` header with the full match count.
  */
 
+import { userAgent } from "@/lib/site";
+
 /**
  * Search INPLASY for registered systematic review protocols matching a query.
  * Returns the count of matching registrations.
@@ -37,7 +39,7 @@ export async function searchINPLASY(query: string): Promise<number> {
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "Blindspot (blindspot-sr.dev; school.dharmayu@gmail.com)",
+        "User-Agent": userAgent("school.dharmayu@gmail.com"),
         Accept: "application/json",
       },
       // Cache for 24 hours — INPLASY registration data doesn't change frequently

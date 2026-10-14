@@ -10,6 +10,8 @@
  * This prevents researchers from pursuing topics where a review is already in progress.
  */
 
+import { userAgent } from "@/lib/site";
+
 interface ProsperoRecord {
   id: string;
   title: string;
@@ -41,7 +43,7 @@ export async function searchProspero(query: string): Promise<number> {
 
     const res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "Blindspot (blindspot-sr.dev)",
+        "User-Agent": userAgent(),
       },
       // Cache for 24 hours since PROSPERO data doesn't change frequently
       next: { revalidate: 86400 },
