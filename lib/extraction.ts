@@ -76,7 +76,7 @@ export interface PassCandidate {
 export type ExtractionPass = (
   pages: SourcePage[],
   target: ExtractionTarget,
-) => PassCandidate;
+) => PassCandidate | Promise<PassCandidate>;
 
 export interface ExtractOptions {
   /** Pass A — a cell-by-cell transcriber (reads the table as a grid). */
@@ -211,8 +211,14 @@ function verifyTarget(
   };
 }
 
+function emptySummary(): Record<ExtractionStatus, number> {
+  return { verified: 0, check: 0, manual: 0, human: 0, author_contact: 0 };
+}
+
 /**
  * Extract and verify every target against a resolved full-text source.
+ * Synchronous: both passes must be sync (stubs). Live model passes are async —
+ * use `extractOutcomesAsync`.
  *
  * @param pages    the source's pages + text layers (from `lib/fulltext`)
  * @param targets  the outcomes to extract
@@ -223,18 +229,32 @@ export function extractOutcomes(
   targets: ExtractionTarget[],
   opts: ExtractOptions,
 ): ExtractionResult {
-  const summary: Record<ExtractionStatus, number> = {
-    verified: 0,
-    check: 0,
-    manual: 0,
-    human: 0,
-    author_contact: 0,
-  };
-  const values = targets.map((target) =>
-    record(
-      summary,
-      verifyTarget(target, pages, opts.transcriber(pages, target), opts.hunter(pages, target)),
-    ),
-  );
+  const summary = emptySummary();
+  const values = targets.map((target) => {
+    const a = opts.transcriber(pages, target);
+    const b = opts.hunter(pages, target);
+    if (a instanceof Promise || b instanceof Promise) {
+      throw new Error("extractOutcomes got an async pass; use extractOutcomesAsync");
+    }
+    return record(summary, verifyTarget(target, pages, a, b));
+  });
+  return { values, summary, method: "ai-assisted-two-pass" };
+}
+
+/** Async variant for live model passes; identical gate and dispositions. */
+export async function extractOutcomesAsync(
+  pages: SourcePage[],
+  targets: ExtractionTarget[],
+  opts: ExtractOptions,
+): Promise<ExtractionResult> {
+  const summary = emptySummary();
+  const values: ExtractedValue[] = [];
+  for (const target of targets) {
+    const [a, b] = await Promise.all([
+      opts.transcriber(pages, target),
+      opts.hunter(pages, target),
+    ]);
+    values.push(record(summary, verifyTarget(target, pages, a, b)));
+  }
   return { values, summary, method: "ai-assisted-two-pass" };
 }
