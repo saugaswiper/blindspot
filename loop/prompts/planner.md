@@ -10,6 +10,10 @@ stage, the next brief MUST be the fix for it — before any new feature. A broke
 (e.g. a measured recall FAIL) outranks closing out nice-to-haves. Only when no open FAIL
 remains do you pick the next new stage.
 
+OPERATOR BUILD ORDER: when no FAIL is open, follow the build order in Meta/Roadmap & Status.md —
+it overrides the frontier list below. Write the brief for the earliest unbuilt step and put
+`**Priority:** NEXT` under its title. Never brief a later step while an earlier one has no brief.
+
 Pick the single highest-value UNBLOCKED stage (skip anything waiting on ops/secrets — note
 the blocker instead). Frontier: full-text retrieval → data extraction → risk-of-bias
 (Otto-SR parity), then meta-analysis and living reviews. A brief is ONE shippable change — never bundle multiple features (a multi-item brief
