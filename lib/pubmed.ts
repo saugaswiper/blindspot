@@ -221,6 +221,18 @@ export async function checkMeshTerms(pubmedQuery: string): Promise<boolean> {
 }
 
 /**
+ * Non-primary publication types excluded from the screening feed (brief 012).
+ * Binary `NOT` only — never `AND NOT` (validation 006 F4).
+ */
+export const SCREENING_FEED_EXCLUSIONS =
+  ' NOT systematic[sb] NOT "meta-analysis"[pt] NOT "network meta-analysis"[pt] NOT review[pt]';
+
+/** Build the PubMed term for the screening feed. */
+export function screeningFeedTerm(query: string): string {
+  return `(${query})${SCREENING_FEED_EXCLUSIONS}`;
+}
+
+/**
  * Fetch primary study records (title + abstract) from PubMed for AI screening.
  *
  * ESearch retrieves up to `limit` PMIDs in a single call (PubMed supports up
@@ -237,7 +249,8 @@ export async function fetchPrimaryStudiesForScreening(
   // Binary `NOT systematic[sb]` (not `AND NOT`): ATM silently drops the NOT from
   // `AND NOT`, feeding the screening workbench systematic reviews instead of the
   // primary studies it is supposed to screen (validation 006 F4).
-  const { ids } = await esearch(`(${query}) NOT systematic[sb]`, Math.min(limit, 10000));
+  // Brief 012 also drops NMAs and narrative reviews (validation 007 F6/F7).
+  const { ids } = await esearch(screeningFeedTerm(query), Math.min(limit, 10000));
   if (ids.length === 0) return [];
 
   // EFetch supports up to 200 IDs per call — batch as needed
