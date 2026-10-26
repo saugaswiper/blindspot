@@ -1,0 +1,1087 @@
+[
+ {
+  "review": "Nelson_2002",
+  "seed": 1,
+  "n": 366,
+  "total": 80,
+  "B": 10,
+  "wss95": 0.44999999999999996,
+  "wss95Ref": 0.44999999999999996,
+  "wss95Random": -0.030874316939890754,
+  "recallAt10pct": 0.225,
+  "recallAt20pct": 0.4625,
+  "estStop": {
+   "screenedFrac": 0.9617486338797814,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9890710382513661,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Nelson_2002",
+  "seed": 2,
+  "n": 366,
+  "total": 80,
+  "B": 10,
+  "wss95": 0.3789617486338797,
+  "wss95Ref": 0.3789617486338797,
+  "wss95Random": -0.014480874316939937,
+  "recallAt10pct": 0.3,
+  "recallAt20pct": 0.4875,
+  "estStop": {
+   "screenedFrac": 0.9617486338797814,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9890710382513661,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Nelson_2002",
+  "seed": 3,
+  "n": 366,
+  "total": 80,
+  "B": 10,
+  "wss95": 0.3816939890710382,
+  "wss95Ref": 0.3816939890710382,
+  "wss95Random": -0.006284153005464525,
+  "recallAt10pct": 0.2375,
+  "recallAt20pct": 0.45,
+  "estStop": {
+   "screenedFrac": 0.9617486338797814,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9890710382513661,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Nelson_2002",
+  "seed": 4,
+  "n": 366,
+  "total": 80,
+  "B": 10,
+  "wss95": 0.36256830601092893,
+  "wss95Ref": 0.36256830601092893,
+  "wss95Random": 0.007377049180327826,
+  "recallAt10pct": 0.2375,
+  "recallAt20pct": 0.4125,
+  "estStop": {
+   "screenedFrac": 0.9617486338797814,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9890710382513661,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Nelson_2002",
+  "seed": 5,
+  "n": 366,
+  "total": 80,
+  "B": 10,
+  "wss95": 0.38442622950819666,
+  "wss95Ref": 0.38442622950819666,
+  "wss95Random": 0.026502732240437116,
+  "recallAt10pct": 0.2,
+  "recallAt20pct": 0.4125,
+  "estStop": {
+   "screenedFrac": 0.9617486338797814,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9890710382513661,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Sep_2021",
+  "seed": 1,
+  "n": 271,
+  "total": 40,
+  "B": 10,
+  "wss95": 0.34852398523985234,
+  "wss95Ref": 0.34852398523985234,
+  "wss95Random": 0.009040590405904013,
+  "recallAt10pct": 0.15,
+  "recallAt20pct": 0.325,
+  "estStop": {
+   "screenedFrac": 0.966789667896679,
+   "trueRecall": 1
+  },
+  "lowerStop": null,
+  "lowerCoverage": 1,
+  "estOverRounds": 0.037037037037037035
+ },
+ {
+  "review": "Sep_2021",
+  "seed": 2,
+  "n": 271,
+  "total": 40,
+  "B": 10,
+  "wss95": 0.22675276752767526,
+  "wss95Ref": 0.22675276752767526,
+  "wss95Random": 0.0976014760147601,
+  "recallAt10pct": 0.225,
+  "recallAt20pct": 0.45,
+  "estStop": {
+   "screenedFrac": 0.966789667896679,
+   "trueRecall": 1
+  },
+  "lowerStop": null,
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Sep_2021",
+  "seed": 3,
+  "n": 271,
+  "total": 40,
+  "B": 10,
+  "wss95": 0.3854243542435424,
+  "wss95Ref": 0.3854243542435424,
+  "wss95Random": -0.027859778597786024,
+  "recallAt10pct": 0.1,
+  "recallAt20pct": 0.35,
+  "estStop": {
+   "screenedFrac": 0.966789667896679,
+   "trueRecall": 1
+  },
+  "lowerStop": null,
+  "lowerCoverage": 1,
+  "estOverRounds": 0.1111111111111111
+ },
+ {
+  "review": "Sep_2021",
+  "seed": 4,
+  "n": 271,
+  "total": 40,
+  "B": 10,
+  "wss95": 0.35590405904059036,
+  "wss95Ref": 0.35590405904059036,
+  "wss95Random": -0.013099630996310008,
+  "recallAt10pct": 0.1,
+  "recallAt20pct": 0.4,
+  "estStop": {
+   "screenedFrac": 0.966789667896679,
+   "trueRecall": 1
+  },
+  "lowerStop": null,
+  "lowerCoverage": 1,
+  "estOverRounds": 0.07407407407407407
+ },
+ {
+  "review": "Sep_2021",
+  "seed": 5,
+  "n": 271,
+  "total": 40,
+  "B": 10,
+  "wss95": 0.21568265682656823,
+  "wss95Ref": 0.21568265682656823,
+  "wss95Random": -0.005719557195572003,
+  "recallAt10pct": 0.325,
+  "recallAt20pct": 0.425,
+  "estStop": {
+   "screenedFrac": 0.966789667896679,
+   "trueRecall": 1
+  },
+  "lowerStop": null,
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Oud_2018",
+  "seed": 1,
+  "n": 952,
+  "total": 20,
+  "B": 16,
+  "wss95": 0.8228991596638655,
+  "wss95Ref": 0.8228991596638655,
+  "wss95Random": 0.00987394957983189,
+  "recallAt10pct": 0.8,
+  "recallAt20pct": 0.95,
+  "estStop": {
+   "screenedFrac": 0.9600840336134454,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.976890756302521,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Oud_2018",
+  "seed": 2,
+  "n": 952,
+  "total": 20,
+  "B": 16,
+  "wss95": 0.8123949579831933,
+  "wss95Ref": 0.8123949579831933,
+  "wss95Random": 0.1317226890756302,
+  "recallAt10pct": 0.8,
+  "recallAt20pct": 0.95,
+  "estStop": {
+   "screenedFrac": 0.9600840336134454,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.976890756302521,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Oud_2018",
+  "seed": 3,
+  "n": 952,
+  "total": 20,
+  "B": 16,
+  "wss95": 0.778781512605042,
+  "wss95Ref": 0.778781512605042,
+  "wss95Random": 0.045588235294117596,
+  "recallAt10pct": 0.75,
+  "recallAt20pct": 0.95,
+  "estStop": {
+   "screenedFrac": 0.9600840336134454,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.976890756302521,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Oud_2018",
+  "seed": 4,
+  "n": 952,
+  "total": 20,
+  "B": 16,
+  "wss95": 0.8271008403361344,
+  "wss95Ref": 0.8271008403361344,
+  "wss95Random": 0.08865546218487391,
+  "recallAt10pct": 0.8,
+  "recallAt20pct": 0.95,
+  "estStop": {
+   "screenedFrac": 0.9600840336134454,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.976890756302521,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Oud_2018",
+  "seed": 5,
+  "n": 952,
+  "total": 20,
+  "B": 16,
+  "wss95": 0.7945378151260504,
+  "wss95Ref": 0.7945378151260504,
+  "wss95Random": 0.019327731092436934,
+  "recallAt10pct": 0.75,
+  "recallAt20pct": 0.95,
+  "estStop": {
+   "screenedFrac": 0.9600840336134454,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.976890756302521,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "van_der_Valk_2021",
+  "seed": 1,
+  "n": 725,
+  "total": 89,
+  "B": 13,
+  "wss95": 0.42310344827586205,
+  "wss95Ref": 0.42310344827586205,
+  "wss95Random": -0.0017241379310345278,
+  "recallAt10pct": 0.3258426966292135,
+  "recallAt20pct": 0.5842696629213483,
+  "estStop": {
+   "screenedFrac": 0.953103448275862,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9710344827586207,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "van_der_Valk_2021",
+  "seed": 2,
+  "n": 725,
+  "total": 89,
+  "B": 13,
+  "wss95": 0.4051724137931034,
+  "wss95Ref": 0.4051724137931034,
+  "wss95Random": -0.014137931034482805,
+  "recallAt10pct": 0.33707865168539325,
+  "recallAt20pct": 0.5842696629213483,
+  "estStop": {
+   "screenedFrac": 0.953103448275862,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9710344827586207,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "van_der_Valk_2021",
+  "seed": 3,
+  "n": 725,
+  "total": 89,
+  "B": 13,
+  "wss95": 0.4244827586206896,
+  "wss95Ref": 0.4244827586206896,
+  "wss95Random": -0.02931034482758625,
+  "recallAt10pct": 0.3258426966292135,
+  "recallAt20pct": 0.5617977528089888,
+  "estStop": {
+   "screenedFrac": 0.953103448275862,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9710344827586207,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "van_der_Valk_2021",
+  "seed": 4,
+  "n": 725,
+  "total": 89,
+  "B": 13,
+  "wss95": 0.4258620689655172,
+  "wss95Ref": 0.4258620689655172,
+  "wss95Random": -0.01275862068965522,
+  "recallAt10pct": 0.3146067415730337,
+  "recallAt20pct": 0.5842696629213483,
+  "estStop": {
+   "screenedFrac": 0.953103448275862,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9710344827586207,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "van_der_Valk_2021",
+  "seed": 5,
+  "n": 725,
+  "total": 89,
+  "B": 13,
+  "wss95": 0.42310344827586205,
+  "wss95Ref": 0.42310344827586205,
+  "wss95Random": -0.016896551724137975,
+  "recallAt10pct": 0.2808988764044944,
+  "recallAt20pct": 0.5617977528089888,
+  "estStop": {
+   "screenedFrac": 0.953103448275862,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9710344827586207,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Menon_2022",
+  "seed": 1,
+  "n": 975,
+  "total": 74,
+  "B": 17,
+  "wss95": 0.551025641025641,
+  "wss95Ref": 0.551025641025641,
+  "wss95Random": -0.010000000000000044,
+  "recallAt10pct": 0.6486486486486487,
+  "recallAt20pct": 0.8648648648648649,
+  "estStop": {
+   "screenedFrac": 0.961025641025641,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9784615384615385,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Menon_2022",
+  "seed": 2,
+  "n": 975,
+  "total": 74,
+  "B": 17,
+  "wss95": 0.5571794871794872,
+  "wss95Ref": 0.5571794871794872,
+  "wss95Random": -0.013076923076923118,
+  "recallAt10pct": 0.7027027027027027,
+  "recallAt20pct": 0.8648648648648649,
+  "estStop": {
+   "screenedFrac": 0.961025641025641,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9784615384615385,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Menon_2022",
+  "seed": 3,
+  "n": 975,
+  "total": 74,
+  "B": 17,
+  "wss95": 0.5623076923076923,
+  "wss95Ref": 0.5623076923076923,
+  "wss95Random": -0.023333333333333376,
+  "recallAt10pct": 0.6891891891891891,
+  "recallAt20pct": 0.8378378378378378,
+  "estStop": {
+   "screenedFrac": 0.961025641025641,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9784615384615385,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Menon_2022",
+  "seed": 4,
+  "n": 975,
+  "total": 74,
+  "B": 17,
+  "wss95": 0.5458974358974359,
+  "wss95Ref": 0.5458974358974359,
+  "wss95Random": 0.0023076923076922606,
+  "recallAt10pct": 0.6756756756756757,
+  "recallAt20pct": 0.8918918918918919,
+  "estStop": {
+   "screenedFrac": 0.961025641025641,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9784615384615385,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Menon_2022",
+  "seed": 5,
+  "n": 975,
+  "total": 74,
+  "B": 17,
+  "wss95": 0.5746153846153845,
+  "wss95Ref": 0.5746153846153845,
+  "wss95Random": -0.026410256410256454,
+  "recallAt10pct": 0.7162162162162162,
+  "recallAt20pct": 0.8648648648648649,
+  "estStop": {
+   "screenedFrac": 0.961025641025641,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9784615384615385,
+   "trueRecall": 0.9864864864864865
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Donners_2021",
+  "seed": 1,
+  "n": 258,
+  "total": 15,
+  "B": 10,
+  "wss95": 0.6515503875968992,
+  "wss95Ref": 0.6515503875968992,
+  "wss95Random": 0.201937984496124,
+  "recallAt10pct": 0.5333333333333333,
+  "recallAt20pct": 0.8666666666666667,
+  "estStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Donners_2021",
+  "seed": 2,
+  "n": 258,
+  "total": 15,
+  "B": 10,
+  "wss95": 0.6011627906976744,
+  "wss95Ref": 0.6011627906976744,
+  "wss95Random": -0.030620155038759735,
+  "recallAt10pct": 0.5333333333333333,
+  "recallAt20pct": 0.8666666666666667,
+  "estStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Donners_2021",
+  "seed": 3,
+  "n": 258,
+  "total": 15,
+  "B": 10,
+  "wss95": 0.6127906976744185,
+  "wss95Ref": 0.6127906976744185,
+  "wss95Random": -0.02286821705426361,
+  "recallAt10pct": 0.4666666666666667,
+  "recallAt20pct": 0.8666666666666667,
+  "estStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Donners_2021",
+  "seed": 4,
+  "n": 258,
+  "total": 15,
+  "B": 10,
+  "wss95": 0.5662790697674418,
+  "wss95Ref": 0.5662790697674418,
+  "wss95Random": -0.01899224806201555,
+  "recallAt10pct": 0.4666666666666667,
+  "recallAt20pct": 0.8666666666666667,
+  "estStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Donners_2021",
+  "seed": 5,
+  "n": 258,
+  "total": 15,
+  "B": 10,
+  "wss95": 0.6166666666666666,
+  "wss95Ref": 0.6166666666666666,
+  "wss95Random": -0.011240310077519425,
+  "recallAt10pct": 0.4,
+  "recallAt20pct": 0.8,
+  "estStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9767441860465116,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Meijboom_2021",
+  "seed": 1,
+  "n": 882,
+  "total": 37,
+  "B": 15,
+  "wss95": 0.6370748299319727,
+  "wss95Ref": 0.6370748299319727,
+  "wss95Random": -0.01938775510204086,
+  "recallAt10pct": 0.7027027027027027,
+  "recallAt20pct": 0.9459459459459459,
+  "estStop": {
+   "screenedFrac": 0.9546485260770975,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.971655328798186,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Meijboom_2021",
+  "seed": 2,
+  "n": 882,
+  "total": 37,
+  "B": 15,
+  "wss95": 0.6166666666666666,
+  "wss95Ref": 0.6166666666666666,
+  "wss95Random": -0.027324263038548798,
+  "recallAt10pct": 0.6216216216216216,
+  "recallAt20pct": 0.9459459459459459,
+  "estStop": {
+   "screenedFrac": 0.9546485260770975,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.971655328798186,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Meijboom_2021",
+  "seed": 3,
+  "n": 882,
+  "total": 37,
+  "B": 15,
+  "wss95": 0.6393424036281179,
+  "wss95Ref": 0.6393424036281179,
+  "wss95Random": -0.04433106575963723,
+  "recallAt10pct": 0.6756756756756757,
+  "recallAt20pct": 0.9459459459459459,
+  "estStop": {
+   "screenedFrac": 0.9546485260770975,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.971655328798186,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Meijboom_2021",
+  "seed": 4,
+  "n": 882,
+  "total": 37,
+  "B": 15,
+  "wss95": 0.6166666666666666,
+  "wss95Ref": 0.6166666666666666,
+  "wss95Random": 0.0010204081632652628,
+  "recallAt10pct": 0.6756756756756757,
+  "recallAt20pct": 0.9459459459459459,
+  "estStop": {
+   "screenedFrac": 0.9546485260770975,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.971655328798186,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Meijboom_2021",
+  "seed": 5,
+  "n": 882,
+  "total": 37,
+  "B": 15,
+  "wss95": 0.6359410430839002,
+  "wss95Ref": 0.6359410430839002,
+  "wss95Random": 0.03503401360544213,
+  "recallAt10pct": 0.7027027027027027,
+  "recallAt20pct": 0.9459459459459459,
+  "estStop": {
+   "screenedFrac": 0.9546485260770975,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.971655328798186,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Jeyaraman_2020",
+  "seed": 1,
+  "n": 1175,
+  "total": 96,
+  "B": 20,
+  "wss95": 0.5831914893617021,
+  "wss95Ref": 0.5831914893617021,
+  "wss95Random": -0.006595744680851105,
+  "recallAt10pct": 0.5416666666666666,
+  "recallAt20pct": 0.8333333333333334,
+  "estStop": {
+   "screenedFrac": 0.9548936170212766,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9719148936170213,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Jeyaraman_2020",
+  "seed": 2,
+  "n": 1175,
+  "total": 96,
+  "B": 20,
+  "wss95": 0.6053191489361701,
+  "wss95Ref": 0.6053191489361701,
+  "wss95Random": 0.010425531914893572,
+  "recallAt10pct": 0.5729166666666666,
+  "recallAt20pct": 0.78125,
+  "estStop": {
+   "screenedFrac": 0.9548936170212766,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9719148936170213,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Jeyaraman_2020",
+  "seed": 3,
+  "n": 1175,
+  "total": 96,
+  "B": 20,
+  "wss95": 0.6138297872340425,
+  "wss95Ref": 0.6138297872340425,
+  "wss95Random": 0.007872340425531872,
+  "recallAt10pct": 0.5833333333333334,
+  "recallAt20pct": 0.8020833333333334,
+  "estStop": {
+   "screenedFrac": 0.9548936170212766,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9719148936170213,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Jeyaraman_2020",
+  "seed": 4,
+  "n": 1175,
+  "total": 96,
+  "B": 20,
+  "wss95": 0.59,
+  "wss95Ref": 0.59,
+  "wss95Random": -0.01936170212765962,
+  "recallAt10pct": 0.625,
+  "recallAt20pct": 0.84375,
+  "estStop": {
+   "screenedFrac": 0.9548936170212766,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9719148936170213,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Jeyaraman_2020",
+  "seed": 5,
+  "n": 1175,
+  "total": 96,
+  "B": 20,
+  "wss95": 0.6027659574468085,
+  "wss95Ref": 0.6027659574468085,
+  "wss95Random": -0.010851063829787282,
+  "recallAt10pct": 0.6145833333333334,
+  "recallAt20pct": 0.8125,
+  "estStop": {
+   "screenedFrac": 0.9548936170212766,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9719148936170213,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Bos_2018",
+  "seed": 1,
+  "n": 4878,
+  "total": 10,
+  "B": 82,
+  "wss95": 0.2605781057810578,
+  "wss95Ref": 0.2605781057810578,
+  "wss95Random": -0.021709717097171018,
+  "recallAt10pct": 0.9,
+  "recallAt20pct": 0.9,
+  "estStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Bos_2018",
+  "seed": 2,
+  "n": 4878,
+  "total": 10,
+  "B": 82,
+  "wss95": 0.25114801148011473,
+  "wss95Ref": 0.25114801148011473,
+  "wss95Random": 0.15889708897088967,
+  "recallAt10pct": 0.9,
+  "recallAt20pct": 0.9,
+  "estStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Bos_2018",
+  "seed": 3,
+  "n": 4878,
+  "total": 10,
+  "B": 82,
+  "wss95": 0.26119311193111927,
+  "wss95Ref": 0.26119311193111927,
+  "wss95Random": -0.04384993849938504,
+  "recallAt10pct": 0.9,
+  "recallAt20pct": 0.9,
+  "estStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Bos_2018",
+  "seed": 4,
+  "n": 4878,
+  "total": 10,
+  "B": 82,
+  "wss95": 0.26242312423124226,
+  "wss95Ref": 0.26242312423124226,
+  "wss95Random": 0.07935629356293558,
+  "recallAt10pct": 0.9,
+  "recallAt20pct": 0.9,
+  "estStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Bos_2018",
+  "seed": 5,
+  "n": 4878,
+  "total": 10,
+  "B": 82,
+  "wss95": 0.24848298482984826,
+  "wss95Ref": 0.24848298482984826,
+  "wss95Random": 0.015395653956539523,
+  "recallAt10pct": 0.9,
+  "recallAt20pct": 0.9,
+  "estStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.992209922099221,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Chou_2004",
+  "seed": 1,
+  "n": 1630,
+  "total": 9,
+  "B": 28,
+  "wss95": 0.19233128834355823,
+  "wss95Ref": 0.19233128834355823,
+  "wss95Random": -0.03650306748466262,
+  "recallAt10pct": 0.2222222222222222,
+  "recallAt20pct": 0.4444444444444444,
+  "estStop": {
+   "screenedFrac": 0.9803680981595092,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9975460122699387,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0.05084745762711865
+ },
+ {
+  "review": "Chou_2004",
+  "seed": 2,
+  "n": 1630,
+  "total": 9,
+  "B": 28,
+  "wss95": 0.26472392638036807,
+  "wss95Ref": 0.26472392638036807,
+  "wss95Random": 0.006441717791410999,
+  "recallAt10pct": 0.3333333333333333,
+  "recallAt20pct": 0.4444444444444444,
+  "estStop": {
+   "screenedFrac": 0.9803680981595092,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9975460122699387,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Chou_2004",
+  "seed": 3,
+  "n": 1630,
+  "total": 9,
+  "B": 28,
+  "wss95": 0.26165644171779134,
+  "wss95Ref": 0.26165644171779134,
+  "wss95Random": 0.17085889570552143,
+  "recallAt10pct": 0.4444444444444444,
+  "recallAt20pct": 0.4444444444444444,
+  "estStop": {
+   "screenedFrac": 0.9803680981595092,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9975460122699387,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Chou_2004",
+  "seed": 4,
+  "n": 1630,
+  "total": 9,
+  "B": 28,
+  "wss95": 0.27576687116564413,
+  "wss95Ref": 0.27576687116564413,
+  "wss95Random": 0.007055214723926333,
+  "recallAt10pct": 0.2222222222222222,
+  "recallAt20pct": 0.2222222222222222,
+  "estStop": {
+   "screenedFrac": 0.9803680981595092,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9975460122699387,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ },
+ {
+  "review": "Chou_2004",
+  "seed": 5,
+  "n": 1630,
+  "total": 9,
+  "B": 28,
+  "wss95": 0.261042944785276,
+  "wss95Ref": 0.261042944785276,
+  "wss95Random": -0.015644171779141146,
+  "recallAt10pct": 0.3333333333333333,
+  "recallAt20pct": 0.4444444444444444,
+  "estStop": {
+   "screenedFrac": 0.9803680981595092,
+   "trueRecall": 1
+  },
+  "lowerStop": {
+   "screenedFrac": 0.9975460122699387,
+   "trueRecall": 1
+  },
+  "lowerCoverage": 1,
+  "estOverRounds": 0
+ }
+]
