@@ -34,3 +34,6 @@
 
 ## Stale wiki pages
 Roadmap & Status and the Screening workbench feature page (speed-mode behavior, scoping, announcements); Design Language / design 003 §S6 tracking (keyboard-opaque rows addressed, claimed).
+
+## Operator review fix (2026-11-03)
+With focus on `document.body` and no active row, every key was out of scope, so the "Press j to start" hint did nothing. A bare `j` from the body now activates row 1 **without** `preventDefault` (letters do not scroll), so AC1 still holds. Arrows from the body remain unscoped.

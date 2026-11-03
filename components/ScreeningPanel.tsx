@@ -431,7 +431,12 @@ function ScreeningResultsTable({
         targetIsBody: t === document.body,
         hasActiveRow: activeIdx >= 0,
       });
-      if (!inScope) return;
+      if (!inScope) {
+        // "Press j to start": a bare j from the page body activates row 1. Letters don't
+        // scroll, so no preventDefault is needed and native scrolling is untouched.
+        if (e.key === "j" && t === document.body && activeIdx < 0 && visible.length > 0) setActiveIdx(0);
+        return;
+      }
 
       if (action.kind === "move") {
         e.preventDefault();
