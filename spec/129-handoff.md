@@ -31,3 +31,6 @@ Warm-starting / capping epochs in `fit` (not needed for the 10 s budget here); g
 
 ## Stale wiki pages
 Roadmap & Status (brief 013 implemented, awaiting validation); ML Layer (`estimateRecall` description and the `RecallEstimate` shape); Briefs/013 mirror (status); Screening Recall Estimate Fix.
+
+## Operator review fix (2026-11-03)
+`poissonCdf`/`poissonQuantile` computed `exp(-mu)` directly, which underflows to 0 for mu > ~745 (e.g. 3,000 unscreened records with summed score > 745 early in screening): CDF stuck at 0 → quantile loop to 1e6 with O(m) CDF per step (effectively a hang). Now log-space, single-pass quantile with a cap at mu + 50√mu + 50. Regression test added (mu = 1,500 finishes < 1 s, interval ordered).

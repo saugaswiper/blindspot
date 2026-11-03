@@ -37,6 +37,16 @@ describe("rankRecords", () => {
 });
 
 describe("estimateRecall", () => {
+  it("terminates and stays ordered when expected missed is large (mu > 745 underflow)", () => {
+    const t0 = Date.now();
+    const r = estimateRecall(10, Array(3000).fill(0.5)); // mu = 1500
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(r.lower).toBeGreaterThan(0);
+    expect(r.lower).toBeLessThanOrEqual(r.estimate);
+    expect(r.estimate).toBeLessThanOrEqual(r.upper);
+    expect(r.estimate).toBeCloseTo(10 / 1510, 6);
+  });
+
   it("is advisory with lower <= estimate <= upper", () => {
     const r = estimateRecall(8, [0.5, 0.25, 0.25]);
     expect(r.advisory).toBe(true);

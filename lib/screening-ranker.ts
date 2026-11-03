@@ -145,21 +145,31 @@ export interface RecallAudit {
 
 const ALPHA = 0.025;
 
+// Terms are built in log space: exp(-mu) underflows to 0 for mu > ~745, which
+// would make the CDF 0 forever and the quantile search never terminate.
 function poissonCdf(k: number, mu: number): number {
   if (mu <= 0) return 1;
-  let term = Math.exp(-mu);
-  let sum = term;
+  let logTerm = -mu;
+  let sum = Math.exp(logTerm);
   for (let i = 1; i <= k; i++) {
-    term *= mu / i;
-    sum += term;
+    logTerm += Math.log(mu / i);
+    sum += Math.exp(logTerm);
   }
   return Math.min(1, sum);
 }
 
-/** Smallest integer m with P(Pois(mu) <= m) >= q. */
+/** Smallest integer m with P(Pois(mu) <= m) >= q. Single pass, O(m). */
 function poissonQuantile(mu: number, q: number): number {
+  if (mu <= 0) return 0;
+  let logTerm = -mu;
+  let cdf = Math.exp(logTerm);
   let m = 0;
-  while (poissonCdf(m, mu) < q && m < 1e6) m++;
+  const cap = Math.ceil(mu + 50 * Math.sqrt(mu) + 50);
+  while (cdf < q && m < cap) {
+    m++;
+    logTerm += Math.log(mu / m);
+    cdf += Math.exp(logTerm);
+  }
   return m;
 }
 
