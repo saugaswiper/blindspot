@@ -37,15 +37,60 @@ describe("rankRecords", () => {
 });
 
 describe("estimateRecall", () => {
-  it("is advisory with lower <= estimate", () => {
+  it("is advisory with lower <= estimate <= upper", () => {
     const r = estimateRecall(8, [0.5, 0.25, 0.25]);
     expect(r.advisory).toBe(true);
     expect(r.estimate).toBeCloseTo(8 / 9);
     expect(r.lower).toBeLessThanOrEqual(r.estimate);
+    expect(r.upper).toBeGreaterThanOrEqual(r.estimate);
+    expect(r.method).toBe("poisson-uncalibrated");
   });
-  it("is 1 when nothing remains", () => {
-    expect(estimateRecall(0, []).estimate).toBe(1);
+  it("is 1 when nothing remains, including 0 includes and an empty pool", () => {
+    const r = estimateRecall(0, []);
+    expect([r.estimate, r.lower, r.upper]).toEqual([1, 1, 1]);
   });
+  it("is monotone in found includes", () => {
+    const tail = Array(200).fill(0.02);
+    let prev = -1;
+    for (let f = 0; f <= 30; f++) {
+      const r = estimateRecall(f, tail);
+      expect(r.estimate).toBeGreaterThanOrEqual(prev);
+      prev = r.estimate;
+    }
+  });
+  it("lower bound is a real bound: far below the point estimate on a long tail", () => {
+    const r = estimateRecall(20, Array(1000).fill(0.005)); // expect 5 missed
+    expect(r.estimate).toBeCloseTo(20 / 25);
+    expect(r.lower).toBeLessThan(0.75);
+    expect(r.upper).toBeGreaterThan(r.estimate);
+  });
+  it("interval narrows as the unscreened tail shrinks", () => {
+    const wide = estimateRecall(20, Array(1000).fill(0.005));
+    const narrow = estimateRecall(24, Array(100).fill(0.005));
+    expect(narrow.upper - narrow.lower).toBeLessThan(wide.upper - wide.lower);
+  });
+  it("audit showing the model under-predicts lowers the estimate; never raises it", () => {
+    const tail = Array(500).fill(0.01);
+    const base = estimateRecall(20, tail);
+    const bad = estimateRecall(20, tail, Array.from({ length: 20 }, (_, i) => ({ score: 0.05, include: i < 6 })));
+    expect(bad.method).toBe("poisson-audit-scaled");
+    expect(bad.estimate).toBeLessThan(base.estimate);
+    expect(bad.lower).toBeLessThan(base.lower);
+    const good = estimateRecall(20, tail, Array.from({ length: 20 }, () => ({ score: 0.5, include: false })));
+    expect(good.estimate).toBeCloseTo(base.estimate);
+  });
+});
+
+describe("rankRecords latency", () => {
+  it("ranks n=3000 with 1500 verdicts inside the 10 s budget", () => {
+    const words = Array.from({ length: 400 }, (_, i) => `w${i}`);
+    const pick = (i: number, k: number) => Array.from({ length: 30 }, (_, j) => words[(i * 7 + j * k) % 400]).join(" ");
+    const many: RankRecord[] = Array.from({ length: 3000 }, (_, i) => ({ id: String(i), title: pick(i, 3), abstract: pick(i, 11) }));
+    const verdicts = many.slice(0, 1500).map((r, i) => ({ id: r.id, verdict: (i % 10 === 0 ? "include" : "exclude") as "include" | "exclude" }));
+    const t0 = Date.now();
+    expect(rankRecords(many, verdicts)).toHaveLength(3000);
+    expect(Date.now() - t0).toBeLessThan(10_000);
+  }, 30_000);
 });
 
 describe("benchmark metrics", () => {
