@@ -249,17 +249,22 @@ export interface StoppingOptions {
   alpha?: number;
   /** Never stop before this share of the pool is screened (default 0.2). */
   minScreenedFrac?: number;
-  /** Sample size k as a share of the pool (default 0.1). */
-  kFrac?: number;
 }
 
 export interface StoppingResult {
   stop: boolean;
-  /** P(X <= x) under the least favourable H0 (recall just below target). */
+  /** Smallest P(X <= x) over all k, under the least favourable H0 (recall just below target). */
   p: number;
-  /** One-sided (1-alpha) lower bound on recall at the start of the sample; 0 if untestable. */
+  /** One-sided (1-alpha) lower bound on recall at the start of the best sample; 0 if untestable. */
   recallLowerBound: number;
+  /** The k (last-k-screened sample size) that gave the smallest p. */
   kUsed: number;
+  /**
+   * Why the test did not stop (null when it stopped): `untestable-few-includes` = fewer than
+   * ~19 includes found, so M0 = 1 and certifying the target means ruling out even one missed
+   * include; `insufficient-sample` = enough includes but the evidence so far is not enough.
+   */
+  reason: "untestable-few-includes" | "insufficient-sample" | null;
   method: "hypergeometric-cmh2020";
   advisory: true;
 }
@@ -287,39 +292,50 @@ export function hypergeomCdf(x: number, R: number, M: number, k: number): number
 /**
  * Advisory statistical stopping test. `screenedInOrder[i]` is the human verdict
  * (true = include) of the i-th screened record; `nTotal` is the pool size.
- * Never auto-excludes.
+ * Every sample size k = 1..s-1 is evaluated and the smallest p is used.
+ * NOTE: the paper's multiplicity handling for scanning k could not be verified (no access to
+ * the full text); the min-p is unadjusted, so validity is for the tester to check. Never auto-excludes.
  */
 export function stoppingTest(
   screenedInOrder: boolean[],
   nTotal: number,
-  { target = 0.95, alpha = 0.05, minScreenedFrac = 0.2, kFrac = 0.1 }: StoppingOptions = {}
+  { target = 0.95, alpha = 0.05, minScreenedFrac = 0.2 }: StoppingOptions = {}
 ): StoppingResult {
   const s = screenedInOrder.length;
-  const k = Math.max(1, Math.ceil(kFrac * nTotal));
-  const none: StoppingResult = { stop: false, p: 1, recallLowerBound: 0, kUsed: k, method: "hypergeometric-cmh2020", advisory: true };
-  if (s < minScreenedFrac * nTotal || s <= k || s > nTotal) return none;
-  let x = 0;
-  for (let i = s - k; i < s; i++) if (screenedInOrder[i]) x++;
-  let dPrev = 0;
-  for (let i = 0; i < s - k; i++) if (screenedInOrder[i]) dPrev++;
-  const R = nTotal - (s - k);
-  if (dPrev === 0) return none;
-  const M0 = Math.floor((dPrev * (1 - target)) / target) + 1;
-  if (M0 > R) return none; // cannot even hold M0 includes
-  const p = hypergeomCdf(x, R, Math.max(M0, x), k);
+  const none: StoppingResult = { stop: false, p: 1, recallLowerBound: 0, kUsed: 0, reason: "insufficient-sample", method: "hypergeometric-cmh2020", advisory: true };
+  if (s < minScreenedFrac * nTotal || s < 2 || s > nTotal) return none;
+  // prefix[i] = includes among the first i screened
+  const prefix = new Array<number>(s + 1).fill(0);
+  for (let i = 0; i < s; i++) prefix[i + 1] = prefix[i] + (screenedInOrder[i] ? 1 : 0);
+  const found = prefix[s];
+  if (Math.floor((found * (1 - target)) / target) + 1 <= 1) return { ...none, reason: "untestable-few-includes" };
+  let best = { p: 1, k: 0, x: 0, dPrev: 0, R: 0 };
+  for (let k = 1; k < s; k++) {
+    const dPrev = prefix[s - k];
+    if (dPrev === 0) break; // shorter heads only have fewer includes
+    const x = found - dPrev;
+    const R = nTotal - (s - k);
+    const M0 = Math.floor((dPrev * (1 - target)) / target) + 1;
+    if (M0 > R) continue;
+    const p = hypergeomCdf(x, R, Math.max(M0, x), k);
+    if (p < best.p) best = { p, k, x, dPrev, R };
+  }
+  if (best.k === 0) return none;
   // Largest M still compatible with x at level alpha (p(M) decreases in M).
-  let lo = x;
-  let hi = R;
+  let lo = best.x;
+  let hi = best.R;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if (hypergeomCdf(x, R, mid, k) >= alpha) lo = mid;
+    if (hypergeomCdf(best.x, best.R, mid, best.k) >= alpha) lo = mid;
     else hi = mid - 1;
   }
+  const stop = best.p < alpha;
   return {
-    stop: p < alpha,
-    p,
-    recallLowerBound: dPrev / (dPrev + lo),
-    kUsed: k,
+    stop,
+    p: best.p,
+    recallLowerBound: best.dPrev / (best.dPrev + lo),
+    kUsed: best.k,
+    reason: stop ? null : "insufficient-sample",
     method: "hypergeometric-cmh2020",
     advisory: true,
   };

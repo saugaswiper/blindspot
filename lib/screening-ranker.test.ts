@@ -144,6 +144,14 @@ describe("stoppingTest (hypergeometric)", () => {
     expect(stoppingTest(seq, n).stop).toBe(false);
   });
   it("cannot stop with too few includes found", () => {
-    expect(stoppingTest(head(5, 300), 1000).stop).toBe(false);
+    const r = stoppingTest(head(5, 300), 1000);
+    expect(r.stop).toBe(false);
+    expect(r.reason).toBe("untestable-few-includes");
+  });
+  it("reports a reason only when it does not stop, and the best k", () => {
+    const r = stoppingTest(head(400, 500), 1000);
+    expect(r.reason).toBeNull();
+    expect(r.kUsed).toBeGreaterThan(0);
+    expect(stoppingTest(head(400, 500).map((v, i) => v || i % 5 === 0), 1000).reason).toBe("insufficient-sample");
   });
 });
