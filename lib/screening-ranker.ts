@@ -128,22 +128,99 @@ export function rankRecords(records: RankRecord[], verdicts: RankVerdict[] = [])
 export interface RecallEstimate {
   /** Point estimate of the share of all includes already found (0–1). */
   estimate: number;
-  /** Conservative lower bound: assumes up to 2x the expected unscreened includes (heuristic, unvalidated). */
+  /** One-sided 97.5% lower bound on recall (0–1): found / (found + upper bound on missed). */
   lower: number;
+  /** One-sided 97.5% upper bound on recall (0–1). */
+  upper: number;
+  /** Interval method used; "audit-scaled" means scores were corrected by an out-of-sample audit. */
+  method: "poisson-uncalibrated" | "poisson-audit-scaled";
   advisory: true;
 }
 
+/** An out-of-sample audit pair: the score a record had BEFORE it was screened, and the human verdict. */
+export interface RecallAudit {
+  score: number;
+  include: boolean;
+}
+
+const ALPHA = 0.025;
+
+// Terms are built in log space: exp(-mu) underflows to 0 for mu > ~745, which
+// would make the CDF 0 forever and the quantile search never terminate.
+function poissonCdf(k: number, mu: number): number {
+  if (mu <= 0) return 1;
+  let logTerm = -mu;
+  let sum = Math.exp(logTerm);
+  for (let i = 1; i <= k; i++) {
+    logTerm += Math.log(mu / i);
+    sum += Math.exp(logTerm);
+  }
+  return Math.min(1, sum);
+}
+
+/** Smallest integer m with P(Pois(mu) <= m) >= q. Single pass, O(m). */
+function poissonQuantile(mu: number, q: number): number {
+  if (mu <= 0) return 0;
+  let logTerm = -mu;
+  let cdf = Math.exp(logTerm);
+  let m = 0;
+  const cap = Math.ceil(mu + 50 * Math.sqrt(mu) + 50);
+  while (cdf < q && m < cap) {
+    m++;
+    logTerm += Math.log(mu / m);
+    cdf += Math.exp(logTerm);
+  }
+  return m;
+}
+
+/** Garwood upper limit: largest mu still compatible with seeing k events (P(Pois(mu) <= k) > ALPHA). */
+function poissonUpperMean(k: number): number {
+  let lo = 0;
+  let hi = k + 10 * Math.sqrt(k + 1) + 10;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (poissonCdf(k, mid) > ALPHA) lo = mid;
+    else hi = mid;
+  }
+  return hi;
+}
+
 /**
- * Advisory stopping estimate: found includes / (found + expected includes
- * among unscreened records, from model scores). Never auto-excludes; the
- * reviewer decides when to stop. The lower bound assumes the unscreened
- * expectation could be up to 2x the model's estimate.
+ * Advisory stopping estimate. Missed includes among the unscreened records are
+ * modelled as Poisson with mean = sum of model scores. A Poisson upper tail
+ * dominates the Poisson-binomial tail (Hoeffding), so the bound is conservative
+ * for any score vector. Raw scores come from a regularised model and are not
+ * calibrated, so callers SHOULD pass `audit` — (score-before-screening, verdict)
+ * pairs for records the model had not trained on, e.g. the latest screened batch.
+ * The expected-vs-observed include ratio then scales the unscreened mean up (never
+ * down), with a Garwood upper limit on the observed count feeding the lower bound.
+ * Never auto-excludes; the reviewer decides when to stop.
  */
-export function estimateRecall(foundIncludes: number, unscreenedScores: number[]): RecallEstimate {
-  const expectedMissed = unscreenedScores.reduce((s, p) => s + p, 0);
-  const denom = foundIncludes + expectedMissed;
-  const estimate = denom === 0 ? 1 : foundIncludes / denom;
-  const lowerDenom = foundIncludes + 2 * expectedMissed;
-  const lower = lowerDenom === 0 ? 1 : foundIncludes / lowerDenom;
-  return { estimate, lower, advisory: true };
+export function estimateRecall(
+  foundIncludes: number,
+  unscreenedScores: number[],
+  audit: RecallAudit[] = []
+): RecallEstimate {
+  const sumP = unscreenedScores.reduce((s, p) => s + p, 0);
+  let ratioPt = 1;
+  let ratioHi = 1;
+  if (audit.length > 0) {
+    const expected = audit.reduce((s, a) => s + a.score, 0);
+    const hits = audit.filter((a) => a.include).length;
+    const e = Math.max(expected, 1e-6);
+    ratioPt = Math.max(1, hits / e);
+    ratioHi = Math.max(ratioPt, poissonUpperMean(hits) / e);
+  }
+  const muPt = sumP * ratioPt;
+  const muHi = sumP * ratioHi;
+  const missedHi = Math.max(muPt, poissonQuantile(muHi, 1 - ALPHA));
+  const missedLo = Math.min(muPt, poissonQuantile(muPt, ALPHA));
+  const rec = (missed: number) => (foundIncludes + missed === 0 ? 1 : foundIncludes / (foundIncludes + missed));
+  return {
+    estimate: rec(muPt),
+    lower: rec(missedHi),
+    upper: rec(missedLo),
+    method: audit.length > 0 ? "poisson-audit-scaled" : "poisson-uncalibrated",
+    advisory: true,
+  };
 }
