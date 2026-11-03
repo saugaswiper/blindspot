@@ -21,9 +21,10 @@
  *   initialResult – previously saved ScreeningResult (if any) from the DB
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CalibrationExample, ExistingReview, FulltextSource, ScreeningCriteria, ScreeningDecision, ScreeningReasonCode, ScreeningResult } from "@/types";
 import { downloadTextFile, toRis } from "@/lib/citation-export";
+import { announceVerdict, isKeyInScope, parseSpeedModeKey, toggleVerdict } from "@/lib/screening-speed-mode";
 import {
   buildCsv,
   carryOverHumanVerdicts,
@@ -370,6 +371,11 @@ function ScreeningResultsTable({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   // Keyboard speed mode: position of the active row within the visible list.
   const [activeIdx, setActiveIdx] = useState(-1);
+  // Scope for speed-mode keys: only the panel's own results region (and the sort select, for Escape).
+  const regionRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLSelectElement>(null);
+  // One polite status message per verdict action (visually hidden).
+  const [announcement, setAnnouncement] = useState("");
 
   const { decisions, criteria } = result;
   const total = decisions.length;
@@ -403,7 +409,14 @@ function ScreeningResultsTable({
     if (activeIdx >= visible.length) setActiveIdx(visible.length - 1);
   }, [activeIdx, visible.length]);
 
+  // Record a verdict and announce its effect once (keyboard and button paths share this).
+  function recordVerdict(pos: number, idx: number, verdict: Verdict | null) {
+    onOverride(idx, verdict);
+    setAnnouncement(announceVerdict(pos + 1, sorted.length, verdict));
+  }
+
   // Keyboard speed mode (Covidence-style): j/k navigate, y/n/u verdict, r reasoning.
+  // Scoped to the results region so page scrolling elsewhere is untouched.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       // Never hijack typing in form fields.
@@ -411,30 +424,42 @@ function ScreeningResultsTable({
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      if (e.key === "j" || e.key === "ArrowDown") {
+      const action = parseSpeedModeKey(e.key);
+      if (!action) return;
+      const inScope = isKeyInScope({
+        insideRegion: !!(t && regionRef.current?.contains(t)),
+        targetIsBody: t === document.body,
+        hasActiveRow: activeIdx >= 0,
+      });
+      if (!inScope) return;
+
+      if (action.kind === "move") {
         e.preventDefault();
-        setActiveIdx((i) => Math.min(i + 1, visible.length - 1));
-      } else if (e.key === "k" || e.key === "ArrowUp") {
+        setActiveIdx((i) => action.delta === 1 ? Math.min(i + 1, visible.length - 1) : Math.max(i - 1, 0));
+      } else if (action.kind === "escape") {
+        if (activeIdx < 0) return;
         e.preventDefault();
-        setActiveIdx((i) => Math.max(i - 1, 0));
+        setActiveIdx(-1);
+        toolbarRef.current?.focus();
       } else if (activeIdx >= 0 && activeIdx < visible.length) {
         const { d, idx } = visible[activeIdx];
-        if (e.key === "y") onOverride(idx, d.human_decision === "include" ? null : "include");
-        else if (e.key === "n") onOverride(idx, d.human_decision === "exclude" ? null : "exclude");
-        else if (e.key === "u") onOverride(idx, d.human_decision === "uncertain" ? null : "uncertain");
-        else if (e.key === "r") setExpandedIndex((cur) => (cur === idx ? null : idx));
+        if (action.kind === "verdict") recordVerdict(activeIdx, idx, toggleVerdict(d.human_decision, action.verdict));
+        else setExpandedIndex((cur) => (cur === idx ? null : idx));
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [visible, activeIdx, onOverride]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, activeIdx, onOverride, sorted.length]);
 
   // Keep the active row in view while navigating with the keyboard.
   useEffect(() => {
     if (activeIdx < 0 || activeIdx >= visible.length) return;
-    document
-      .getElementById(`screening-row-${visible[activeIdx].idx}`)
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const row = document.getElementById(`screening-row-${visible[activeIdx].idx}`);
+    row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // Keep DOM focus on the active row if focus is already inside the list.
+    if (row && regionRef.current?.contains(document.activeElement) && document.activeElement !== row
+        && document.activeElement?.getAttribute("role") === "listitem") row.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx]);
 
@@ -530,6 +555,7 @@ function ScreeningResultsTable({
           aria-label="Search screened records"
         />
         <select
+          ref={toolbarRef}
           value={sortMode}
           onChange={(e) => setSortMode(e.target.value as SortMode)}
           className="text-xs px-2 py-1.5 rounded-md focus:outline-none"
@@ -550,6 +576,12 @@ function ScreeningResultsTable({
           style={{ color: "var(--accent)", background: "var(--surface-2)", border: "1px solid var(--border)" }}
         >
           Speed mode
+        </span>
+        <span className="mr-1">
+          {activeIdx >= 0 && activeIdx < visible.length
+            ? `Row ${(activeIdx + 1).toLocaleString("en-US")} of ${sorted.length.toLocaleString("en-US")}`
+            : "Press j to start"}
+          {" · "}
         </span>
         <Kbd>j</Kbd>/<Kbd>k</Kbd> navigate · <Kbd>y</Kbd> include · <Kbd>n</Kbd> exclude · <Kbd>u</Kbd> uncertain · <Kbd>r</Kbd> reasoning
       </p>
@@ -606,7 +638,8 @@ function ScreeningResultsTable({
       </details>
 
       {/* Results list */}
-      <div className="space-y-2">
+      <div className="sr-only" role="status" aria-live="polite">{announcement}</div>
+      <div className="space-y-2" role="list" ref={regionRef} aria-label="Screened records">
         {sorted.length === 0 ? (
           <p className="text-sm text-center py-4" style={{ color: "var(--muted)" }}>
             {q
@@ -629,12 +662,16 @@ function ScreeningResultsTable({
               <div
                 key={idx}
                 id={`screening-row-${idx}`}
+                role="listitem"
+                tabIndex={pos === (activeIdx >= 0 ? activeIdx : 0) ? 0 : -1}
+                aria-current={isActive ? "true" : undefined}
                 onClick={() => setActiveIdx(pos)}
+                onFocus={(e) => { if (e.target === e.currentTarget) setActiveIdx(pos); }}
                 className="rounded-md px-3 py-2.5 cursor-pointer"
                 style={{
                   background: "var(--surface)",
                   borderLeft: `2px solid ${tone.color}`,
-                  outline: isActive ? "2px solid var(--accent)" : "none",
+                  outline: isActive ? "2px solid var(--ring)" : "none",
                   outlineOffset: "1px",
                 }}
               >
@@ -702,7 +739,7 @@ function ScreeningResultsTable({
                             <button
                               key={v}
                               type="button"
-                              onClick={() => onOverride(idx, isActive ? null : v)}
+                              onClick={() => recordVerdict(pos, idx, isActive ? null : v)}
                               className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold transition-opacity [--tw-ring-offset-color:var(--surface)] ${isActive ? "ring-2 ring-offset-1 ring-current" : "opacity-70 hover:opacity-100"}`}
                               style={toneBadgeStyle(v)}
                               title={isActive ? "Click to revert to the AI decision" : `Set your verdict: ${DECISION_TONES[v].label}`}
