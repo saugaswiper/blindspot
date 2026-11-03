@@ -1,0 +1,200 @@
+{
+ "CD011218": {
+  "n": 690,
+  "includes": 14,
+  "noAbstract": 16,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD012268": {
+  "n": 4586,
+  "includes": 18,
+  "noAbstract": 85,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013042": {
+  "n": 1005,
+  "includes": 27,
+  "noAbstract": 60,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013059": {
+  "n": 5441,
+  "includes": 17,
+  "noAbstract": 94,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013071": {
+  "n": 9962,
+  "includes": 52,
+  "noAbstract": 859,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013197": {
+  "n": 2464,
+  "includes": 43,
+  "noAbstract": 69,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013199": {
+  "n": 2238,
+  "includes": 16,
+  "noAbstract": 469,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013295": {
+  "n": 3137,
+  "includes": 115,
+  "noAbstract": 252,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013358": {
+  "n": 3542,
+  "includes": 99,
+  "noAbstract": 325,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013377": {
+  "n": 5955,
+  "includes": 10,
+  "noAbstract": 390,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013421": {
+  "n": 2400,
+  "includes": 23,
+  "noAbstract": 89,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013590": {
+  "n": 1852,
+  "includes": 28,
+  "noAbstract": 178,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013591": {
+  "n": 10958,
+  "includes": 20,
+  "noAbstract": 217,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013822": {
+  "n": 10314,
+  "includes": 18,
+  "noAbstract": 607,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD013880": {
+  "n": 11642,
+  "includes": 43,
+  "noAbstract": 360,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD014715": {
+  "n": 49162,
+  "includes": 133,
+  "noAbstract": 912,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD014736": {
+  "n": 6128,
+  "includes": 8,
+  "noAbstract": 115,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD015038": {
+  "n": 2196,
+  "includes": 14,
+  "noAbstract": 315,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD015042": {
+  "n": 3057,
+  "includes": 9,
+  "noAbstract": 62,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD015067": {
+  "n": 2068,
+  "includes": 12,
+  "noAbstract": 162,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD015306": {
+  "n": 1671,
+  "includes": 6,
+  "noAbstract": 245,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ },
+ "CD015432": {
+  "n": 2036,
+  "includes": 43,
+  "noAbstract": 167,
+  "labelValues": [
+   "False",
+   "True"
+  ]
+ }
+}
