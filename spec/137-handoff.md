@@ -23,3 +23,6 @@
 
 ## Stale wiki pages
 ML Layer / Roadmap & Status: `fit` is faster (exact change); latency at n≈3,000 is still unconfirmed against the 300 ms target.
+
+## Operator note (2026-11-03)
+The committed `spec/benchmarks/015-setb-scorecard.json` was a 2-review run. I replaced it with the operator sweep: the same script, seed 1, all 16 Set B reviews with n ≤ 6,000, run on handoff 135 code (rankings identical to this exact change). Mean per-call latency at n ≈ 3,000 in that file predates this speed-up. One CD013059 max of about 17 minutes is a machine sleep, not code. Still partial: 6 larger reviews, seeds 2–3, and conditions C, D and E.
