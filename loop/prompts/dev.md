@@ -9,6 +9,9 @@ Read first, in order, and STOP once you have enough (token discipline):
    fix-brief for a validation FAIL outranks feature briefs; next a brief marked `Priority: NEXT`; next a `Track: design` brief
    (designer-written UI slice); otherwise the lowest-numbered unimplemented one. If none, the
    top UNBLOCKED item from the Roadmap North-Star table.
+   A brief is IMPLEMENTED only if some spec/*-handoff.md names it (`grep -il "brief NNN" spec/*-handoff.md`);
+   a commit that merely adds the brief file ("merge: brief NNN") does NOT count. A brief partly
+   shipped (handoff lists deferred items) stays open — continue it before starting a later one.
 Read ONLY those wiki pages and the exact code files the brief names. Never sweep the codebase.
 
 Implement exactly ONE scoped stage, in the design-token system (no hardcoded colors).
