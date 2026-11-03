@@ -180,3 +180,18 @@ describe("rankRecords memoisation (brief 017 AC5)", () => {
     expect(rankRecords(grown, verdicts).map((r) => r.id)).toContain("z");
   });
 });
+
+describe("rankRecords active-term fit", () => {
+  it("is deterministic and ranks the matching record first", () => {
+    const recs = [
+      { id: "a", title: "ketamine depression trial", abstract: "randomised ketamine" },
+      { id: "b", title: "bridge engineering", abstract: "steel load" },
+      { id: "c", title: "ketamine randomised", abstract: "depression outcome" },
+      { id: "d", title: "steel bridge", abstract: "concrete" },
+    ];
+    const v = [{ id: "a", verdict: "include" as const }, { id: "b", verdict: "exclude" as const }];
+    const r1 = rankRecords(recs, v);
+    expect(rankRecords(recs, v)).toEqual(r1);
+    expect(r1.findIndex((r) => r.id === "c")).toBeLessThan(r1.findIndex((r) => r.id === "d"));
+  });
+});

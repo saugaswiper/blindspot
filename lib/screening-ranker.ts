@@ -107,8 +107,13 @@ function fit(x: SparseVec[], y: number[], dim: number, epochs = 200, lr = 1, l2 
   const grad = new Float64Array(dim);
   let b = 0;
   const m = x.length;
+  // Terms absent from every training row keep zero gradient and zero weight
+  // (zero init, L2 decay of 0 is 0), so updating only the active terms is exact.
+  const seen = new Uint8Array(dim);
+  const active: number[] = [];
+  for (const { idx } of x) for (let j = 0; j < idx.length; j++) if (!seen[idx[j]]) { seen[idx[j]] = 1; active.push(idx[j]); }
   for (let e = 0; e < epochs; e++) {
-    grad.fill(0);
+    for (let a = 0; a < active.length; a++) grad[active[a]] = 0;
     let gb = 0;
     for (let i = 0; i < m; i++) {
       const { idx, val } = x[i];
@@ -119,7 +124,10 @@ function fit(x: SparseVec[], y: number[], dim: number, epochs = 200, lr = 1, l2 
       for (let j = 0; j < idx.length; j++) grad[idx[j]] += err * val[j];
     }
     b -= (lr * gb) / m;
-    for (let t = 0; t < dim; t++) w[t] -= lr * (grad[t] / m + l2 * w[t]);
+    for (let a = 0; a < active.length; a++) {
+      const t = active[a];
+      w[t] -= lr * (grad[t] / m + l2 * w[t]);
+    }
   }
   return { w, b };
 }
