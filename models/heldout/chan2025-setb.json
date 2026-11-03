@@ -1,0 +1,34 @@
+{
+  "purpose": "Held-out reviews: never train on these, including other versions of the same CD number.",
+  "dataset": {
+    "doi": "10.17632/7sgmg89zb6.1",
+    "file": "20240827_Systematic_review_manual_search_data.zip",
+    "sha256": "649d89336b68f314f6177ef90a2da274e22e7c755a3729634b574698362e48d3",
+    "license": "CC BY 4.0",
+    "citation": "Chan, He, Leung, Verspoor 2025, Research Synthesis Methods, doi:10.1017/rsm.2025.1"
+  },
+  "reviewIds": [
+    "CD011218",
+    "CD012268",
+    "CD013042",
+    "CD013059",
+    "CD013071",
+    "CD013197",
+    "CD013199",
+    "CD013295",
+    "CD013358",
+    "CD013377",
+    "CD013421",
+    "CD013590",
+    "CD013591",
+    "CD013822",
+    "CD013880",
+    "CD014715",
+    "CD014736",
+    "CD015038",
+    "CD015042",
+    "CD015067",
+    "CD015306",
+    "CD015432"
+  ]
+}
