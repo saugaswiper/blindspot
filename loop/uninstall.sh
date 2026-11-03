@@ -2,7 +2,7 @@
 # Remove the loop's launchd jobs (stops all scheduled runs).
 set -uo pipefail
 LA="$HOME/Library/LaunchAgents"
-for role in planner dev tester librarian; do
+for role in planner dev tester designer librarian; do
   label="com.blindspot.loop.$role"
   launchctl unload "$LA/$label.plist" 2>/dev/null || true
   rm -f "$LA/$label.plist"
