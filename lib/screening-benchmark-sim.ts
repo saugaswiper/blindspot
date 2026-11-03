@@ -3,7 +3,7 @@
  * Replays a review with known labels: random order (A), or `rankRecords` active
  * learning (B) with the validation 015 protocol. Reports metrics only, never record text.
  */
-import { rankRecords, estimateRecall, type RankRecord } from "@/lib/screening-ranker";
+import { rankRecords, estimateRecall, stoppingTest, type RankRecord } from "@/lib/screening-ranker";
 import { wss, recallAtK } from "@/lib/screening-benchmark";
 
 export function rng(seed: number): () => number {
@@ -84,6 +84,8 @@ export interface ActiveRun {
   order: boolean[];
   /** Stop point of brief 013's `estimateRecall` lower bound reaching 0.95; null if never. */
   stop: { screenedFrac: number; trueRecall: number; lowerHeld: boolean } | null;
+  /** First point where `stoppingTest` (hypergeometric, brief 017) says stop; null if never. */
+  hgStop: { screenedFrac: number; trueRecall: number; targetMet: boolean } | null;
   rankCalls: number;
   rankMsTotal: number;
   rankMsMax: number;
@@ -103,6 +105,7 @@ export function activeLearningRun(records: RankRecord[], labels: boolean[], seed
   const verdicts = new Map<number, "include" | "exclude">(order.map((i) => [i, labels[i] ? "include" : "exclude"]));
   const batch = Math.max(10, Math.ceil(n / 60));
   let stop: ActiveRun["stop"] = null;
+  let hgStop: ActiveRun["hgStop"] = null;
   let rankCalls = 0;
   let rankMsTotal = 0;
   let rankMsMax = 0;
@@ -125,6 +128,10 @@ export function activeLearningRun(records: RankRecord[], labels: boolean[], seed
         stop = { screenedFrac: order.length / n, trueRecall, lowerHeld: e.lower <= trueRecall + 1e-9 };
       }
     }
+    if (!hgStop && stoppingTest(order.map((i) => labels[i]), n).stop) {
+      const trueRecall = total ? order.filter((i) => labels[i]).length / total : 1;
+      hgStop = { screenedFrac: order.length / n, trueRecall, targetMet: trueRecall >= 0.95 };
+    }
     const next = unl.slice(0, batch);
     audit = next.map((r) => ({ score: r.score, include: labels[Number(r.id)] }));
     for (const r of next) {
@@ -133,5 +140,5 @@ export function activeLearningRun(records: RankRecord[], labels: boolean[], seed
       verdicts.set(i, labels[i] ? "include" : "exclude");
     }
   }
-  return { order: order.map((i) => labels[i]), stop, rankCalls, rankMsTotal, rankMsMax };
+  return { order: order.map((i) => labels[i]), stop, hgStop, rankCalls, rankMsTotal, rankMsMax };
 }
