@@ -44,50 +44,82 @@ function termCounts(r: RankRecord): Map<string, number> {
   return counts;
 }
 
-type SparseVec = Map<string, number>;
+/** Sparse row: parallel term-index / weight arrays. */
+interface SparseVec {
+  idx: Int32Array;
+  val: Float64Array;
+}
 
-function vectorize(records: RankRecord[]): SparseVec[] {
+interface Vectorized {
+  rows: SparseVec[];
+  dim: number;
+}
+
+function vectorize(records: RankRecord[]): Vectorized {
   const docs = records.map(termCounts);
   const df = new Map<string, number>();
-  for (const d of docs) for (const t of d.keys()) df.set(t, (df.get(t) ?? 0) + 1);
+  const index = new Map<string, number>();
+  for (const d of docs) {
+    for (const t of d.keys()) {
+      df.set(t, (df.get(t) ?? 0) + 1);
+      if (!index.has(t)) index.set(t, index.size);
+    }
+  }
   const n = records.length;
-  return docs.map((d) => {
-    const v: SparseVec = new Map();
+  const rows = docs.map((d) => {
+    const idx = new Int32Array(d.size);
+    const val = new Float64Array(d.size);
     let norm = 0;
+    let k = 0;
     for (const [t, c] of d) {
       const w = (1 + Math.log(c)) * (Math.log((1 + n) / (1 + (df.get(t) ?? 0))) + 1);
-      v.set(t, w);
+      idx[k] = index.get(t)!;
+      val[k++] = w;
       norm += w * w;
     }
     norm = Math.sqrt(norm) || 1;
-    for (const [t, w] of v) v.set(t, w / norm);
-    return v;
+    for (let j = 0; j < val.length; j++) val[j] /= norm;
+    return { idx, val };
   });
+  return { rows, dim: index.size };
+}
+
+// Vectors depend only on the records, and a review calls rankRecords ~60 times
+// on the same array. Memoise per array instance; treat arrays as immutable
+// (the length guard catches the common push/splice mutation).
+const vectorCache = new WeakMap<RankRecord[], Vectorized & { n: number }>();
+
+function vectorizeCached(records: RankRecord[]): Vectorized {
+  const hit = vectorCache.get(records);
+  if (hit && hit.n === records.length) return hit;
+  const v = { ...vectorize(records), n: records.length };
+  vectorCache.set(records, v);
+  return v;
 }
 
 /**
  * Fit logistic regression by batch gradient descent with L2 regularisation.
- * Fixed iteration count and zero init keep it fully deterministic.
+ * Fixed iteration count and zero init keep it fully deterministic. Weights live
+ * in a dense Float64Array over the term index.
  */
-function fit(x: SparseVec[], y: number[], epochs = 200, lr = 1, l2 = 0.01) {
-  const w = new Map<string, number>();
+function fit(x: SparseVec[], y: number[], dim: number, epochs = 200, lr = 1, l2 = 0.01) {
+  const w = new Float64Array(dim);
+  const grad = new Float64Array(dim);
   let b = 0;
   const m = x.length;
   for (let e = 0; e < epochs; e++) {
-    const grad = new Map<string, number>();
+    grad.fill(0);
     let gb = 0;
     for (let i = 0; i < m; i++) {
+      const { idx, val } = x[i];
       let z = b;
-      for (const [t, v] of x[i]) z += (w.get(t) ?? 0) * v;
+      for (let j = 0; j < idx.length; j++) z += w[idx[j]] * val[j];
       const err = 1 / (1 + Math.exp(-z)) - y[i];
       gb += err;
-      for (const [t, v] of x[i]) grad.set(t, (grad.get(t) ?? 0) + err * v);
+      for (let j = 0; j < idx.length; j++) grad[idx[j]] += err * val[j];
     }
     b -= (lr * gb) / m;
-    for (const [t, g] of grad) {
-      const cur = w.get(t) ?? 0;
-      w.set(t, cur - lr * (g / m + l2 * cur));
-    }
+    for (let t = 0; t < dim; t++) w[t] -= lr * (grad[t] / m + l2 * w[t]);
   }
   return { w, b };
 }
@@ -103,21 +135,22 @@ export function rankRecords(records: RankRecord[], verdicts: RankVerdict[] = [])
   const hasExc = verdicts.some((v) => v.verdict === "exclude");
   if (!hasInc || !hasExc) return records.map((r) => ({ id: r.id, score: 0.5 }));
 
-  const vecs = vectorize(records);
+  const { rows, dim } = vectorizeCached(records);
   const trainX: SparseVec[] = [];
   const trainY: number[] = [];
   records.forEach((r, i) => {
     const v = known.get(r.id);
     if (v) {
-      trainX.push(vecs[i]);
+      trainX.push(rows[i]);
       trainY.push(v === "include" ? 1 : 0);
     }
   });
-  const { w, b } = fit(trainX, trainY);
+  const { w, b } = fit(trainX, trainY, dim);
 
   const scored = records.map((r, i) => {
     let z = b;
-    for (const [t, v] of vecs[i]) z += (w.get(t) ?? 0) * v;
+    const { idx, val } = rows[i];
+    for (let j = 0; j < idx.length; j++) z += w[idx[j]] * val[j];
     return { id: r.id, score: 1 / (1 + Math.exp(-z)), i };
   });
   // Stable: ties keep input order.
