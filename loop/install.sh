@@ -1,6 +1,6 @@
 #!/bin/bash
 # Install the loop as macOS launchd jobs (run while you're logged in; survive reboots).
-# Times are LOCAL. Schedule: planner Mon 08:57, dev 09:07, tester 12:07, librarian 13:07.
+# Times are LOCAL. Schedule: planner Mon 08:57, dev 09:07, tester 12:07, designer Wed 10:37, librarian 13:07.
 set -euo pipefail
 LA="$HOME/Library/LaunchAgents"
 RUN="/Users/dharmayudesai/blindspot/loop/run.sh"
@@ -37,5 +37,6 @@ EOF
 plist planner   8 57 1     # Monday
 plist dev       9  7
 plist tester    12 7
+plist designer  10 37 3   # Wednesday
 plist librarian 13 7
 echo "Done. Logs: /Users/dharmayudesai/blindspot/loop/logs/  ·  disable: loop/uninstall.sh"

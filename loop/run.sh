@@ -4,7 +4,7 @@
 # push a branch (you merge); the librarian pushes the wiki directly (single writer).
 set -uo pipefail
 
-ROLE="${1:?usage: run.sh <planner|dev|tester|librarian>}"
+ROLE="${1:?usage: run.sh <planner|dev|tester|designer|librarian>}"
 CODE="/Users/dharmayudesai/blindspot"
 WIKI="/Users/dharmayudesai/blindspot wiki"
 CLAUDE="/Users/dharmayudesai/.local/bin/claude"
@@ -18,6 +18,7 @@ case "$ROLE" in
   planner)   MODEL="claude-sonnet-5-5";;
   dev)       MODEL="claude-sonnet-5-5";;
   tester)    MODEL="claude-sonnet-5-5";;
+  designer)  MODEL="claude-sonnet-5-5";;
   librarian) MODEL="claude-haiku-4-5-20251001";;
   *) echo "unknown role: $ROLE" >&2; exit 2;;
 esac
@@ -111,12 +112,12 @@ else
     echo "[$(date)] $ROLE: agent left HEAD on $(git rev-parse --abbrev-ref HEAD) — returning to main" >>"$LOG"
     git checkout -q main >>"$LOG" 2>&1 || { echo "[$(date)] $ROLE: cannot return to main — aborting, tree left as-is" >>"$LOG"; exit 1; }
   fi
-  # Role write scope: planner only spec/briefs/, tester only spec/validation/.
-  case "$ROLE" in planner) SCOPE="spec/briefs/";; tester) SCOPE="spec/validation/";; *) SCOPE="";; esac
+  # Role write scope: planner spec/briefs/, tester spec/validation/, designer spec/briefs|design/.
+  case "$ROLE" in planner) SCOPE="^spec/briefs/";; tester) SCOPE="^spec/validation/";; designer) SCOPE="^spec/(briefs|design)/";; *) SCOPE="";; esac
   if [ -n "$SCOPE" ]; then
-    git diff HEAD --name-only | grep -v "^$SCOPE" | while read -r f; do
+    git diff HEAD --name-only | grep -vE "$SCOPE" | while read -r f; do
       echo "[$(date)] $ROLE: out-of-scope change dropped: $f" >>"$LOG"; git restore --source=HEAD --staged --worktree -- "$f"; done
-    git ls-files --others --exclude-standard | grep -v "^$SCOPE" | while read -r f; do
+    git ls-files --others --exclude-standard | grep -vE "$SCOPE" | while read -r f; do
       echo "[$(date)] $ROLE: out-of-scope file dropped: $f" >>"$LOG"; rm -f "$f"; done
   fi
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then

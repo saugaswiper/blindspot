@@ -6,7 +6,8 @@ handles git.
 Read first, in order, and STOP once you have enough (token discipline):
 1. The wiki's CLAUDE.md, Meta/Autonomous Loop.md, Meta/Roadmap & Status.md.
 2. The highest-PRIORITY open brief in spec/briefs/ — skip any brief whose Status says QUEUED; a
-   fix-brief for a validation FAIL outranks feature briefs; next a brief marked `Priority: NEXT`; otherwise the lowest-numbered unimplemented one. If none, the
+   fix-brief for a validation FAIL outranks feature briefs; next a brief marked `Priority: NEXT`; next a `Track: design` brief
+   (designer-written UI slice); otherwise the lowest-numbered unimplemented one. If none, the
    top UNBLOCKED item from the Roadmap North-Star table.
 Read ONLY those wiki pages and the exact code files the brief names. Never sweep the codebase.
 
