@@ -106,6 +106,9 @@ export function activeLearningRun(records: RankRecord[], labels: boolean[], seed
   let rankCalls = 0;
   let rankMsTotal = 0;
   let rankMsMax = 0;
+  // Out-of-sample audit for estimateRecall (handoff 129): the previous batch's scores
+  // from BEFORE it was screened, paired with its verdicts.
+  let audit: { score: number; include: boolean }[] = [];
   while (order.length < n) {
     const t0 = performance.now();
     const ranked = rankRecords(records, [...verdicts].map(([i, v]) => ({ id: String(i), verdict: v })));
@@ -116,13 +119,15 @@ export function activeLearningRun(records: RankRecord[], labels: boolean[], seed
     const unl = ranked.filter((r) => !verdicts.has(Number(r.id)));
     if (!stop) {
       const found = order.filter((i) => labels[i]).length;
-      const e = estimateRecall(found, unl.map((r) => r.score));
+      const e = estimateRecall(found, unl.map((r) => r.score), audit);
       if (e.lower >= 0.95) {
         const trueRecall = total ? found / total : 1;
         stop = { screenedFrac: order.length / n, trueRecall, lowerHeld: e.lower <= trueRecall + 1e-9 };
       }
     }
-    for (const r of unl.slice(0, batch)) {
+    const next = unl.slice(0, batch);
+    audit = next.map((r) => ({ score: r.score, include: labels[Number(r.id)] }));
+    for (const r of next) {
       const i = Number(r.id);
       order.push(i);
       verdicts.set(i, labels[i] ? "include" : "exclude");

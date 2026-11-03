@@ -25,3 +25,6 @@ Conditions C (protocol cold start), D (fusion), E (Gemini sample, AC6); DTA and 
 
 ## Stale wiki pages
 Roadmap & Status and Screening Model Plan (brief 015 slice 2 shipped; latency finding); ML Layer (new `lib/screening-benchmark-sim.ts`).
+
+## Operator review fix (2026-11-03)
+`activeLearningRun` now passes the previous batch (pre-screening score + verdict) as `audit` to `estimateRecall`, the intended path from handoff 129. Caveat for the tester: that batch is the top of the ranking, not a random sample, so the audit ratio (clamped at ≥ 1) rarely moves. The smoke result (stop never fires at n=690) is probably the conservative Poisson bound itself, not missing calibration.
