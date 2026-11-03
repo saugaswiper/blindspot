@@ -585,7 +585,9 @@ export async function getCachedTopicCounts(query: string): Promise<{
   cached: true;
 } | null> {
   try {
-    const supabase = await createClient();
+    // Server-only; RLS has no client policies on this table (counts must not be
+    // writable with the public anon key — cache poisoning).
+    const supabase = createServiceRoleClient();
     const queryHash = getQueryHash(query);
 
     const { data, error } = await supabase
@@ -625,7 +627,9 @@ export async function setCachedTopicCounts(
   openalexCount: number | null
 ): Promise<void> {
   try {
-    const supabase = await createClient();
+    // Server-only; RLS has no client policies on this table (counts must not be
+    // writable with the public anon key — cache poisoning).
+    const supabase = createServiceRoleClient();
     const queryHash = getQueryHash(query);
 
     // Upsert: insert or update if already exists (via UNIQUE constraint on query_hash)
@@ -656,7 +660,9 @@ export async function setCachedTopicCounts(
  */
 export async function invalidateTopicCache(query: string): Promise<void> {
   try {
-    const supabase = await createClient();
+    // Server-only; RLS has no client policies on this table (counts must not be
+    // writable with the public anon key — cache poisoning).
+    const supabase = createServiceRoleClient();
     const queryHash = getQueryHash(query);
 
     const { error } = await supabase
