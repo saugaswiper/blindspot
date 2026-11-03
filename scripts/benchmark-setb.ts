@@ -32,9 +32,10 @@ for (const f of readdirSync(dir).sort()) {
     reviewId: id, n, includes: labels.filter(Boolean).length, seeds,
     A, B,
     stop: runs.map((r) => r.stop),
+    hgStop: runs.map((r) => r.hgStop),
     latencyMs: { calls: runs[0].rankCalls, meanPerCall: runs[0].rankMsTotal / runs[0].rankCalls, max: runs[0].rankMsMax },
   });
-  console.log(`${id} n=${n} B wss95=${B.map((m) => m.wss95.toFixed(3)).join("/")}`);
+  console.log(`${id} n=${n} inc=${labels.filter(Boolean).length} B wss95=${B.map((m) => m.wss95.toFixed(3)).join("/")} hgStop=${JSON.stringify(runs.map((r) => r.hgStop))}`);
 }
 
 const meanOf = (key: "A" | "B", m: keyof ReturnType<typeof orderMetrics>) =>
