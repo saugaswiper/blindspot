@@ -195,6 +195,9 @@ function poissonUpperMean(k: number): number {
  * The expected-vs-observed include ratio then scales the unscreened mean up (never
  * down), with a Garwood upper limit on the observed count feeding the lower bound.
  * Never auto-excludes; the reviewer decides when to stop.
+ *
+ * @deprecated as a stopping signal (validation 016: the lower bound never reached 0.95 on
+ * Set B). Use `stoppingTest`. Kept exported for compatibility and comparison.
  */
 export function estimateRecall(
   foundIncludes: number,
@@ -221,6 +224,103 @@ export function estimateRecall(
     lower: rec(missedHi),
     upper: rec(missedLo),
     method: audit.length > 0 ? "poisson-audit-scaled" : "poisson-uncalibrated",
+    advisory: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hypergeometric stopping test (Callaghan & Müller-Hansen 2020, Syst Rev 9:273).
+// The paper's full text was not accessed; this is the test from first principles.
+//
+// Let s records be screened in ranked order. Take the last k as the sample and the
+// first s-k as "already reviewed" with d' includes. The population is the R = N-(s-k)
+// records not yet reviewed at that point; it holds M includes, x of them in the sample.
+// H0: recall at s-k is below target t, i.e. d'/(d'+M) < t, i.e. M >= M0 = floor(d'(1-t)/t)+1.
+// Under H0 and a random sample, X ~ Hypergeometric(R, M, k), so
+//   p = max over M >= M0 of P(X <= x) = P(X <= x | M0)   (the tail shrinks as M grows).
+// Reject H0 (stop) when p < alpha. The last k of a ranked list are the likeliest
+// includes of the tail, so x is biased upward and the test errs towards not stopping.
+// ---------------------------------------------------------------------------
+
+export interface StoppingOptions {
+  /** Recall to certify (default 0.95). */
+  target?: number;
+  /** Significance level (default 0.05). */
+  alpha?: number;
+  /** Never stop before this share of the pool is screened (default 0.2). */
+  minScreenedFrac?: number;
+  /** Sample size k as a share of the pool (default 0.1). */
+  kFrac?: number;
+}
+
+export interface StoppingResult {
+  stop: boolean;
+  /** P(X <= x) under the least favourable H0 (recall just below target). */
+  p: number;
+  /** One-sided (1-alpha) lower bound on recall at the start of the sample; 0 if untestable. */
+  recallLowerBound: number;
+  kUsed: number;
+  method: "hypergeometric-cmh2020";
+  advisory: true;
+}
+
+const logFactCache: number[] = [0];
+function logFact(n: number): number {
+  for (let i = logFactCache.length; i <= n; i++) logFactCache.push(logFactCache[i - 1] + Math.log(i));
+  return logFactCache[n];
+}
+function logChoose(n: number, r: number): number {
+  return r < 0 || r > n ? -Infinity : logFact(n) - logFact(r) - logFact(n - r);
+}
+
+/** P(X <= x) for X ~ Hypergeometric(population R, M successes, k draws). */
+export function hypergeomCdf(x: number, R: number, M: number, k: number): number {
+  const denom = logChoose(R, k);
+  let sum = 0;
+  for (let j = 0; j <= Math.min(x, M, k); j++) {
+    const lp = logChoose(M, j) + logChoose(R - M, k - j) - denom;
+    if (lp > -Infinity) sum += Math.exp(lp);
+  }
+  return Math.min(1, sum);
+}
+
+/**
+ * Advisory statistical stopping test. `screenedInOrder[i]` is the human verdict
+ * (true = include) of the i-th screened record; `nTotal` is the pool size.
+ * Never auto-excludes.
+ */
+export function stoppingTest(
+  screenedInOrder: boolean[],
+  nTotal: number,
+  { target = 0.95, alpha = 0.05, minScreenedFrac = 0.2, kFrac = 0.1 }: StoppingOptions = {}
+): StoppingResult {
+  const s = screenedInOrder.length;
+  const k = Math.max(1, Math.ceil(kFrac * nTotal));
+  const none: StoppingResult = { stop: false, p: 1, recallLowerBound: 0, kUsed: k, method: "hypergeometric-cmh2020", advisory: true };
+  if (s < minScreenedFrac * nTotal || s <= k || s > nTotal) return none;
+  let x = 0;
+  for (let i = s - k; i < s; i++) if (screenedInOrder[i]) x++;
+  let dPrev = 0;
+  for (let i = 0; i < s - k; i++) if (screenedInOrder[i]) dPrev++;
+  const R = nTotal - (s - k);
+  if (dPrev === 0) return none;
+  const M0 = Math.floor((dPrev * (1 - target)) / target) + 1;
+  if (M0 > R) return none; // cannot even hold M0 includes
+  const p = hypergeomCdf(x, R, Math.max(M0, x), k);
+  // Largest M still compatible with x at level alpha (p(M) decreases in M).
+  let lo = x;
+  let hi = R;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (hypergeomCdf(x, R, mid, k) >= alpha) lo = mid;
+    else hi = mid - 1;
+  }
+  return {
+    stop: p < alpha,
+    p,
+    recallLowerBound: dPrev / (dPrev + lo),
+    kUsed: k,
+    method: "hypergeometric-cmh2020",
     advisory: true,
   };
 }

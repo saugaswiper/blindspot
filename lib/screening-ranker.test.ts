@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { estimateRecall, rankRecords, type RankRecord } from "@/lib/screening-ranker";
+import { estimateRecall, hypergeomCdf, stoppingTest, rankRecords, type RankRecord } from "@/lib/screening-ranker";
 import { recallAtK, splitHasNoOverlap, wss } from "@/lib/screening-benchmark";
 
 const recs: RankRecord[] = [
@@ -117,5 +117,33 @@ describe("benchmark metrics", () => {
   it("split overlap check", () => {
     expect(splitHasNoOverlap(["r1", "r2"], ["r3"])).toBe(true);
     expect(splitHasNoOverlap(["r1", "r2"], ["r2"])).toBe(false);
+  });
+});
+
+describe("stoppingTest (hypergeometric)", () => {
+  const head = (d: number, len: number) => Array.from({ length: len }, (_, i) => i < d);
+  it("matches hand-computed hypergeometric values", () => {
+    // R=10, M=2, k=3: P(X=0)=C(8,3)/C(10,3)=56/120; P(X<=1)=112/120
+    expect(hypergeomCdf(0, 10, 2, 3)).toBeCloseTo(56 / 120, 10);
+    expect(hypergeomCdf(1, 10, 2, 3)).toBeCloseTo(112 / 120, 10);
+  });
+  it("never stops before the minimum screened fraction", () => {
+    const r = stoppingTest(head(50, 150), 1000); // 15% < 20%, all-negative-looking tail
+    expect(r.stop).toBe(false);
+    expect(r.method).toBe("hypergeometric-cmh2020");
+  });
+  it("stops on an all-negative tail once enough is screened", () => {
+    const n = 1000;
+    expect(stoppingTest(head(400, 500), n).stop).toBe(true);
+    expect(stoppingTest(head(400, 500), n).recallLowerBound).toBeGreaterThan(0);
+  });
+  it("an include in the last k blocks the stop", () => {
+    const n = 1000;
+    const seq = head(400, 500);
+    seq[499] = true;
+    expect(stoppingTest(seq, n).stop).toBe(false);
+  });
+  it("cannot stop with too few includes found", () => {
+    expect(stoppingTest(head(5, 300), 1000).stop).toBe(false);
   });
 });
