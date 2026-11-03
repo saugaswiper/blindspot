@@ -155,3 +155,28 @@ describe("stoppingTest (hypergeometric)", () => {
     expect(stoppingTest(head(400, 500).map((v, i) => v || i % 5 === 0), 1000).reason).toBe("insufficient-sample");
   });
 });
+
+describe("rankRecords memoisation (brief 017 AC5)", () => {
+  it("gives identical order and scores on a cached array and a fresh copy", () => {
+    const verdicts = [
+      { id: "a", verdict: "include" as const },
+      { id: "b", verdict: "exclude" as const },
+    ];
+    const first = rankRecords(recs, verdicts);
+    const second = rankRecords(recs, verdicts); // vectors served from cache
+    const fresh = rankRecords(recs.map((r) => ({ ...r })), verdicts); // new array, no cache
+    expect(second).toEqual(first);
+    expect(fresh).toEqual(first);
+  });
+
+  it("re-vectorises when the array grows", () => {
+    const grown = recs.slice();
+    const verdicts = [
+      { id: "a", verdict: "include" as const },
+      { id: "b", verdict: "exclude" as const },
+    ];
+    rankRecords(grown, verdicts);
+    grown.push({ id: "z", title: "Ketamine depression", abstract: "trial" });
+    expect(rankRecords(grown, verdicts).map((r) => r.id)).toContain("z");
+  });
+});
